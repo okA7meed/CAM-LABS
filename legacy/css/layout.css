@@ -1,0 +1,695 @@
+/* ==========================================================================
+   CAM LABS — Main Website Layout Styles
+   Header, Hero, Services, Workflow, Capabilities, CTA & Footer
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. Header & Navigation System
+   -------------------------------------------------------------------------- */
+.cam-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--header-height);
+  background-color: rgba(10, 10, 10, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--cam-border-subtle);
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.cam-header.scrolled {
+  background-color: rgba(10, 10, 10, 0.95);
+  border-bottom-color: var(--cam-border-medium);
+  box-shadow: var(--shadow-md);
+}
+
+.header-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.brand-wrapper {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  text-decoration: none;
+}
+
+.brand-logo {
+  height: 36px;
+  width: auto;
+  display: block;
+}
+
+.network-status-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: var(--cam-surface-1);
+  border: 1px solid var(--cam-border-subtle);
+  border-radius: var(--radius-full);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: var(--cam-text-muted);
+}
+
+.network-status-badge .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--cam-success);
+}
+
+.desktop-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.nav-link {
+  padding: 0.5rem 0.875rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--cam-text-secondary);
+  border-radius: var(--radius-sm);
+  transition: color var(--transition-fast), background-color var(--transition-fast);
+  cursor: pointer;
+}
+
+.nav-link:hover {
+  color: var(--cam-text-primary);
+  background-color: var(--cam-surface-1);
+}
+
+.nav-link.active {
+  color: var(--cam-blue-primary);
+  font-weight: 600;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.persona-select-btn {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  padding: 0.4rem 0.75rem;
+  background: var(--cam-surface-2);
+  border: 1px solid var(--cam-border-medium);
+  color: var(--cam-text-secondary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.persona-select-btn:hover {
+  border-color: var(--cam-blue-primary);
+  color: var(--cam-text-primary);
+}
+
+/* Mobile Hamburger & Drawer */
+.mobile-nav-toggle {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--cam-text-primary);
+  cursor: pointer;
+  padding: 6px;
+}
+
+.mobile-menu-drawer {
+  position: fixed;
+  top: var(--header-height);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--cam-bg);
+  border-top: 1px solid var(--cam-border-subtle);
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  transform: translateY(-100%);
+  opacity: 0;
+  pointer-events: none;
+  transition: all var(--transition-base);
+  z-index: 490;
+  overflow-y: auto;
+}
+
+.mobile-menu-drawer.open {
+  transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.mobile-nav-link {
+  font-size: 1.125rem;
+  font-weight: 600;
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--cam-border-subtle);
+  color: var(--cam-text-primary);
+}
+
+@media (max-width: 1024px) {
+  .desktop-nav {
+    display: none;
+  }
+  .network-status-badge {
+    display: none;
+  }
+  .mobile-nav-toggle {
+    display: flex;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   2. Hero Section & Interactive CAD Showcase
+   -------------------------------------------------------------------------- */
+.hero-section {
+  position: relative;
+  padding-top: calc(var(--header-height) + var(--space-12));
+  padding-bottom: var(--space-16);
+  overflow: hidden;
+}
+
+.hero-grid {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: var(--space-12);
+  align-items: center;
+}
+
+@media (max-width: 1024px) {
+  .hero-grid {
+    grid-template-columns: 1fr;
+    gap: var(--space-10);
+  }
+}
+
+.hero-content {
+  position: relative;
+  z-index: 10;
+}
+
+.hero-badge-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+  flex-wrap: wrap;
+}
+
+.hero-title {
+  font-size: clamp(2.5rem, 5vw, 3.875rem);
+  font-weight: 900;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  margin-bottom: var(--space-6);
+}
+
+.hero-title-highlight {
+  color: var(--cam-blue-primary);
+  position: relative;
+  display: inline-block;
+}
+
+.hero-description {
+  font-size: 1.1875rem;
+  color: var(--cam-text-secondary);
+  line-height: 1.6;
+  max-width: 580px;
+  margin-bottom: var(--space-8);
+}
+
+.hero-cta-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-10);
+}
+
+.hero-metrics-ticker {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-4);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--cam-border-subtle);
+}
+
+@media (max-width: 640px) {
+  .hero-metrics-ticker {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-4);
+  }
+}
+
+.hero-metric-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.hero-metric-val {
+  font-family: var(--font-mono);
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: var(--cam-text-primary);
+}
+
+.hero-metric-label {
+  font-size: 0.75rem;
+  color: var(--cam-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Hero 3D CAD Showcase Stage */
+.hero-cad-stage {
+  position: relative;
+  width: 100%;
+  background: var(--cam-surface-1);
+  border: 1px solid var(--cam-border-medium);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-xl);
+}
+
+.cad-stage-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  background-color: var(--cam-surface-2);
+  border-bottom: 1px solid var(--cam-border-subtle);
+}
+
+.cad-part-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--cam-text-secondary);
+}
+
+.cad-controls-hud {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.hud-btn {
+  background: transparent;
+  border: 1px solid var(--cam-border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--cam-text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  padding: 3px 8px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.hud-btn:hover, .hud-btn.active {
+  background-color: var(--cam-blue-subtle);
+  border-color: var(--cam-blue-primary);
+  color: var(--cam-blue-primary);
+}
+
+.cad-canvas-wrapper {
+  position: relative;
+  height: 380px;
+  width: 100%;
+  background: radial-gradient(circle at center, #1F2937 0%, #0A0A0A 80%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#hero-cad-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.cad-overlay-crosshairs {
+  position: absolute;
+  inset: var(--space-3);
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.cad-crosshair-row {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.cad-stage-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  background-color: var(--cam-surface-2);
+  border-top: 1px solid var(--cam-border-subtle);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+
+/* --------------------------------------------------------------------------
+   3. Manufacturing Services Section
+   -------------------------------------------------------------------------- */
+.services-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-6);
+}
+
+@media (max-width: 1024px) {
+  .services-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .services-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.service-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.service-icon-wrapper {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-sm);
+  background-color: var(--cam-blue-subtle);
+  border: 1px solid var(--cam-border-blue);
+  color: var(--cam-blue-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--space-4);
+}
+
+.service-tech-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: var(--space-3) 0 var(--space-4) 0;
+}
+
+.service-spec-matrix {
+  margin-top: auto;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--cam-border-subtle);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+  font-size: 0.75rem;
+}
+
+.spec-entry {
+  display: flex;
+  flex-direction: column;
+}
+
+.spec-key {
+  color: var(--cam-text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+}
+
+.spec-val {
+  color: var(--cam-text-primary);
+  font-weight: 600;
+  font-family: var(--font-mono);
+}
+
+/* --------------------------------------------------------------------------
+   4. How CAM LABS Works (Interactive 4-Stage Pipeline)
+   -------------------------------------------------------------------------- */
+.workflow-stepper-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-4);
+  position: relative;
+  margin-top: var(--space-8);
+}
+
+@media (max-width: 1024px) {
+  .workflow-stepper-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .workflow-stepper-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.step-card {
+  background-color: var(--cam-surface-1);
+  border: 1px solid var(--cam-border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-6);
+  position: relative;
+  transition: all var(--transition-fast);
+}
+
+.step-card:hover {
+  border-color: var(--cam-border-blue);
+  transform: translateY(-2px);
+}
+
+.step-number {
+  font-family: var(--font-mono);
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--cam-blue-primary);
+  line-height: 1;
+  margin-bottom: var(--space-3);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.step-icon {
+  width: 28px;
+  height: 28px;
+  color: var(--cam-text-muted);
+}
+
+.step-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--cam-text-primary);
+  margin-bottom: var(--space-2);
+}
+
+.step-desc {
+  font-size: 0.875rem;
+  color: var(--cam-text-muted);
+  line-height: 1.5;
+}
+
+/* --------------------------------------------------------------------------
+   5. Capabilities & Precision Assurance
+   -------------------------------------------------------------------------- */
+.capabilities-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-8);
+  align-items: center;
+}
+
+@media (max-width: 900px) {
+  .capabilities-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.capability-feature-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.capability-feature-item {
+  display: flex;
+  gap: var(--space-4);
+  background: var(--cam-surface-1);
+  border: 1px solid var(--cam-border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  align-items: flex-start;
+}
+
+.feature-icon-box {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  background: var(--cam-surface-2);
+  border: 1px solid var(--cam-border-medium);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cam-blue-primary);
+  flex-shrink: 0;
+}
+
+.inspection-report-mock {
+  background: var(--cam-surface-1);
+  border: 1px solid var(--cam-border-medium);
+  border-radius: var(--radius-md);
+  padding: var(--space-6);
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+}
+
+.report-header {
+  border-bottom: 1px solid var(--cam-border-subtle);
+  padding-bottom: var(--space-3);
+  margin-bottom: var(--space-4);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.report-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px dashed var(--cam-border-subtle);
+}
+
+/* --------------------------------------------------------------------------
+   6. Call to Action Banner
+   -------------------------------------------------------------------------- */
+.cta-banner {
+  background: linear-gradient(135deg, #111827 0%, #1F2937 50%, #0A0A0A 100%);
+  border: 1px solid var(--cam-border-blue);
+  border-radius: var(--radius-lg);
+  padding: var(--space-12) var(--space-8);
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--shadow-glow);
+}
+
+.cta-banner-content {
+  max-width: 680px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 2;
+}
+
+/* --------------------------------------------------------------------------
+   7. Footer
+   -------------------------------------------------------------------------- */
+.cam-footer {
+  background-color: #060606;
+  border-top: 1px solid var(--cam-border-subtle);
+  padding: var(--space-16) 0 var(--space-8) 0;
+  margin-top: auto;
+}
+
+.footer-grid {
+  display: grid;
+  grid-template-columns: 2fr repeat(3, 1fr);
+  gap: var(--space-10);
+  margin-bottom: var(--space-12);
+}
+
+@media (max-width: 900px) {
+  .footer-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .footer-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.footer-col-brand {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.footer-desc {
+  color: var(--cam-text-muted);
+  font-size: 0.875rem;
+  line-height: 1.6;
+  max-width: 320px;
+}
+
+.footer-heading {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--cam-text-primary);
+  margin-bottom: var(--space-4);
+}
+
+.footer-links {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.footer-links a {
+  font-size: 0.875rem;
+  color: var(--cam-text-muted);
+  transition: color var(--transition-fast);
+}
+
+.footer-links a:hover {
+  color: var(--cam-blue-primary);
+}
+
+.footer-bottom {
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--cam-border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.8125rem;
+  color: var(--cam-text-faint);
+}
+
+@media (max-width: 640px) {
+  .footer-bottom {
+    flex-direction: column;
+    gap: var(--space-4);
+    text-align: center;
+  }
+}

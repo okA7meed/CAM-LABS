@@ -1,0 +1,1215 @@
+/* ==========================================================================
+   CAM LABS — Main Website Layout Styles
+   Header, Hero, Services, Workflow, Capabilities, CTA & Footer
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. Header & Navigation System
+   -------------------------------------------------------------------------- */
+.cam-header {
+  position: sticky;
+  top: 0;
+  width: 100%;
+  height: var(--header-height);
+  background-color: color-mix(in srgb, var(--cam-bg) 86%, transparent);
+  border-bottom: 1px solid var(--cam-border-medium);
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  animation: navbar-enter 480ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  transition: background-color var(--transition-base), border-color var(--transition-base), box-shadow var(--transition-base);
+}
+
+.cam-header.scrolled {
+  background-color: color-mix(in srgb, var(--cam-bg) 94%, var(--cam-surface-1));
+  border-color: var(--cam-border-strong);
+  backdrop-filter: blur(16px) saturate(1.12);
+  -webkit-backdrop-filter: blur(16px) saturate(1.12);
+  box-shadow: 0 5px 16px rgba(0, 0, 0, 0.12);
+}
+
+.header-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  width: 100%;
+  max-width: none;
+  padding-left: var(--space-6);
+  padding-right: var(--space-6);
+}
+
+.desktop-nav {
+  flex: 1 1 auto;
+  justify-content: center;
+  min-width: 0;
+}
+
+.header-actions {
+  flex: 0 0 auto;
+}
+
+.brand-wrapper {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: fit-content;
+  text-decoration: none;
+  border-radius: var(--radius-md);
+  transition: transform var(--transition-fast), filter var(--transition-fast);
+}
+
+.brand-wrapper:hover {
+  color: inherit;
+  filter: drop-shadow(0 0 9px var(--cam-blue-glow));
+  transform: translateY(-1px);
+}
+
+.brand-logo {
+  width: 108px;
+  height: 42px;
+}
+
+.cam-logo {
+  position: relative;
+  display: block;
+  flex: 0 0 auto;
+}
+
+.cam-logo-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  opacity: 0;
+  transition: opacity var(--transition-base);
+}
+
+.cam-logo-image.is-active {
+  opacity: 1;
+}
+
+.footer-logo {
+  width: 88px;
+  height: 32px;
+  align-self: flex-start;
+}
+
+.network-status-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: var(--navbar-control-height);
+  padding: 5px 9px;
+  background: var(--cam-surface-1);
+  border: 1px solid var(--cam-border-subtle);
+  border-radius: var(--radius-md);
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
+  color: var(--cam-text-muted);
+}
+
+.network-status-badge .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--cam-success);
+}
+
+.desktop-nav {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0;
+}
+
+.nav-active-indicator {
+  position: absolute;
+  left: 0;
+  bottom: 4px;
+  height: 2px;
+  border-radius: var(--radius-full);
+  background: var(--cam-blue-primary);
+  pointer-events: none;
+  transition: transform 280ms cubic-bezier(0.16, 1, 0.3, 1), width 280ms cubic-bezier(0.16, 1, 0.3, 1), opacity 200ms ease;
+  will-change: transform, width;
+}
+
+.nav-link {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: var(--navbar-control-height);
+  padding: 0 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--cam-text-muted);
+  border-radius: 4px;
+  white-space: nowrap;
+  transition: color var(--transition-fast), background-color var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
+  cursor: pointer;
+}
+
+.nav-link:hover {
+  color: var(--cam-text-primary);
+  background-color: var(--cam-surface-1);
+}
+
+.nav-link.active {
+  color: var(--cam-text-primary);
+  background: var(--cam-blue-subtle);
+  box-shadow: inset 0 0 0 1px var(--cam-border-blue);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  justify-self: end;
+  gap: 8px;
+}
+
+.nav-preferences {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nav-menu-wrapper { position: relative; }
+
+.nav-icon-button {
+  display: grid;
+  place-items: center;
+  width: var(--navbar-control-height);
+  height: var(--navbar-control-height);
+  padding: 0;
+  border: 1px solid var(--cam-border-subtle);
+  --btn-block-size: var(--navbar-control-height);
+  border-radius: var(--btn-radius);
+  background: color-mix(in srgb, var(--cam-surface-1) 84%, transparent);
+  color: var(--cam-text-secondary);
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), var(--shadow-sm);
+  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.nav-icon-button svg { width: 16px; height: 16px; }
+.nav-icon-button:hover { color: var(--cam-text-primary); background: var(--cam-surface-2); border-color: var(--cam-border-strong); transform: translateY(-1px); }
+.nav-icon-button:active { transform: scale(0.94); }
+.nav-icon-button:focus-visible { outline: 2px solid var(--cam-blue-primary); outline-offset: 2px; }
+.nav-icon-button.open { color: var(--cam-text-primary); background: var(--cam-surface-2); border-color: var(--cam-border-blue); }
+
+.nav-menu {
+  position: absolute;
+  z-index: 60;
+  top: calc(100% + 8px);
+  inset-inline-end: 0;
+  display: flex;
+  min-width: 168px;
+  flex-direction: column;
+  gap: 2px;
+  padding: 5px;
+  border: 1px solid var(--cam-border-subtle);
+  border-radius: 12px;
+  background: var(--cam-surface-1);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.25);
+  transform-origin: top var(--nav-menu-origin, right);
+  animation: nav-menu-in 140ms ease-out;
+}
+
+[dir='rtl'] .nav-menu { --nav-menu-origin: left; }
+
+@keyframes nav-menu-in {
+  from { opacity: 0; transform: translateY(-6px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-menu { animation: none; }
+}
+
+.nav-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--cam-text-secondary);
+  font: 600 0.8125rem var(--font-sans);
+  text-align: start;
+  cursor: pointer;
+  transition: color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.nav-menu-item svg { width: 15px; height: 15px; }
+.nav-menu-item .nav-menu-label { flex: 1; }
+.nav-menu-icon { display: grid; place-items: center; width: 16px; }
+.nav-menu-flag { font-size: 0.95rem; line-height: 1; }
+.nav-menu-check { width: 13px; height: 13px; color: var(--cam-blue-primary); }
+.nav-menu-item:hover { color: var(--cam-text-primary); background: var(--cam-surface-2); }
+.nav-menu-item:focus-visible { outline: 2px solid var(--cam-blue-primary); outline-offset: -2px; }
+.nav-menu-item.selected { color: var(--cam-text-primary); background: var(--cam-blue-subtle); box-shadow: inset 0 0 0 1px var(--cam-border-blue); }
+
+.header-sign-in {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--navbar-control-height);
+  border: 1px solid var(--cam-border-medium);
+  --btn-block-size: var(--navbar-control-height);
+  border-radius: var(--btn-radius);
+  background: transparent;
+  color: var(--cam-text-secondary);
+  font: 600 0.75rem var(--font-sans);
+  cursor: pointer;
+  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
+  white-space: nowrap;
+}
+
+.header-sign-in:hover { color: var(--cam-text-primary); background: var(--cam-surface-2); border-color: var(--cam-border-strong); transform: translateY(-1px); }
+.header-sign-in { padding: 0 12px; }
+
+.header-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: var(--navbar-control-height);
+  padding: 0 13px;
+  border: 1px solid var(--cam-blue-hover);
+  --btn-block-size: var(--navbar-control-height);
+  border-radius: var(--btn-radius);
+  background: var(--cam-blue-primary);
+  color: #fff;
+  font: 700 0.8125rem var(--font-sans);
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 5px 16px rgba(0, 102, 255, 0.30);
+  transition: background-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
+}
+
+.header-cta svg { width: 15px; height: 15px; }
+.header-cta:hover { background: var(--cam-blue-hover); color: #fff; box-shadow: 0 8px 20px var(--cam-blue-glow); transform: translateY(-2px); }
+.header-cta:active { transform: translateY(0); }
+
+.persona-select-btn {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  height: var(--navbar-control-height);
+  padding: 0 0.75rem;
+  background: var(--cam-surface-2);
+  border: 1px solid var(--cam-border-medium);
+  color: var(--cam-text-secondary);
+  --btn-block-size: var(--navbar-control-height);
+  border-radius: var(--btn-radius);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.persona-select-btn:hover {
+  border-color: var(--cam-blue-primary);
+  color: var(--cam-text-primary);
+}
+
+/* Mobile Hamburger & Drawer */
+.mobile-nav-toggle {
+  display: none;
+  width: 44px;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+  background: var(--cam-surface-2);
+  border: 1px solid var(--cam-border-medium);
+  --btn-block-size: 44px;
+  border-radius: var(--btn-radius);
+  color: var(--cam-text-primary);
+  cursor: pointer;
+  padding: 0;
+  transition: border-color var(--transition-fast), background-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.mobile-nav-toggle:hover { border-color: var(--cam-border-blue); background: var(--cam-blue-subtle); transform: translateY(-1px); }
+
+.mobile-menu-drawer {
+  position: fixed;
+  top: var(--header-height);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--cam-bg);
+  border-top: 1px solid var(--cam-border-medium);
+  border-radius: 0;
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  transform: translateY(-12px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-base), transform var(--transition-smooth);
+  z-index: 490;
+  overflow-y: auto;
+  box-shadow: none;
+}
+
+.mobile-menu-drawer.open {
+  transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.mobile-nav-link {
+  display: flex;
+  align-items: center;
+  height: var(--navbar-control-height);
+  padding: 0 0.875rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--cam-text-secondary);
+  font-size: 1rem;
+  font-weight: 650;
+  transition: background-color var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.mobile-nav-link:hover { color: var(--cam-text-primary); background: var(--cam-surface-1); border-color: var(--cam-border-subtle); transform: translateX(3px); }
+
+@media (max-width: 1200px) {
+  .desktop-nav {
+    display: none;
+  }
+  .network-status-badge {
+    display: none;
+  }
+  .header-container { grid-template-columns: 1fr auto; }
+  .mobile-nav-toggle {
+    display: inline-flex;
+  }
+}
+
+@media (max-width: 900px) {
+  .header-container { gap: var(--space-2); padding-inline: var(--space-3); }
+  .persona-select-btn, .header-sign-in { display: none; }
+  .header-actions { min-width: 0; gap: 6px; }
+  .brand-logo { width: 96px; }
+}
+
+@media (max-width: 680px) {
+  .cam-header { height: 64px; }
+  .header-container { padding-left: var(--space-3); padding-right: var(--space-3); }
+  .brand-logo { width: 92px; height: 38px; }
+  .header-actions { gap: 6px; }
+  .header-sign-in,
+  .persona-select-btn { display: none; }
+  .nav-preferences { gap: 4px; }
+  .header-cta { width: 44px; height: 44px; padding: 0; --btn-block-size: 44px; border-radius: var(--btn-radius); }
+  .header-cta span { display: none; }
+  .mobile-menu-drawer { top: 64px; left: 0; right: 0; bottom: 0; border-radius: 0; padding: var(--space-4); }
+}
+
+@media (max-width: 680px) {
+  .mobile-nav-link,
+  .mobile-menu-drawer .btn {
+    min-height: 44px;
+    height: auto;
+  }
+}
+
+.mobile-menu-drawer .btn {
+  height: var(--navbar-control-height);
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+[data-theme='light'] .cam-header { background-color: color-mix(in srgb, var(--cam-bg) 86%, transparent); }
+[data-theme='light'] .cam-header.scrolled { background-color: color-mix(in srgb, var(--cam-bg) 94%, var(--cam-surface-1)); }
+[data-theme='light'] .mobile-menu-drawer { background: var(--cam-bg); }
+[dir='rtl'] { text-align: start; }
+[dir='rtl'] .header-container { direction: rtl; }
+[dir='rtl'] .desktop-nav { direction: rtl; }
+[dir='rtl'] .mobile-nav-link:hover { transform: translateX(-3px); }
+[dir='rtl'] .mobile-menu-drawer { inset-inline: 0; }
+[dir='rtl'] .header-cta svg { transform: scaleX(-1); }
+[dir='rtl'] .hero-cta-group svg { transform: scaleX(-1); }
+[dir='rtl'] .hero-metrics-ticker, [dir='rtl'] .services-grid, [dir='rtl'] .footer-grid { direction: rtl; }
+[dir='rtl'] input, [dir='rtl'] textarea, [dir='rtl'] select { text-align: start; }
+[dir='rtl'] .section-badge,
+[dir='rtl'] .network-status-badge,
+[dir='rtl'] .nav-menu { direction: rtl; }
+[dir='rtl'] .section-badge-dot { margin-inline-end: 0; margin-inline-start: 6px; }
+[dir='rtl'] .hero-metric,
+[dir='rtl'] .report-row,
+[dir='rtl'] .prop-row { text-align: start; }
+.loading-state { min-height: 45vh; display: grid; place-content: center; gap: var(--space-4); text-align: center; }
+.loading-state-mark { width: 160px; height: 10px; border-radius: var(--radius-full); margin: 0 auto; }
+
+@keyframes navbar-enter {
+  from { opacity: 0; transform: translateY(-12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* --------------------------------------------------------------------------
+   2. Hero Section & Interactive CAD Showcase
+   -------------------------------------------------------------------------- */
+.hero-section {
+  position: relative;
+  padding-top: var(--space-12);
+  padding-bottom: var(--space-16);
+  overflow: hidden;
+}
+
+.hero-grid {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: var(--space-12);
+  align-items: center;
+}
+
+@media (max-width: 1024px) {
+  .hero-grid {
+    grid-template-columns: 1fr;
+    gap: var(--space-10);
+  }
+}
+
+.hero-content {
+  position: relative;
+  z-index: 10;
+}
+
+.hero-badge-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+  flex-wrap: wrap;
+}
+
+.hero-title {
+  font-family: var(--font-hero-display);
+  font-size: clamp(2.5rem, 5vw, 3.875rem);
+  font-weight: 900;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  margin-bottom: var(--space-6);
+}
+
+[lang='ar'] h1.hero-title {
+  font-family: var(--font-hero-arabic);
+  font-weight: 900;
+}
+
+.hero-title-highlight {
+  color: var(--cam-blue-primary);
+  position: relative;
+  display: inline-block;
+}
+
+@media (max-width: 640px) {
+  .hero-title-prefix,
+  .hero-title-action,
+  .hero-title-outro {
+    display: block;
+  }
+
+  .hero-title-highlight {
+    display: inline;
+  }
+}
+
+.hero-description {
+  font-size: 1.1875rem;
+  color: var(--cam-text-secondary);
+  line-height: 1.6;
+  max-width: 580px;
+  margin-bottom: var(--space-8);
+}
+
+.hero-cta-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-10);
+}
+
+.hero-metrics-ticker {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-4);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--cam-border-subtle);
+}
+
+@media (max-width: 640px) {
+  .hero-metrics-ticker {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-4);
+  }
+}
+
+.hero-metric-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.hero-metric-val {
+  font-family: var(--font-mono);
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: var(--cam-text-primary);
+}
+
+.hero-metric-label {
+  font-size: 0.75rem;
+  color: var(--cam-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Hero 3D CAD Showcase Stage — macOS-inspired engineering application window */
+.hero-cad-stage {
+  /* Self-contained window palette so the inspector stays dark in every theme */
+  --cad-chrome-top: #1b1f26;
+  --cad-chrome-bottom: #15181e;
+  --cad-chrome-flat: #14171c;
+  --cad-window-border: rgba(255, 255, 255, 0.09);
+  --cad-window-text: #e8ecf2;
+  --cad-window-muted: #99a1af;
+  --cad-window-faint: #666e7c;
+  --cad-accent: #4d9bff;
+
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  container-type: inline-size;
+  background: var(--cad-chrome-flat);
+  border: 1px solid var(--cad-window-border);
+  border-radius: clamp(12px, 1.3vw, 18px);
+  overflow: hidden;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.cad-stage-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: 10px var(--space-4);
+  background: linear-gradient(180deg, var(--cad-chrome-top), var(--cad-chrome-bottom));
+  border-bottom: 1px solid var(--cad-window-border);
+}
+
+.cad-window-lights {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
+.cad-light {
+  display: block;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+  opacity: 0.9;
+}
+
+.cad-light-red { background: #ff5f57; }
+.cad-light-amber { background: #febc2e; }
+.cad-light-green { background: #28c840; }
+
+.cad-part-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--cad-window-muted);
+}
+
+.cad-app-name {
+  flex: none;
+  color: var(--cad-window-text);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.cad-meta-divider {
+  flex: none;
+  width: 1px;
+  height: 12px;
+  background: var(--cad-window-border);
+}
+
+.cad-filename {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cad-controls-hud {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+  max-width: 100%;
+  padding: 2px;
+  border: 1px solid var(--cad-window-border);
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.3);
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.cad-controls-hud::-webkit-scrollbar,
+.cad-part-switch::-webkit-scrollbar,
+.cad-status-readout::-webkit-scrollbar {
+  display: none;
+}
+
+.hud-btn {
+  background: transparent;
+  border: 1px solid var(--cam-border-subtle);
+  --btn-block-size: calc(1em + 6px + 2px);
+  border-radius: var(--btn-radius);
+  color: var(--cam-text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  padding: 3px 8px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.hud-btn:hover, .hud-btn.active {
+  background-color: var(--cam-blue-subtle);
+  border-color: var(--cam-blue-primary);
+  color: var(--cam-blue-primary);
+}
+
+/* Window-scoped control chrome (kept separate so .hud-btn stays reusable) */
+.hero-cad-stage .hud-btn {
+  flex: none;
+  padding: 4px 10px;
+  border-color: transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--cad-window-muted);
+  white-space: nowrap;
+  transition: color var(--transition-fast), background-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.hero-cad-stage .hud-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--cad-window-text);
+}
+
+.hero-cad-stage .hud-btn.active {
+  background: rgba(0, 102, 255, 0.16);
+  color: var(--cad-accent);
+  box-shadow: inset 0 0 0 1px rgba(0, 102, 255, 0.45);
+}
+
+.hero-cad-stage .hud-btn:focus-visible {
+  outline: 2px solid var(--cam-blue-primary);
+  outline-offset: 1px;
+}
+
+.cad-canvas-wrapper {
+  position: relative;
+  height: 380px;
+  width: 100%;
+  background:
+    radial-gradient(ellipse at 50% 44%, rgba(255, 255, 255, 0.05), transparent 62%),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.022) 0 1px, transparent 1px 44px),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.022) 0 1px, transparent 1px 44px),
+    #06070a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#hero-cad-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.cad-overlay-crosshairs {
+  position: absolute;
+  inset: var(--space-3);
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.cad-crosshair-row {
+  display: flex;
+  gap: var(--space-3);
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  color: var(--cad-window-faint);
+}
+
+.cad-stage-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: 9px var(--space-4);
+  background: var(--cad-chrome-flat);
+  border-top: 1px solid var(--cad-window-border);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: var(--cad-window-muted);
+}
+
+.cad-part-switch {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.cad-status-readout {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  overflow-x: auto;
+  white-space: nowrap;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.cad-status-sep {
+  flex: none;
+  width: 1px;
+  height: 11px;
+  background: var(--cad-window-border);
+}
+
+.cad-status-flag {
+  color: var(--cam-success);
+  letter-spacing: 0.04em;
+}
+
+.cad-status-material {
+  color: var(--cam-cyan-tech);
+}
+
+@media (max-width: 900px) {
+  .cad-canvas-wrapper {
+    height: 340px;
+  }
+}
+
+@media (max-width: 640px) {
+  .cad-stage-header,
+  .cad-stage-footer {
+    padding-inline: var(--space-3);
+  }
+
+  .cad-app-name {
+    font-size: 0.625rem;
+    letter-spacing: 0.06em;
+  }
+
+  .cad-part-meta {
+    font-size: 0.6875rem;
+  }
+
+  .cad-canvas-wrapper {
+    height: 300px;
+  }
+}
+
+/* The window adapts to its own width, not just the viewport, because the hero
+   column is far narrower than the page. */
+@container (max-width: 720px) {
+  .cad-stage-header,
+  .cad-stage-footer {
+    flex-wrap: wrap;
+    row-gap: var(--space-2);
+  }
+
+  .cad-controls-hud,
+  .cad-status-readout {
+    flex: 1 1 100%;
+    justify-content: flex-start;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   3. Manufacturing Services Section
+   -------------------------------------------------------------------------- */
+.services-section {
+  background-color: var(--cam-surface-1);
+  border-top: 1px solid var(--cam-border-subtle);
+  border-bottom: 1px solid var(--cam-border-subtle);
+}
+
+.themed-section-band {
+  background-color: var(--cam-surface-1);
+  border-top: 1px solid var(--cam-border-subtle);
+  border-bottom: 1px solid var(--cam-border-subtle);
+}
+
+.services-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-6);
+}
+
+@media (max-width: 1024px) {
+  .services-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .services-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.service-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.service-icon-wrapper {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-sm);
+  background-color: var(--cam-blue-subtle);
+  border: 1px solid var(--cam-border-blue);
+  color: var(--cam-blue-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--space-4);
+}
+
+.service-tech-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: var(--space-3) 0 var(--space-4) 0;
+}
+
+.service-spec-matrix {
+  margin-top: auto;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--cam-border-subtle);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+  font-size: 0.75rem;
+}
+
+.spec-entry {
+  display: flex;
+  flex-direction: column;
+}
+
+.spec-key {
+  color: var(--cam-text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+}
+
+.spec-val {
+  color: var(--cam-text-primary);
+  font-weight: 600;
+  font-family: var(--font-mono);
+}
+
+/* --------------------------------------------------------------------------
+   4. How CAM LABS Works (Interactive 4-Stage Pipeline)
+   -------------------------------------------------------------------------- */
+.workflow-stepper-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-4);
+  position: relative;
+  margin-top: var(--space-8);
+}
+
+@media (max-width: 1024px) {
+  .workflow-stepper-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .workflow-stepper-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.step-card {
+  background-color: var(--cam-surface-1);
+  border: 1px solid var(--cam-border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-6);
+  position: relative;
+  transition: all var(--transition-fast);
+}
+
+.step-card:hover {
+  border-color: var(--cam-border-blue);
+  transform: translateY(-2px);
+}
+
+.step-number {
+  font-family: var(--font-mono);
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--cam-blue-primary);
+  line-height: 1;
+  margin-bottom: var(--space-3);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.step-icon {
+  width: 28px;
+  height: 28px;
+  color: var(--cam-text-muted);
+}
+
+.step-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--cam-text-primary);
+  margin-bottom: var(--space-2);
+}
+
+.step-desc {
+  font-size: 0.875rem;
+  color: var(--cam-text-muted);
+  line-height: 1.5;
+}
+
+/* Platform-wide visual language refinement */
+.hero-section {
+  padding-top: clamp(3rem, 8vw, 7rem);
+  background: radial-gradient(circle at 78% 28%, rgba(0, 102, 255, 0.12), transparent 28%);
+}
+
+.hero-title { letter-spacing: 0; }
+.hero-title-highlight { text-shadow: 0 0 24px rgba(0, 102, 255, 0.24); }
+.service-card, .step-card { box-shadow: 0 18px 48px rgba(0, 0, 0, 0.18); }
+.service-card:hover, .step-card:hover { box-shadow: 0 22px 54px rgba(0, 0, 0, 0.28), 0 0 0 1px var(--cam-border-blue); }
+.workflow-stepper-grid::before { content: ''; position: absolute; top: 32px; right: 10%; left: 10%; height: 1px; background: var(--cam-border-subtle); pointer-events: none; }
+.step-card { z-index: 1; }
+
+@media (max-width: 640px) {
+  .workflow-stepper-grid::before { display: none; }
+  .hero-section { padding-top: var(--space-8); }
+}
+
+/* --------------------------------------------------------------------------
+   5. Capabilities & Precision Assurance
+   -------------------------------------------------------------------------- */
+.capabilities-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-8);
+  align-items: center;
+}
+
+@media (max-width: 900px) {
+  .capabilities-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.capability-feature-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.capability-feature-item {
+  display: flex;
+  gap: var(--space-4);
+  background: var(--cam-surface-1);
+  border: 1px solid var(--cam-border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  align-items: flex-start;
+}
+
+.feature-icon-box {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  background: var(--cam-surface-2);
+  border: 1px solid var(--cam-border-medium);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cam-blue-primary);
+  flex-shrink: 0;
+}
+
+.inspection-report-mock {
+  background: var(--cam-surface-1);
+  border: 1px solid var(--cam-border-medium);
+  border-radius: var(--radius-md);
+  padding: var(--space-6);
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+}
+
+.report-header {
+  border-bottom: 1px solid var(--cam-border-subtle);
+  padding-bottom: var(--space-3);
+  margin-bottom: var(--space-4);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.report-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px dashed var(--cam-border-subtle);
+}
+
+/* --------------------------------------------------------------------------
+   6. Call to Action Banner
+   -------------------------------------------------------------------------- */
+.cta-banner {
+  background: linear-gradient(135deg, var(--cam-surface-1) 0%, var(--cam-surface-2) 50%, var(--cam-bg) 100%);
+  border: 1px solid var(--cam-border-blue);
+  border-radius: var(--radius-lg);
+  padding: var(--space-12) var(--space-8);
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--shadow-glow);
+}
+
+.cta-banner-content {
+  max-width: 680px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 2;
+}
+
+/* --------------------------------------------------------------------------
+   7. Footer
+   -------------------------------------------------------------------------- */
+.cam-footer {
+  background-color: var(--cam-surface-1);
+  border-top: 1px solid var(--cam-border-subtle);
+  padding: var(--space-16) 0 var(--space-8) 0;
+  margin-top: auto;
+}
+
+.footer-grid {
+  display: grid;
+  grid-template-columns: 2fr repeat(3, 1fr);
+  gap: var(--space-10);
+  margin-bottom: var(--space-12);
+}
+
+@media (max-width: 900px) {
+  .footer-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .footer-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.footer-col-brand {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.footer-desc {
+  color: var(--cam-text-muted);
+  font-size: 0.875rem;
+  line-height: 1.6;
+  max-width: 320px;
+}
+
+.footer-heading {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--cam-text-primary);
+  margin-bottom: var(--space-4);
+}
+
+.footer-links {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.footer-links a {
+  font-size: 0.875rem;
+  color: var(--cam-text-muted);
+  transition: color var(--transition-fast);
+}
+
+.footer-links a:hover {
+  color: var(--cam-blue-primary);
+}
+
+.footer-bottom {
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--cam-border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.8125rem;
+  color: var(--cam-text-faint);
+}
+
+@media (max-width: 640px) {
+  .footer-bottom {
+    flex-direction: column;
+    gap: var(--space-4);
+    text-align: center;
+  }
+}

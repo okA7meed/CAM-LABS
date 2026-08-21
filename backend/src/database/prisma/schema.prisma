@@ -1,0 +1,234 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id            String    @id @default(uuid())
+  name          String
+  email         String    @unique
+  role          String    @default("CUSTOMER")
+  accountStatus String    @default("ACTIVE")
+  company       String    @default("Independent")
+  phone         String?
+  avatar        String?
+  tier          String    @default("Pro Engineer")
+  address       String?
+  taxId         String?
+  passwordHash  String?
+  preferences   Json?     // { units: "mm", toleranceStandard: "ISO 2768-fine", ... }
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  orders        Order[]
+  quotes        Quote[]
+  cadFiles      CadFile[]
+  sessions      Session[]
+
+  @@map("users")
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model Material {
+  id                 String   @id
+  name               String
+  technology         String   // SLS, SLA, FDM, CNC, DMLS, Sheet Metal
+  category           String   // Polymers, High-Performance, Metals, Resins, Elastomers
+  description        String
+  tensileStrength    Float    // MPa
+  hdt                Float    // °C
+  elongation         Float    // %
+  density            Float    // g/cm³
+  standardTolerance  String
+  minWallThickness   String
+  leadTime           String
+  surfaceFinish      String
+  tags               String[]
+  colorOptions       String[]
+  idealFor           String
+  isCertified        Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@map("materials")
+}
+
+model Order {
+  id                String   @id // e.g. CAM-2026-8894 (CAM LABS Internal ID)
+  userId            String?
+  user              User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  quoteId           String?
+  partName          String
+  technology        String
+  material          String
+  quantity          Int      @default(1)
+  date              String
+  estDelivery       String
+  status            String   @default("In Review") // In Review, In Production, Quality Inspection, Delivered
+  statusBadge       String   @default("badge-blue")
+  progressStep      Int      @default(1)
+  manufacturingCost String?
+  serviceFee        String?
+  totalCost         String
+  tolerance         String   @default("±0.05 mm")
+  provider          String   @default("CAM LABS") // Historical field; active engine is CAM LABS
+  providerOrderRef  String?  // Historical provider reference; active orders use internalOrderRef
+  trackingNum       String?  // Historical external tracking field; active orders use CAM LABS tracking
+  history           Json     // Array of { step, date, done, desc }
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  cadFiles          OrderCadFile[]
+
+  @@map("orders")
+}
+
+model OrderCadFile {
+  orderId   String
+  cadFileId String
+  configuration Json?
+  totalCost     String?
+  order     Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  cadFile   CadFile @relation(fields: [cadFileId], references: [id], onDelete: Restrict)
+
+  @@id([orderId, cadFileId])
+  @@index([cadFileId])
+  @@map("order_cad_files")
+}
+
+model Quote {
+  id                String   @id // e.g. RFQ-2026-7741 (CAM LABS Internal Quote ID)
+  userId            String?
+  user              User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  partName          String
+  technology        String
+  material          String
+  quantity          Int      @default(1)
+  toleranceGrade    String?  @default("standard")
+  surfaceFinish     String?  @default("Standard")
+  manufacturingCost String?  // Historical manufacturing cost field
+  serviceFee        String?  // Historical field retained for quote data integrity; unused by active pricing
+  unitPrice         String
+  totalPrice        String
+  leadTime          String
+  validUntil        String   // 14-day validity
+  status            String   @default("Ready for Approval")
+  provider          String   @default("CAM LABS") // Historical field; active quotes are CAM LABS quotes
+  providerQuoteRef  String?  // Historical field; active quotes store an internal CAM LABS quote reference
+  isSimulated       Boolean  @default(false)
+  cadFileIds        Json?    // CAD files included in the authoritative quotation
+  pricingBreakdown  Json?    // Authoritative CAM LABS cost components and value sources
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("quotes")
+}
+
+model CadFile {
+  id             String   @id @default(uuid())
+  userId         String?
+  guestId        String?
+  user           User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  name           String
+  format         String   // STEP, STL, DXF, IGES
+  size           String
+  uploaded       String
+  volume         String
+  dimensions     String
+  meshTriangles  String
+  status         String   @default("Verified CAD")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  versions       CadFileVersion[]
+  orders         OrderCadFile[]
+
+  @@index([userId, updatedAt])
+  @@index([guestId, updatedAt])
+
+  @@map("cad_files")
+}
+
+model CadFileVersion {
+  id                String              @id @default(uuid())
+  cadFileId         String
+  cadFile           CadFile             @relation(fields: [cadFileId], references: [id], onDelete: Cascade)
+  version           Int
+  originalName      String
+  format            String
+  mimeType          String
+  byteSize          Int
+  checksum          String
+  storageKey        String              @unique
+  uploadStatus      String              @default("STORED")
+  scanStatus        String              @default("PENDING")
+  processingStatus  String              @default("PENDING")
+  metadata          Json?
+  dimensions        String?
+  volume            String?
+  meshTriangles     String?
+  viewerAssetKey    String?
+  viewerAssetSize   Int?
+  processingDuration Int?
+  detectedUnit      String?
+  failureCode       String?
+  failureMessage    String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  jobs              CadProcessingJob[]
+  dfmReport         DfmReport?
+
+  @@unique([cadFileId, version])
+  @@unique([cadFileId, checksum])
+  @@index([cadFileId, createdAt])
+  @@index([processingStatus, scanStatus])
+  @@map("cad_file_versions")
+}
+
+model CadProcessingJob {
+  id          String          @id @default(uuid())
+  versionId   String
+  version     CadFileVersion  @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  operation   String
+  status      String          @default("PENDING")
+  attempts    Int             @default(0)
+  maxAttempts Int             @default(3)
+  availableAt DateTime        @default(now())
+  startedAt   DateTime?
+  finishedAt  DateTime?
+  lastError   String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@unique([versionId, operation])
+  @@index([status, availableAt])
+  @@map("cad_processing_jobs")
+}
+
+model DfmReport {
+  id          String         @id @default(uuid())
+  versionId   String         @unique
+  version     CadFileVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  status      String
+  summary     Json
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@map("dfm_reports")
+}

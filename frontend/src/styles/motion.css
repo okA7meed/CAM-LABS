@@ -1,0 +1,346 @@
+/* ==========================================================================
+   CAM LABS — Motion System
+   Hero choreography, rotating headline, scroll reveals & micro-interactions.
+   Loaded last so it can refine the base design system without overriding tokens.
+   ========================================================================== */
+
+:root {
+  --cam-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --cam-reveal-duration: 700ms;
+  --cam-stagger-step: 90ms;
+}
+
+/* --------------------------------------------------------------------------
+   1. Scroll Reveal
+   -------------------------------------------------------------------------- */
+.cam-reveal {
+  opacity: 0;
+}
+
+.cam-reveal.is-revealed {
+  opacity: 1;
+  animation: cam-reveal-in var(--cam-reveal-duration) var(--cam-ease-out) backwards;
+  animation-delay: var(--cam-reveal-delay, 0ms);
+}
+
+@keyframes cam-reveal-in {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+}
+
+/* Staggered children — the animation uses `backwards` fill so hover
+   transforms on the cards stay untouched once the reveal has finished. */
+.cam-stagger > * {
+  opacity: 0;
+}
+
+.cam-stagger.is-revealed > * {
+  opacity: 1;
+  animation: cam-stagger-in 620ms var(--cam-ease-out) backwards;
+}
+
+@keyframes cam-stagger-in {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+}
+
+.cam-stagger.is-revealed > *:nth-child(1) { animation-delay: 0ms; }
+.cam-stagger.is-revealed > *:nth-child(2) { animation-delay: calc(1 * var(--cam-stagger-step)); }
+.cam-stagger.is-revealed > *:nth-child(3) { animation-delay: calc(2 * var(--cam-stagger-step)); }
+.cam-stagger.is-revealed > *:nth-child(4) { animation-delay: calc(3 * var(--cam-stagger-step)); }
+.cam-stagger.is-revealed > *:nth-child(5) { animation-delay: calc(4 * var(--cam-stagger-step)); }
+.cam-stagger.is-revealed > *:nth-child(6) { animation-delay: calc(5 * var(--cam-stagger-step)); }
+.cam-stagger.is-revealed > *:nth-child(7) { animation-delay: calc(6 * var(--cam-stagger-step)); }
+.cam-stagger.is-revealed > *:nth-child(8) { animation-delay: calc(7 * var(--cam-stagger-step)); }
+.cam-stagger.is-revealed > *:nth-child(n + 9) { animation-delay: calc(8 * var(--cam-stagger-step)); }
+
+/* --------------------------------------------------------------------------
+   2. Hero Entrance Choreography (~1080ms end to end)
+   -------------------------------------------------------------------------- */
+.cam-hero-in {
+  animation: cam-hero-rise 620ms var(--cam-ease-out) backwards;
+  animation-delay: var(--cam-hero-delay, 0ms);
+}
+
+@keyframes cam-hero-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   3. Rotating Hero Headline
+   -------------------------------------------------------------------------- */
+/* The rotating phrase reserves the widest variant, so the hero column must be
+   allowed to shrink below its min-content size to avoid horizontal overflow. */
+.hero-content,
+.hero-title,
+.hero-title-action {
+  min-width: 0;
+}
+
+.cam-headline {
+  display: inline-grid;
+  max-width: 100%;
+  text-align: start;
+  vertical-align: top;
+}
+
+.cam-headline > * {
+  grid-area: 1 / 1;
+}
+
+/* Hidden ghosts reserve the widest and tallest phrase so the hero never reflows. */
+.cam-headline-ghost {
+  visibility: hidden;
+  pointer-events: none;
+  user-select: none;
+}
+
+.cam-headline-phrase {
+  white-space: pre-wrap;
+}
+
+.cam-headline-caret {
+  display: inline-block;
+  width: 3px;
+  height: 0.9em;
+  margin-inline-start: 0.06em;
+  vertical-align: middle;
+  border-radius: 1px;
+  background-color: currentColor;
+  animation: cam-caret-blink 1s ease-in-out infinite;
+}
+
+@keyframes cam-caret-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.05;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   4. Hero CAD Stage Interaction
+   -------------------------------------------------------------------------- */
+.hero-stage-shell {
+  position: relative;
+  min-width: 0;
+  transition: transform 500ms var(--cam-ease-out);
+}
+
+.hero-stage-shell .hero-cad-stage {
+  transition: transform var(--transition-base), border-color var(--transition-base),
+    box-shadow var(--transition-smooth);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .hero-stage-shell {
+    transform: translate3d(var(--cam-tilt-x, 0px), var(--cam-tilt-y, 0px), 0);
+  }
+
+  .hero-stage-shell:hover .hero-cad-stage {
+    transform: translateY(-2px);
+    border-color: rgba(255, 255, 255, 0.16);
+    box-shadow: 0 32px 74px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   5. Workflow Connector Line
+   -------------------------------------------------------------------------- */
+.workflow-stepper-grid::before {
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 900ms var(--cam-ease-out) 160ms;
+}
+
+.workflow-stepper-grid.is-revealed::before {
+  transform: scaleX(1);
+}
+
+[dir='rtl'] .workflow-stepper-grid::before {
+  transform-origin: right center;
+}
+
+/* --------------------------------------------------------------------------
+   6. Button & Navigation Micro-Interactions
+   -------------------------------------------------------------------------- */
+.btn:not(:disabled):not(.disabled):active {
+  transform: translateY(1px);
+}
+
+.btn-outline:hover,
+.btn-secondary:hover,
+.btn-outline-blue:hover {
+  transform: translateY(-1px);
+}
+
+.nav-link:hover {
+  transform: translateY(-1px);
+}
+
+/* --------------------------------------------------------------------------
+   7. Price Recalculation Transition
+   Shared, reusable state machine visuals for every live/recalculating price
+   surface (configurator, review, order summary, dashboard, etc). Only the
+   price node itself animates — never the surrounding layout.
+   -------------------------------------------------------------------------- */
+.price-transition {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+  vertical-align: middle;
+}
+
+.price-transition-face {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+  animation: price-face-in 260ms var(--cam-ease-out) both;
+}
+
+@keyframes price-face-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+.price-transition.is-ready .price-transition-value {
+  animation: price-value-settle 420ms var(--cam-ease-out) both;
+}
+
+@keyframes price-value-settle {
+  0% {
+    opacity: 0;
+    transform: translateY(6px) scale(0.96);
+  }
+  55% {
+    opacity: 1;
+    transform: translateY(-1px) scale(1.015);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.price-transition-calculating {
+  overflow: hidden;
+  color: var(--cam-text-muted);
+  font: 600 0.78rem var(--font-sans);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.price-transition-pulse {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+}
+
+.price-transition-pulse i {
+  display: block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.32;
+  animation: price-pulse-dot 1.1s ease-in-out infinite;
+}
+
+.price-transition-pulse i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.price-transition-pulse i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes price-pulse-dot {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: scale(0.75);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.price-transition-error {
+  color: var(--cam-danger);
+  font-weight: 700;
+}
+
+.price-transition-idle {
+  color: var(--cam-text-muted);
+}
+
+.price-transition-lg .price-transition-calculating {
+  font-size: 0.85rem;
+}
+
+/* --------------------------------------------------------------------------
+   8. Reduced Motion
+   -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .cam-reveal,
+  .cam-stagger > * {
+    opacity: 1;
+  }
+
+  .price-transition-face,
+  .price-transition.is-ready .price-transition-value,
+  .price-transition-pulse i {
+    animation: none !important;
+  }
+
+  .cam-headline-phrase,
+  .cam-headline-caret {
+    animation: none;
+    opacity: 1;
+    filter: none;
+    transform: none;
+  }
+
+  .hero-stage-shell {
+    transform: none;
+  }
+
+  .hero-stage-shell:hover .hero-cad-stage {
+    transform: none;
+  }
+
+  .workflow-stepper-grid::before,
+  .workflow-stepper-grid.is-revealed::before {
+    transform: scaleX(1);
+    transition: none;
+  }
+
+  .btn:not(:disabled):active,
+  .btn-outline:hover,
+  .btn-secondary:hover,
+  .btn-outline-blue:hover,
+  .nav-link:hover {
+    transform: none;
+  }
+
+  .nav-active-indicator {
+    transition: opacity 120ms ease;
+  }
+}

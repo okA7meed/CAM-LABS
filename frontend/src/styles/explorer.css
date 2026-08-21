@@ -1,0 +1,248 @@
+/* ==========================================================================
+   CAM LABS — Materials & Manufacturing Technologies Explorer Styles
+   ========================================================================== */
+
+.explorer-section {
+  padding-top: var(--space-8);
+  padding-bottom: var(--space-16);
+}
+
+.explorer-toolbar {
+  background-color: var(--cam-surface-1);
+  border: 1px solid var(--cam-border-medium);
+  border-radius: var(--radius-md);
+  padding: var(--space-5);
+  margin-bottom: var(--space-8);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.toolbar-search-row {
+  display: flex;
+  gap: var(--space-4);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.search-input-box {
+  flex: 1;
+  min-width: 260px;
+}
+
+.filter-group-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.filter-label {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: var(--cam-text-muted);
+  min-width: 90px;
+}
+
+.filter-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.chip-btn {
+  background: var(--cam-bg);
+  border: 1px solid var(--cam-border-subtle);
+  --btn-block-size: calc(1em + 8px + 2px);
+  border-radius: var(--btn-radius);
+  color: var(--cam-text-muted);
+  font-size: 0.8125rem;
+  font-family: var(--font-mono);
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.chip-btn:hover {
+  border-color: var(--cam-border-medium);
+  color: var(--cam-text-primary);
+}
+
+.chip-btn.active {
+  background-color: var(--cam-blue-subtle);
+  border-color: var(--cam-blue-primary);
+  color: var(--cam-blue-primary);
+  font-weight: 600;
+}
+
+/* Materials Grid */
+.materials-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-6);
+}
+
+@media (max-width: 1100px) {
+  .materials-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 680px) {
+  .materials-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.material-card {
+  background-color: var(--cam-surface-1);
+  border: 1px solid var(--cam-border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  transition: all var(--transition-fast);
+  position: relative;
+}
+
+.material-card:hover {
+  border-color: var(--cam-border-medium);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+.material-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.material-name {
+  font-size: 1.1875rem;
+  font-weight: 700;
+  color: var(--cam-text-primary);
+  line-height: 1.2;
+}
+
+.material-tech-pill {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--cam-surface-2);
+  border: 1px solid var(--cam-border-medium);
+  color: var(--cam-text-secondary);
+}
+
+.material-props-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.prop-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8125rem;
+}
+
+.prop-name {
+  color: var(--cam-text-muted);
+}
+
+.prop-val {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--cam-text-primary);
+}
+
+.prop-bar-track {
+  width: 100%;
+  height: 4px;
+  background-color: var(--cam-surface-2);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 2px;
+}
+
+.prop-bar-fill {
+  height: 100%;
+  background-color: var(--cam-blue-primary);
+  border-radius: 2px;
+}
+
+.material-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.prop-tag {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  padding: 2px 6px;
+  background: var(--cam-surface-2);
+  border: 1px solid var(--cam-border-subtle);
+  border-radius: 3px;
+  color: var(--cam-text-muted);
+}
+
+.material-card-actions {
+  margin-top: auto;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--cam-border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+/* Comparison Floating Bar & Drawer */
+.comparison-floating-bar {
+  position: fixed;
+  bottom: var(--space-6);
+  left: 50%;
+  transform: translateX(-50%) translateY(100px);
+  background-color: var(--cam-surface-2);
+  border: 1px solid var(--cam-border-blue);
+  border-radius: var(--radius-full);
+  padding: var(--space-3) var(--space-6);
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  box-shadow: var(--shadow-xl), 0 0 20px var(--cam-blue-glow);
+  z-index: 800;
+  transition: transform var(--transition-base);
+}
+
+.comparison-floating-bar.active {
+  transform: translateX(-50%) translateY(0);
+}
+
+.comparison-table-wrapper {
+  overflow-x: auto;
+}
+
+.comparison-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.comparison-table th, .comparison-table td {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--cam-border-subtle);
+  font-size: 0.875rem;
+}
+
+.comparison-table th {
+  background: var(--cam-surface-2);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--cam-text-muted);
+}

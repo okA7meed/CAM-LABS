@@ -1,0 +1,379 @@
+/* ==========================================================================
+   CAM LABS — Industrial Design System Tokens & Base Reset
+   Precision Digital Manufacturing Platform
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@700;800;900&family=DM+Sans:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+:root {
+  /* Brand Colors */
+  --cam-bg: #0A0A0A;
+  --cam-surface-1: #111317;
+  --cam-surface-2: #191d24;
+  --cam-surface-3: #252b34;
+  --cam-surface-hover: #202630;
+  
+  --cam-blue-primary: #0066FF;
+  --cam-blue-hover: #1A75FF;
+  --cam-blue-active: #0052CC;
+  --cam-blue-subtle: rgba(0, 102, 255, 0.12);
+  --cam-blue-glow: rgba(0, 102, 255, 0.35);
+  
+  --cam-text-primary: #F9FAFB;
+  --cam-text-secondary: #E5E7EB;
+  --cam-text-muted: #9CA3AF;
+  --cam-text-faint: #6B7280;
+  
+  /* Precision & Status Colors */
+  --cam-success: #10B981;
+  --cam-success-subtle: rgba(16, 185, 129, 0.12);
+  --cam-warning: #F59E0B;
+  --cam-warning-subtle: rgba(245, 158, 11, 0.12);
+  --cam-danger: #EF4444;
+  --cam-danger-subtle: rgba(239, 68, 68, 0.12);
+  --cam-cyan-tech: #06B6D4;
+
+  /* Borders & Dividers */
+  --cam-border-subtle: rgba(255, 255, 255, 0.08);
+  --cam-border-medium: rgba(255, 255, 255, 0.14);
+  --cam-border-strong: rgba(255, 255, 255, 0.22);
+  --cam-border-blue: rgba(0, 102, 255, 0.5);
+
+  /* Typography */
+  --font-sans: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-display: 'Space Grotesk', var(--font-sans);
+  --font-arabic: 'IBM Plex Sans Arabic', 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  /* Space Grotesk / IBM Plex Sans Arabic stop at 700; these ship real 900 faces for the hero headline. */
+  --font-hero-display: 'DM Sans', var(--font-sans);
+  --font-hero-arabic: 'Noto Sans Arabic', var(--font-arabic);
+
+  /* Spacing Scale */
+  --space-1: 0.25rem;  /* 4px */
+  --space-2: 0.5rem;   /* 8px */
+  --space-3: 0.75rem;  /* 12px */
+  --space-4: 1rem;     /* 16px */
+  --space-5: 1.25rem;  /* 20px */
+  --space-6: 1.5rem;   /* 24px */
+  --space-8: 2rem;     /* 32px */
+  --space-10: 2.5rem;  /* 40px */
+  --space-12: 3rem;    /* 48px */
+  --space-16: 4rem;    /* 64px */
+  --space-20: 5rem;    /* 80px */
+  --space-24: 6rem;    /* 96px */
+
+  /* Radii (Engineered & Crisp) */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+
+  /* Button corner curvature — derived from the navbar "Start Manufacturing"
+     button (8px radius on a 36px control = 0.2222 of the control height).
+     Set --btn-block-size per button, then use var(--btn-radius). */
+  --btn-radius-ratio: 0.2222;
+  --btn-block-size: 36px;
+
+  /* Elevation Shadows */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.6), 0 4px 6px -4px rgba(0, 0, 0, 0.6);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.7), 0 8px 10px -6px rgba(0, 0, 0, 0.7);
+  --shadow-glow: 0 0 24px var(--cam-blue-glow);
+
+  /* Transitions */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-smooth: 350ms cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Layout */
+  --container-max-w: 1280px;
+  --header-height: 72px;
+  --navbar-control-height: 36px;
+}
+
+[data-theme='light'] {
+  --cam-bg: #f7f9fc;
+  --cam-bg: #f7f9fc;
+  --cam-surface-1: #ffffff;
+  --cam-surface-2: #f1f5f9;
+  --cam-surface-3: #e5e7eb;
+  --cam-surface-hover: #eaf1ff;
+  --cam-text-primary: #111827;
+  --cam-text-secondary: #374151;
+  --cam-text-muted: #64748b;
+  --cam-text-faint: #94a3b8;
+  --cam-border-subtle: rgba(15, 23, 42, 0.10);
+  --cam-border-medium: rgba(15, 23, 42, 0.16);
+  --cam-border-strong: rgba(15, 23, 42, 0.28);
+  --cam-border-blue: rgba(0, 102, 255, 0.46);
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.08);
+  --shadow-md: 0 6px 14px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 16px 30px rgba(15, 23, 42, 0.12);
+  --shadow-xl: 0 22px 44px rgba(15, 23, 42, 0.15);
+}
+
+/* Base Reset & Box Sizing */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  /* Declared universally so it re-resolves against each element's own
+     --btn-block-size; a var() nested in a custom property is otherwise
+     substituted once, at the element where that property is declared. */
+  --btn-radius: calc(var(--btn-block-size) * var(--btn-radius-ratio));
+}
+
+html {
+  font-size: 16px;
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--cam-bg);
+  color: var(--cam-text-secondary);
+  transition: background-color var(--transition-smooth), color var(--transition-smooth);
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--cam-bg);
+  color: var(--cam-text-secondary);
+  line-height: 1.6;
+  overflow-x: hidden;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  transition: background-color var(--transition-smooth), color var(--transition-smooth);
+}
+
+/* IBM Plex Sans Arabic provides the Arabic voice while leaving English typography unchanged. */
+[lang='ar'] body,
+[lang='ar'] button,
+[lang='ar'] input,
+[lang='ar'] textarea,
+[lang='ar'] select,
+[lang='ar'] option {
+  font-family: var(--font-arabic);
+}
+
+[lang='ar'] h1,
+[lang='ar'] h2,
+[lang='ar'] h3,
+[lang='ar'] h4,
+[lang='ar'] h5,
+[lang='ar'] h6 {
+  font-family: var(--font-arabic);
+  letter-spacing: 0;
+  line-height: 1.35;
+}
+
+[lang='ar'] h1 {
+  font-weight: 900;
+  line-height: 1.25;
+}
+
+[lang='ar'] h2,
+[lang='ar'] h3 {
+  font-weight: 800;
+}
+
+[lang='ar'] p,
+[lang='ar'] li,
+[lang='ar'] label,
+[lang='ar'] a,
+[lang='ar'] td,
+[lang='ar'] th {
+  line-height: 1.8;
+}
+
+[lang='ar'] .font-mono,
+[lang='ar'] code,
+[lang='ar'] pre {
+  font-family: var(--font-arabic);
+  letter-spacing: 0;
+}
+
+/* Engineering Technical Grid Background */
+.tech-grid-bg {
+  position: relative;
+}
+
+.tech-grid-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: 
+    linear-gradient(to right, var(--cam-border-subtle) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--cam-border-subtle) 1px, transparent 1px);
+  background-size: 40px 40px;
+  opacity: 0.2;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Typography Hierarchy */
+h1, h2, h3, h4, h5, h6 {
+  color: var(--cam-text-primary);
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0;
+  font-family: var(--font-display);
+}
+
+h1 {
+  font-size: clamp(2.25rem, 5vw, 3.75rem);
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+h2 {
+  font-size: clamp(1.75rem, 3.5vw, 2.5rem);
+  letter-spacing: 0;
+}
+
+h3 {
+  font-size: clamp(1.25rem, 2vw, 1.5rem);
+  font-weight: 600;
+}
+
+h4 {
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+p {
+  color: var(--cam-text-secondary);
+  font-size: 1rem;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+a:hover {
+  color: var(--cam-blue-primary);
+}
+
+code, pre, .font-mono {
+  font-family: var(--font-mono);
+}
+
+.mono-tag {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+/* Layout Utilities */
+.container {
+  width: 100%;
+  max-width: var(--container-max-w);
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: var(--space-6);
+  padding-right: var(--space-6);
+}
+
+.section-padding {
+  padding-top: var(--space-20);
+  padding-bottom: var(--space-20);
+}
+
+@media (max-width: 768px) {
+  .section-padding {
+    padding-top: var(--space-12);
+    padding-bottom: var(--space-12);
+  }
+}
+
+.section-header {
+  text-align: center;
+  max-width: 760px;
+  margin: 0 auto var(--space-12) auto;
+}
+
+.section-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 4px 12px;
+  background: var(--cam-surface-2);
+  border: 1px solid var(--cam-border-medium);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--cam-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: var(--space-4);
+}
+
+.section-badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--cam-blue-primary);
+}
+
+.section-title {
+  margin-bottom: var(--space-4);
+}
+
+.section-subtitle {
+  font-size: 1.125rem;
+  color: var(--cam-text-muted);
+  line-height: 1.6;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--cam-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--cam-surface-2);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--cam-border-subtle);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--cam-surface-3);
+}
+
+/* Accessibility Focus States */
+:focus-visible {
+  outline: 2px solid var(--cam-blue-primary);
+  outline-offset: 2px;
+}
+
+.page-enter > main {
+  animation: content-enter var(--transition-smooth) both;
+}
+
+@keyframes content-enter {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--cam-surface-2) 25%, var(--cam-surface-3) 50%, var(--cam-surface-2) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease infinite;
+}
+
+@keyframes skeleton-shimmer {
+  to { background-position: -200% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: 0.01ms !important; }
+}

@@ -1,0 +1,47 @@
+{
+  "name": "cam-labs-platform",
+  "version": "1.0.0",
+  "description": "CAM LABS — Digital Manufacturing & 3D Printing Platform",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend",
+    "shared"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=frontend",
+    "dev:frontend": "npm run dev --workspace=frontend",
+    "dev:backend": "npm run dev --workspace=backend",
+    "build": "npm run build --workspace=shared && npm run build --workspace=backend && npm run build --workspace=frontend",
+    "build:frontend": "npm run build --workspace=frontend",
+    "build:backend": "npm run build --workspace=backend",
+    "lint": "npm run lint --workspace=frontend && npm run lint --workspace=backend",
+    "test": "npm run test --workspace=backend"
+  },
+  "keywords": [
+    "cam-labs",
+    "3d-printing",
+    "digital-manufacturing",
+    "cnc-machining",
+    "rapid-prototyping",
+    "react",
+    "typescript",
+    "nodejs",
+    "postgresql",
+    "prisma"
+  ],
+  "author": "CAM LABS Engineering",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@react-three/drei": "^10.7.8",
+    "@react-three/fiber": "^9.7.0",
+    "dxf-parser": "^1.1.2",
+    "i18next": "^26.3.6",
+    "opencascade.js": "^2.0.0-beta.b5ff984",
+    "react-i18next": "^17.0.11",
+    "three": "^0.185.1"
+  },
+  "devDependencies": {
+    "@types/three": "^0.185.4"
+  }
+}
