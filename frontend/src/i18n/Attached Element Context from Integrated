@@ -1,0 +1,67 @@
+Attached Element Context from Integrated Browser
+
+Element: span
+
+URL: http://localhost:3000/
+
+HTML Path: div.tech-grid-bg.page-enter > main.manufacturing-request-view > div.container.request-shell > div.request-actions.request-nav > button.btn.btn-lg.btn-primary.request-nav-next > span
+
+Outer HTML:
+```html
+<span aria-hidden="true">→</span>
+```
+
+Dimensions:
+- top: 674px
+- left: 765px
+- width: 16px
+- height: 17px
+
+CSS:
+```css
+*, *::before, *::after { box-sizing: border-box;
+  margin: 0;
+  padding: 0; }
+
+/* Pseudo-elements */
+::-webkit-scrollbar { width: 8px;
+  height: 8px; }
+::-webkit-scrollbar-thumb { background: var(--cam-surface-2);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--cam-border-subtle); }
+::-webkit-scrollbar-track { background: var(--cam-bg); }
+
+/* Inherited */
+.btn { font-family: var(--font-sans); font-size: 0.9375rem; font-weight: 600; line-height: 1; cursor: pointer; white-space: nowrap }
+.btn-primary { color: #FFFFFF }
+.btn-lg { font-size: 1.0625rem; font-weight: 700 }
+body { font-family: var(--font-sans); color: var(--cam-text-secondary); line-height: 1.6 }
+html { font-size: 16px; color: var(--cam-text-secondary) }
+
+/* Resolved values */
+margin: 0px;
+padding: 0px;
+box-sizing: border-box;
+color: rgb(255, 255, 255);
+cursor: pointer;
+display: block;
+font-family: "DM Sans", -apple-system, "system-ui", "Segoe UI", sans-serif;
+font-size: 17px;
+font-weight: 700;
+height: 17px;
+letter-spacing: normal /*UA*/;
+line-height: 17px;
+text-align: center /*UA*/;
+text-indent: 0px /*UA*/;
+text-transform: none /*UA*/;
+width: 15.6094px;
+word-spacing: 0px /*UA*/;
+
+/* CSS variables */
+--radius-sm: 4px;
+--cam-border-subtle: rgba(255, 255, 255, 0.08);
+--font-sans: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+--cam-text-secondary: #E5E7EB;
+--cam-surface-2: #191d24;
+--cam-bg: #0A0A0A;
+```
