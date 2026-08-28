@@ -19,7 +19,7 @@ const SCROLL_SECTIONS: Array<{ id: string; view: ViewType }> = [
   { id: 'about', view: 'about' },
 ];
 
-const NON_LANDING_VIEWS: ViewType[] = ['dashboard', 'profile', 'marketplace', 'manufacturing-request'];
+const NON_LANDING_VIEWS: ViewType[] = ['dashboard', 'profile', 'marketplace', 'manufacturing-request', 'equation-builder'];
 
 export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav }) => {
   const { currentUser, isAuthenticated, logout } = useAuth();
@@ -200,6 +200,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav }) => {
 
           {isAuthenticated ? (
             <>
+              <button className="header-sign-in" onClick={() => handleNavClick('equation-builder')}>Equation Builder</button>
               <button className="header-sign-in" onClick={() => handleNavClick('dashboard')}>{t('nav.dashboard')}</button>
               <button className="header-sign-in" onClick={() => void logout()}>{t('nav.signOut')}</button>
             </>

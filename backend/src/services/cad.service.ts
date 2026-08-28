@@ -203,6 +203,12 @@ export class CadService {
     if (file.versions.some((version) => version.jobs.some((job) => job.status === 'PENDING' || job.status === 'PROCESSING'))) {
       throw new AppError('CAD processing must finish before this file can be deleted.', 409, 'CAD_PROCESSING_ACTIVE');
     }
+    // A CAD file already committed to an order cannot be removed — it is part
+    // of the order's auditable record (FK is RESTRICT).
+    const orderLinks = await prisma.orderCadFile.count({ where: { cadFileId: id } });
+    if (orderLinks > 0) {
+      throw new AppError('This CAD file is attached to an order and cannot be deleted.', 400, 'CAD_FILE_IN_ORDER');
+    }
     await prisma.cadFile.delete({ where: { id: file.id } });
     await Promise.all(file.versions.flatMap((version) => [storage.remove(version.storageKey), ...(version.viewerAssetKey ? [storage.remove(version.viewerAssetKey)] : [])]));
     return { id: file.id, deletedVersionCount: file.versions.length };

@@ -20,6 +20,10 @@ export interface Material {
   colorOptions: string[];
   idealFor: string;
   isCertified?: boolean;
+  pricePerUnit?: number;
+  priceUnit?: string;
+  availability?: string;
+  isActive?: boolean;
 }
 
 export interface UserPreferences {
@@ -126,4 +130,21 @@ export interface ToastMessage {
   type: 'success' | 'error' | 'info' | 'warning';
 }
 
-export type ViewType = 'home' | 'services' | 'materials' | 'workflow' | 'about' | 'dashboard' | 'profile' | 'marketplace' | 'manufacturing-request';
+export type ViewType = 'home' | 'services' | 'materials' | 'workflow' | 'about' | 'dashboard' | 'profile' | 'marketplace' | 'manufacturing-request' | 'equation-builder'
+  | 'admin-login' | 'admin-dashboard'
+  | 'admin-orders' | 'admin-order-detail'
+  | 'admin-customers' | 'admin-customer-detail'
+  | 'admin-manufacturers' | 'admin-manufacturer-detail'
+  | 'admin-manufacturing-requests' | 'admin-manufacturing-request-detail'
+  | 'admin-materials'
+  | 'admin-quotes' | 'admin-quote-detail'
+  | 'admin-cad-files' | 'admin-cad-file-detail'
+  | 'admin-payments'
+  | 'admin-shipping'
+  | 'admin-pricing'
+  | 'admin-pricing-constants'
+  | 'admin-reports'
+  | 'admin-notifications'
+  | 'admin-users'
+  | 'admin-audit-logs'
+  | 'admin-settings';

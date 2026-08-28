@@ -39,10 +39,10 @@ const numberSetting = (name: string, fallback: number): number => {
 
 export const MANUFACTURING_PRICING_CONFIGURATION: ManufacturingPricingConfiguration = {
   materialPriceEgpPerGram: {
-    pla: numberSetting('CAM_LABS_FDM_PLA_EGP_PER_GRAM', 12),
-    abs: numberSetting('CAM_LABS_FDM_ABS_EGP_PER_GRAM', 15),
-    petg: numberSetting('CAM_LABS_FDM_PETG_EGP_PER_GRAM', 15),
-    tpu: numberSetting('CAM_LABS_FDM_TPU_EGP_PER_GRAM', 24),
+    pla: numberSetting('CAM_LABS_FDM_PLA_EGP_PER_GRAM', 2),
+    abs: numberSetting('CAM_LABS_FDM_ABS_EGP_PER_GRAM', 3),
+    petg: numberSetting('CAM_LABS_FDM_PETG_EGP_PER_GRAM', 3),
+    tpu: numberSetting('CAM_LABS_FDM_TPU_EGP_PER_GRAM', 4),
   },
   materialDensityGramsPerCm3: {
     pla: numberSetting('CAM_LABS_FDM_PLA_DENSITY_G_PER_CM3', 1.24),
@@ -50,7 +50,7 @@ export const MANUFACTURING_PRICING_CONFIGURATION: ManufacturingPricingConfigurat
     petg: numberSetting('CAM_LABS_FDM_PETG_DENSITY_G_PER_CM3', 1.27),
     tpu: numberSetting('CAM_LABS_FDM_TPU_DENSITY_G_PER_CM3', 1.21),
   },
-  machineHourlyRateEgp: numberSetting('CAM_LABS_MACHINE_RATE_EGP_PER_HOUR', 180),
+  machineHourlyRateEgp: numberSetting('CAM_LABS_MACHINE_RATE_EGP_PER_HOUR', 50),
   laborHourlyRateEgp: numberSetting('CAM_LABS_LABOR_RATE_EGP_PER_HOUR', 120),
   setupTimeMinutes: numberSetting('CAM_LABS_SETUP_TIME_MINUTES', 10),
   productionLaborMinutes: numberSetting('CAM_LABS_PRODUCTION_LABOR_MINUTES', 8),

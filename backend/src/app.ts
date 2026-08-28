@@ -14,13 +14,31 @@ import ordersRoutes from './routes/orders.routes';
 import quotesRoutes from './routes/quotes.routes';
 import cadRoutes from './routes/cad.routes';
 import manufacturingRoutes from './routes/manufacturing.routes';
+import pricingAdminRoutes from './routes/pricing-admin.routes';
+import adminRoutes from './routes/admin.routes';
+import adminReportsRoutes from './routes/admin-reports.routes';
+import adminSettingsRoutes from './routes/admin-settings.routes';
 
 export const createApp = (): Application => {
   const app = express();
 
   // ─── Security & Middleware ─────────────────────────────────────────
   app.use(helmet({
-    contentSecurityPolicy: false, // Disabled for development flexibility
+    contentSecurityPolicy: {
+      useDefaults: true,
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "blob:", "https:"],
+        fontSrc: ["'self'", "data:"],
+        connectSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        frameAncestors: ["'self'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+      },
+    },
     crossOriginEmbedderPolicy: false,
   }));
 
@@ -64,6 +82,9 @@ export const createApp = (): Application => {
   });
   app.use('/api/v1/auth/login', authLimiter);
   app.use('/api/v1/auth/register', authLimiter);
+  // Admin login is a prime credential-stuffing target; rate-limit it just like
+  // the public auth endpoints (the admin-auth service also enforces lockout).
+  app.use('/api/v1/auth/admin/login', authLimiter);
 
   // ─── Request Logging ──────────────────────────────────────────────
   app.use((req, _res, next) => {
@@ -79,6 +100,10 @@ export const createApp = (): Application => {
   app.use('/api/v1/quotes', quotesRoutes);
   app.use('/api/v1/cad-files', cadRoutes);
   app.use('/api/v1/manufacturing', manufacturingRoutes);
+  app.use('/api/v1/admin/pricing', pricingAdminRoutes);
+  app.use('/api/v1/admin', adminRoutes);
+  app.use('/api/v1/admin/reports', adminReportsRoutes);
+  app.use('/api/v1/admin/settings', adminSettingsRoutes);
 
   // ─── Global Error Handler ─────────────────────────────────────────
   app.use(errorHandler);

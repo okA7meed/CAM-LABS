@@ -8,6 +8,25 @@ import {
 import { MANUFACTURING_PRICING_CONFIGURATION } from '../../services/pricing-config.service';
 import { Logger } from '../../utils/logger';
 import { FdmSlicerService } from '../../services/fdm-slicer.service';
+import { randomBytes } from 'crypto';
+
+const INTERNAL_NODE = 'CAM-LABS-INTERNAL-CELL-01';
+
+const LEAD_TIME_DAYS_BY_TECHNOLOGY: Record<string, number> = {
+  FDM: 2,
+  SLS: 3,
+  SLA: 2,
+  'CNC': 4,
+  'CNC_MILLING': 4,
+  'CNC_TURNING': 4,
+  DMLS: 6,
+  'SHEET_METAL': 3,
+};
+
+const leadTimeDaysFor = (technology: string): number => {
+  const key = technology.toUpperCase();
+  return LEAD_TIME_DAYS_BY_TECHNOLOGY[key] ?? 3;
+};
 
 export class CAMLabsManufacturingEngine implements IManufacturingEngine {
   readonly name = 'CAM LABS' as const;
@@ -62,27 +81,103 @@ export class CAMLabsManufacturingEngine implements IManufacturingEngine {
     const estimatedMachineSeconds = extrusionSeconds + layerOverheadSeconds;
     const machineTimeSeconds = Math.max(slicerResult.printTimeSeconds, estimatedMachineSeconds);
     const machineTimeMinutes = machineTimeSeconds / 60;
-    const machineCost = machineTimeMinutes / 60 * MANUFACTURING_PRICING_CONFIGURATION.machineHourlyRateEgp;
-    const setupTimeMinutes = MANUFACTURING_PRICING_CONFIGURATION.setupTimeMinutes;
+    const machineCost = (machineTimeMinutes / 60) * rates.machineHourlyRateEgp;
+    const setupTimeMinutes = rates.setupTimeMinutes;
     const finishKey = request.surfaceFinish.toLowerCase();
-    const postProcessingCost = MANUFACTURING_PRICING_CONFIGURATION.postProcessingRatesEgp[finishKey] ?? (finishKey === 'standard' ? 0 : NaN);
+    const postProcessingCost = rates.postProcessingRatesEgp[finishKey] ?? (finishKey === 'standard' ? 0 : NaN);
     if (!Number.isFinite(postProcessingCost)) throw new Error(`No EGP post-processing price is configured for ${request.surfaceFinish}.`);
-    const laborTimeMinutes = (productionLaborMinutes + postProcessingMinutes) * request.quantity;
-    const laborCost = laborTimeMinutes / 60 * MANUFACTURING_PRICING_CONFIGURATION.laborHourlyRateEgp;
-    const setupConsumablesEgp = MANUFACTURING_PRICING_CONFIGURATION.setupConsumablesEgp;
-    const setupCost = setupTimeMinutes / 60 * MANUFACTURING_PRICING_CONFIGURATION.laborHourlyRateEgp + setupConsumablesEgp;
-    const unitManufacturingCost = (materialCost + machineCost + laborCost) / request.quantity + postProcessingCost;
-    const manufacturingCost = setupCost + materialCost + machineCost + laborCost + postProcessingCost * request.quantity;
-    const minimumOrderAdjustment = Math.max(0, MANUFACTURING_PRICING_CONFIGURATION.minimumOrderPriceEgp - manufacturingCost);
-    const finalCustomerPrice = manufacturingCost + minimumOrderAdjustment;
+
+    // Prepare model variables context for the AST pricing engine
+    const modelVariables = {
+      width: dimensions.width,
+      height: dimensions.height,
+      depth: dimensions.depth,
+      dimensionsMm: dimensions,
+      volume: validatedVolumeCm3 * 1000,
+      volumeCm3: validatedVolumeCm3,
+      surfaceArea: validatedSurfaceAreaCm2 * 100,
+      surfaceAreaCm2: validatedSurfaceAreaCm2,
+      boundingBoxVolume: dimensions.width * dimensions.height * dimensions.depth,
+      infill: infillPercent,
+      infillPercent,
+      layerHeight,
+      shellThickness: wallCount * lineWidth,
+      wallCount,
+      quantity: request.quantity,
+      density,
+      machineTime: machineTimeMinutes / 60,
+      machineTimeMinutes,
+      materialPrice,
+      material: request.materialId,
+      technology: request.technology,
+    };
+
+    let evaluationResult;
+    try {
+      const { PricingAdminService } = await import('../../services/pricing-admin.service');
+      const { PricingEngineService } = await import('../../services/pricing-engine.service');
+      const activeEquation = await PricingAdminService.getActivePublishedEquation(request.technology);
+      evaluationResult = PricingEngineService.calculatePricing({
+        modelContext: modelVariables,
+        customVariables: activeEquation.customVariables,
+        constants: activeEquation.constants,
+        equationTree: activeEquation.formulaTree,
+        equationVersionId: activeEquation.version.id,
+        equationVersion: activeEquation.version.version,
+      });
+    } catch (err: any) {
+      Logger.warn(`[CAMLabsManufacturingEngine] Fallback to default equation template: ${err.message}`);
+      const { PricingEngineService } = await import('../../services/pricing-engine.service');
+      const { DEFAULT_FDM_TEMPLATE } = await import('../../services/pricing-admin.service');
+      // The template's PLÁ/PLA_PRICE constant is the canonical PLA floor; pin it
+      // to the exact material being quoted so the fallback never undercuts the
+      // authoritative per-material rate (PLA 2 / ABS 3 / PETG 3 / TPU 4 EGP/g).
+      const fallbackConstants = DEFAULT_FDM_TEMPLATE.constants.map((c) =>
+        c.key === 'PLA_PRICE'
+          ? { ...c, value: materialPrice }
+          : c
+      );
+      evaluationResult = PricingEngineService.calculatePricing({
+        modelContext: modelVariables,
+        customVariables: DEFAULT_FDM_TEMPLATE.customVariables,
+        constants: fallbackConstants,
+        equationTree: DEFAULT_FDM_TEMPLATE.formulaTree,
+        equationVersion: 1,
+      });
+    }
+
+    const unitManufacturingCost = evaluationResult.unitPrice;
+    const finalCustomerPrice = evaluationResult.totalPrice;
+
+    const setupCost = (setupTimeMinutes / 60) * rates.laborHourlyRateEgp + rates.setupConsumablesEgp;
+    const laborTimeMinutes = (rates.productionLaborMinutes + rates.postProcessingMinutes) * request.quantity;
+    const laborCost = (laborTimeMinutes / 60) * rates.laborHourlyRateEgp;
+
     const breakdown = {
       geometry: { volumeCm3: validatedVolumeCm3, surfaceAreaCm2: validatedSurfaceAreaCm2, dimensionsMm: dimensions, boundingBoxHeightMm: dimensions.height, triangleCount: request.triangleCount, units: request.geometryUnits || 'mm' },
       manufacturing: { technology: 'FDM', material: request.materialId, layerHeightMm: layerHeight, infillPercent, wallCount, lineWidthMm: lineWidth, printSpeedMmPerSecond: speed, layerCount, quantity: request.quantity },
       material: { modelVolumeCm3: validatedVolumeCm3, depositedMaterialVolumeCm3, supportVolumeCm3, wasteVolumeCm3, materialVolumeCm3, materialUsageGrams, densityGramsPerCm3: density, pricePerGramEgp: materialPrice, cost: materialCost },
       machine: { printTimeMinutes: machineTimeMinutes, machineHourlyRateEgp: rates.machineHourlyRateEgp, cost: machineCost },
-      labor: { setupTimeMinutes, productionTimeMinutes: productionLaborMinutes, postProcessingTimeMinutes: postProcessingMinutes, laborHourlyRateEgp: rates.laborHourlyRateEgp, cost: laborCost },
-      additionalManufacturing: { setupConsumablesEgp, postProcessingCost },
-      materialCost, machineCost, laborCost, setupCost, postProcessingCost, unitManufacturingCost, quantity: request.quantity, manufacturingCost, minimumOrderAdjustment, finalCustomerPrice, currency: 'EGP' as const, materialUsageGrams, machineTimeMinutes, laborTimeMinutes, setupTimeMinutes,
+      labor: { setupTimeMinutes, productionTimeMinutes: rates.productionLaborMinutes, postProcessingTimeMinutes: rates.postProcessingMinutes, laborHourlyRateEgp: rates.laborHourlyRateEgp, cost: laborCost },
+      additionalManufacturing: { setupConsumablesEgp: rates.setupConsumablesEgp, postProcessingCost },
+      materialCost,
+      machineCost,
+      laborCost,
+      setupCost,
+      postProcessingCost,
+      unitManufacturingCost,
+      quantity: request.quantity,
+      manufacturingCost: finalCustomerPrice,
+      minimumOrderAdjustment: 0,
+      finalCustomerPrice,
+      currency: 'EGP' as const,
+      materialUsageGrams,
+      machineTimeMinutes,
+      laborTimeMinutes,
+      setupTimeMinutes,
+      equationVersionId: evaluationResult.equationVersionId,
+      equationVersion: evaluationResult.equationVersion,
+      equationBreakdown: evaluationResult.breakdown,
       sources: { geometry: request.geometrySource || 'calculated' as const, materialUsage: 'actual' as const, machineTime: 'actual' as const, supportVolume: 'estimated' as const, pricingConfiguration: 'configured' as const },
     };
 
@@ -101,23 +196,65 @@ export class CAMLabsManufacturingEngine implements IManufacturingEngine {
   }
 
   async dispatchOrder(dispatchData: ManufacturingOrderDispatch): Promise<ManufacturingDispatchResult> {
-    Logger.info(`[CAMLabsManufacturingEngine] Queuing internal order ${dispatchData.orderId}.`);
+    const dispatchedAt = new Date();
+    const leadDays = leadTimeDaysFor(dispatchData.technology);
+    const estimatedCompletion = new Date(dispatchedAt.getTime() + leadDays * 24 * 60 * 60 * 1000);
+    Logger.info(`[CAMLabsManufacturingEngine] Queuing internal order ${dispatchData.orderId} on ${INTERNAL_NODE} (${leadDays} day lead).`);
     return {
       engineName: 'CAM LABS',
-      trackingId: `CAM-TRK-${Date.now()}`,
-      internalOrderRef: `CAM-ORD-${Date.now()}`,
-      dispatchedAt: new Date().toISOString(),
+      trackingId: `CAM-TRK-${Date.now()}-${randomBytes(3).toString('hex').toUpperCase()}`,
+      internalOrderRef: `CAM-ORD-${Date.now()}-${randomBytes(3).toString('hex').toUpperCase()}`,
+      dispatchedAt: dispatchedAt.toISOString(),
       status: 'Queued',
-      estimatedCompletion: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      estimatedCompletion: estimatedCompletion.toISOString().split('T')[0],
+      telemetry: { node: INTERNAL_NODE, leadTimeDays: leadDays, provider: 'internal' },
     };
   }
 
   async getOrderStatus(trackingId: string) {
-    return {
-      status: 'Queued',
-      currentMilestone: 'CAM LABS Internal Toolpath Scheduling',
-      progressPercentage: 10,
-      telemetry: { trackingId, node: 'CAM-LABS-INTERNAL-CELL-01' },
-    };
+    try {
+      const { getPrismaClient } = await import('../../config/database');
+      const prisma = getPrismaClient();
+      const order = await prisma.order.findFirst({
+        where: { trackingNum: trackingId },
+        include: { manufacturingRequests: true, events: { orderBy: { createdAt: 'desc' }, take: 10 } },
+      });
+
+      if (!order) {
+        return {
+          status: 'UNKNOWN',
+          currentMilestone: 'Tracking ID not found',
+          progressPercentage: 0,
+          telemetry: { trackingId, node: INTERNAL_NODE },
+        };
+      }
+
+      const milestone = order.manufacturingRequests?.[0]?.status || order.manufacturingStatus || 'PENDING';
+      const progressMap: Record<string, number> = {
+        PENDING: 10, ACCEPTED: 25, IN_PROGRESS: 55, QUALITY: 80, COMPLETED: 100, SHIPPED: 100, DELIVERED: 100,
+      };
+      const lastEvent = order.events?.[0];
+      const milestones = (order.events || []).map((event) => ({
+        eventType: event.eventType,
+        description: event.description,
+        at: event.createdAt.toISOString(),
+      }));
+
+      return {
+        status: milestone,
+        currentMilestone: lastEvent?.description || 'Queued in CAM LABS internal manufacturing',
+        progressPercentage: progressMap[milestone] ?? 10,
+        telemetry: { trackingId, orderId: order.id, node: INTERNAL_NODE, technology: order.technology, material: order.material, quantity: order.quantity },
+        milestones,
+      };
+    } catch (error) {
+      Logger.warn(`[CAMLabsManufacturingEngine] Status lookup failed: ${error instanceof Error ? error.message : String(error)}`);
+      return {
+        status: 'Queued',
+        currentMilestone: 'CAM LABS Internal Toolpath Scheduling',
+        progressPercentage: 10,
+        telemetry: { trackingId, node: INTERNAL_NODE },
+      };
+    }
   }
 }

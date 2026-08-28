@@ -6,6 +6,8 @@ import { Logger } from '../utils/logger';
 import { getPrismaClient } from '../config/database';
 import { Prisma, Quote } from '@prisma/client';
 import { createObjectStorage } from '../cad/object-storage';
+import { randomInt } from 'crypto';
+import { AppError } from '../utils/errors';
 
 /**
  * Quotes Service
@@ -14,6 +16,14 @@ import { createObjectStorage } from '../cad/object-storage';
  */
 export class QuotesService {
   private static readonly storage = createObjectStorage();
+
+  /**
+   * Generate a server-side RFQ identifier with a wider draw space so
+   * crafted primary-key guesses cannot be predicted.
+   */
+  private static generateQuoteId(): string {
+    return `RFQ-2026-${randomInt(100000, 1000000)}`;
+  }
   private static async geometryForCadFile(fileId: string, owner?: { userId?: string; guestId?: string }) {
     const prisma = getPrismaClient();
     const ownerFilter = owner?.userId ? { userId: owner.userId } : owner?.guestId ? { userId: null, guestId: owner.guestId } : {};
@@ -21,11 +31,11 @@ export class QuotesService {
     const version = file?.versions[0];
     const metadata = version?.metadata as { geometryStatus?: string; supportLevel?: string; volume?: number; surfaceArea?: number; dimensions?: { width?: number; depth?: number; height?: number }; units?: string; unitsStatus?: string; triangleCount?: number } | null;
     if (!file || !version || version.processingStatus !== 'COMPLETE' || metadata?.geometryStatus !== 'READY' || metadata.supportLevel === 'FAILED_VALIDATION' || !metadata?.volume || !metadata.surfaceArea || !metadata.dimensions) {
-      throw new Error(`Engineering analysis is unavailable for CAD file ${fileId}.`);
+      throw new AppError(`Engineering analysis is unavailable for CAD file ${fileId}.`, 409, 'CAD_ANALYSIS_UNAVAILABLE');
     }
     const configuredUnit = process.env.CAM_LABS_MESH_DEFAULT_UNIT;
     const unit = (version.detectedUnit && version.detectedUnit !== 'unknown' ? version.detectedUnit : metadata.units && metadata.units !== 'unitless' ? metadata.units : configuredUnit || '').toLowerCase();
-    if (!unit) throw new Error(`Units are unavailable for CAD file ${fileId}.`);
+    if (!unit) throw new AppError(`Units are unavailable for CAD file ${fileId}.`, 409, 'CAD_ANALYSIS_UNAVAILABLE');
     const toMm = unit === 'm' ? 1000 : unit === 'cm' ? 10 : unit === 'in' ? 25.4 : 1;
     const toCm3 = toMm ** 3 / 1000;
     return {
@@ -51,7 +61,7 @@ export class QuotesService {
 
     const engine = getManufacturingEngine();
     const geometry = request.cadFileId ? await this.geometryForCadFile(request.cadFileId, request.cadOwner) : undefined;
-    if (!geometry) throw new Error('A persisted CAD file engineering analysis is required before pricing.');
+    if (!geometry) throw new AppError('A persisted CAD file engineering analysis is required before pricing.', 400, 'CAD_GEOMETRY_REQUIRED');
     const rawQuote = await engine.calculateQuote({ ...request, ...geometry, volumeCm3: geometry.volumeCm3, surfaceAreaCm2: geometry.surfaceAreaCm2 });
     const normalizedQuote = PricingService.processManufacturingQuote(
       rawQuote,
@@ -80,7 +90,7 @@ export class QuotesService {
 
     const newQuote = await prisma.quote.create({
       data: {
-        id: `RFQ-2026-${Math.floor(1000 + Math.random() * 9000)}`,
+        id: this.generateQuoteId(),
         userId: data.userId,
         partName: data.partName,
         technology: data.technology,
@@ -97,6 +107,7 @@ export class QuotesService {
         provider: 'CAM LABS',
         providerQuoteRef: data.pricing.quoteRef,
         cadFileIds: data.cadFileIds,
+        pricingEquationVersionId: (data.pricing.pricingBreakdown as any)?.equationVersionId || undefined,
         pricingBreakdown: data.pricing.pricingBreakdown as unknown as Prisma.InputJsonValue,
       },
     });
@@ -118,9 +129,10 @@ export class QuotesService {
     pricing: MultiFileQuotationResponse;
   }): Promise<Quote> {
     const prisma = getPrismaClient();
+    const primaryVersionId = (data.pricing.files[0]?.pricingBreakdown as any)?.equationVersionId || undefined;
     return prisma.quote.create({
       data: {
-        id: `RFQ-2026-${Math.floor(1000 + Math.random() * 9000)}`,
+        id: this.generateQuoteId(),
         userId: data.userId,
         partName: data.partName,
         technology: data.technology,
@@ -137,6 +149,7 @@ export class QuotesService {
         provider: 'CAM LABS',
         providerQuoteRef: data.pricing.quoteId,
         cadFileIds: data.cadFileIds,
+        pricingEquationVersionId: primaryVersionId,
         pricingBreakdown: data.pricing.pricingBreakdown as unknown as Prisma.InputJsonValue,
       },
     });

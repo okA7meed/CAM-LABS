@@ -1,6 +1,6 @@
 import React, { DragEvent, useEffect, useRef, useState } from 'react';
 import { ApiError, ApiService, CalculatedQuotationData, MultiFileQuotation } from '../../services/api';
-import { CadFile } from '../../types';
+import { CadFile, Material } from '../../types';
 import { useStore } from '../../context/StoreContext';
 import { useAuth } from '../../context/AuthContext';
 import { useTranslation } from 'react-i18next';
@@ -9,7 +9,7 @@ import { CadGeometryData } from '../../services/api';
 import { Icon, IconName } from '../ui/Icon';
 import { ModelDimensions, ModelUnit } from '../../utils/modelUnits';
 import { RequiredMark, OptionalMark } from '../ui/FieldLabel';
-import { MATERIALS_DATA } from '../../data/materialsData';
+import { materialById, useMaterials } from '../../hooks/useMaterials';
 import { PriceEstimateNotice } from '../ui/PriceEstimateNotice';
 import { PriceStatus, PriceTransition } from '../ui/PriceTransition';
 import { UploadItemStatus, UploadValidationState, areAllUploadsReady, hasBlockingUploadState, hasUploadInFlight, isCadFileReady, isUploadItemReady } from './uploadState';
@@ -100,6 +100,7 @@ const fdmParametersFor = (quality: string, wallCount: number, supportEnabled = f
 
 export const ManufacturingRequestView: React.FC = () => {
   const { t } = useTranslation();
+  const { materials } = useMaterials();
   const { setActiveView, openAuthModal } = useStore();
   const { isAuthenticated } = useAuth();
   const [step, setStep] = useState<Step>(0);
@@ -678,7 +679,7 @@ export const ManufacturingRequestView: React.FC = () => {
         {step === 0 && <TechnologyStep selected={request.technology} selectedProcess={request.process} onSelect={(technology) => { if (technology !== request.technology) resetUploadsForTechnologyChange(); updateRequest({ technology, process: null, material: null, cadFile: null, geometry: null }); }} onProcessSelect={(process) => { if (process !== request.process) resetUploadsForTechnologyChange(); updateRequest({ technology: request.technology ?? 'printing', process, material: process === 'fdm' ? 'pla' : null, cadFile: null, geometry: null }); }} t={t} />}
         {step === 1 && <UploadStep items={uploadItems} isDragging={isDragging} onBrowse={() => inputRef.current?.click()} onFiles={addFiles} onDragState={setIsDragging} onPreview={openPreview} onDelete={openDelete} onClearAll={clearAllUploads} t={t} />}
         {step === 2 && <FileSetupStep items={uploadItems} selectedId={selectedSetupId} states={fileSetupStates} configurations={fileConfigurations} request={request} onSelect={selectSetupFile} onToggle={toggleSetupSelection} onToggleAll={toggleAllSetupSelection} onAddFiles={() => inputRef.current?.click()} onDelete={openDelete} onGeometry={(geometry, itemId) => { updateRequest({ geometry }); setFileSetupStates((current) => { const existing = current[itemId]; if (existing?.baseDimensions) return current; const metadata = geometry.metadata; const baseDimensions = metadata?.dimensions ? { x: metadata.dimensions.width, y: metadata.dimensions.height, z: metadata.dimensions.depth } : null; return { ...current, [itemId]: { ...(existing || { unit: 'mm', selected: false }), baseDimensions, dimensions: baseDimensions, volume: metadata?.volume ?? null, surfaceArea: metadata?.surfaceArea ?? null, triangleCount: metadata?.triangleCount ?? null } }; }); }} onSetupChange={(update, itemId) => setFileSetupStates((current) => ({ ...current, [itemId]: { ...(current[itemId] || { unit: 'mm', selected: false, baseDimensions: update.dimensions || null, dimensions: update.dimensions || null, volume: null, surfaceArea: null, triangleCount: null }), ...update } }))} t={t} />}
-        {step === 3 && <WorkflowWorkspace items={uploadItems} selectedIds={materialSelectedIds} configurations={fileConfigurations} request={request} quote={quote} isCalculating={isCalculatingQuote} quoteFailed={quoteFailed} activeId={activeMaterialId} onSelectFile={toggleMaterialFile} onSelectAll={selectAllMaterialFiles} onAddFiles={() => inputRef.current?.click()} onPreview={openPreview} onDelete={openDelete} t={t}><MaterialStep options={materialOptions} selected={request.material} selectedColor={activeMaterialConfig?.color || request.color} selectedPartName={activeMaterialItem?.name} selectedTechnology={request.process} selectedCount={materialSelectedIds.length} onSelectMaterial={(material) => updateMaterialConfiguration({ material })} onSelectColor={(color) => updateMaterialConfiguration({ color })} onApplyAll={() => updateMaterialConfiguration({ material: request.material, color: request.color }, true)} t={t} /></WorkflowWorkspace>}
+        {step === 3 && <WorkflowWorkspace items={uploadItems} selectedIds={materialSelectedIds} configurations={fileConfigurations} request={request} quote={quote} isCalculating={isCalculatingQuote} quoteFailed={quoteFailed} activeId={activeMaterialId} onSelectFile={toggleMaterialFile} onSelectAll={selectAllMaterialFiles} onAddFiles={() => inputRef.current?.click()} onPreview={openPreview} onDelete={openDelete} t={t}><MaterialStep options={materialOptions} materials={materials} selected={request.material} selectedColor={activeMaterialConfig?.color || request.color} selectedPartName={activeMaterialItem?.name} selectedTechnology={request.process} selectedCount={materialSelectedIds.length} onSelectMaterial={(material) => updateMaterialConfiguration({ material })} onSelectColor={(color) => updateMaterialConfiguration({ color })} onApplyAll={() => updateMaterialConfiguration({ material: request.material, color: request.color }, true)} t={t} /></WorkflowWorkspace>}
         {step === 4 && <WorkflowWorkspace items={uploadItems} selectedIds={materialSelectedIds} configurations={fileConfigurations} request={request} quote={quote} isCalculating={isCalculatingQuote} quoteFailed={quoteFailed} onSelectFile={toggleMaterialFile} onSelectAll={selectAllMaterialFiles} onAddFiles={() => inputRef.current?.click()} onPreview={openPreview} onDelete={openDelete} t={t}><ConfigurationStep request={request} isPrinting={isPrinting} isCnc={isCnc} update={(value) => {
           updateRequest(value);
           const configurationUpdate: Partial<FileConfiguration> = {};
@@ -1077,26 +1078,32 @@ const QuoteSummary = ({ request, quote, isCalculating, quoteFailed, t }: { reque
   </aside>;
 };
 
-const MATERIAL_IMAGES: Record<string, string> = {
-  pla: 'https://makersgate1.s3.amazonaws.com/materials/images/pla_GfL9oIw.png',
-  abs: 'https://makersgate1.s3.amazonaws.com/materials/images/abs_5USM7mw.png',
-  petg: 'https://makersgate1.s3.amazonaws.com/materials/images/petg_adskWZ2.png',
-  tpu: 'https://makersgate1.s3.amazonaws.com/materials/images/tpu3.png',
+const MATERIAL_SWATCHES: Record<string, string> = {
+  pla: 'linear-gradient(135deg, #f5426c, #ff9f45)',
+  abs: 'linear-gradient(135deg, #4f5b66, #aab5c0)',
+  petg: 'linear-gradient(135deg, #00b4d8, #90e0ef)',
+  tpu: 'linear-gradient(135deg, #333, #6b7280)',
+  nylon: 'linear-gradient(135deg, #d4c29a, #8a7f5e)',
+  aluminum: 'linear-gradient(135deg, #c0c8d0, #7d8590)',
+  steel: 'linear-gradient(135deg, #9aa5b1, #475159)',
 };
 
-const MATERIAL_DENSITIES: Record<string, number> = { pla: 1.24, abs: 1.04, petg: 1.27, tpu: 1.2 };
-const MATERIAL_RATIOS: Record<string, string> = { pla: '1X', abs: '1.3X', petg: '1.3X', tpu: '2.5X' };
-
-const MaterialStep = ({ options, selected, selectedColor, selectedPartName, selectedTechnology, selectedCount, onSelectMaterial, onSelectColor, onApplyAll, t }: { options: string[]; selected: string | null; selectedColor: string; selectedPartName?: string; selectedTechnology: string | null; selectedCount: number; onSelectMaterial: (material: string) => void; onSelectColor: (color: string) => void; onApplyAll: () => void; t: any }) => {
-  const selectedRecord = MATERIALS_DATA.find((material) => material.name.toLowerCase().includes((selected || '').toLowerCase())) || MATERIALS_DATA.find((material) => material.technology === 'FDM');
+const MaterialStep = ({ options, materials, selected, selectedColor, selectedPartName, selectedTechnology, selectedCount, onSelectMaterial, onSelectColor, onApplyAll, t }: { options: string[]; materials: Material[]; selected: string | null; selectedColor: string; selectedPartName?: string; selectedTechnology: string | null; selectedCount: number; onSelectMaterial: (material: string) => void; onSelectColor: (color: string) => void; onApplyAll: () => void; t: any }) => {
+  const selectedRecord = materialById(materials, selected);
   const colors = ['any', 'black', 'white', 'red', 'blue', 'green', 'yellow', 'orange', 'purple', 'gray'];
   const materialLabel = (material: string) => t(`request.material.${material}`);
   const colorLabel = (color: string) => t(`request.colorOption.${color}`);
+  const basePricePerGram = 2;
+  const priceRatio = (material: string | null) => {
+    const record = materialById(materials, material);
+    if (!record || record.pricePerUnit == null || record.priceUnit !== 'EGP/g' || record.pricePerUnit <= 0) return null;
+    return `${(record.pricePerUnit / basePricePerGram).toFixed(1)}X`.replace(/\.0X$/, 'X');
+  };
   return <div className="material-main">
       <div className="material-context"><div><span className="file-setup-kicker">{t('request.stepOf', { step: 4, total: 6 })}</span><h2>{selectedPartName || t('request.yourParts')}</h2><p>{selectedTechnology ? t(`request.process.${selectedTechnology}`) : t('request.materialBulkHint')}</p></div><button type="button" className="btn btn-outline" onClick={onApplyAll} disabled={!selected || selectedCount < 2}>{t('request.applyToAll', { count: selectedCount })}</button></div>
       <div className="material-title"><span className="request-current-icon"><Icon name="layers3" size={22} /></span><div><h2>{t('request.materialTitle')}</h2><p>{t('request.materialFdmDescription')}</p></div></div>
-      <div className="material-config-layout"><div className="material-options"><div className="material-option-list">{options.map((material) => <button type="button" key={material} className={`material-option-card ${selected === material ? 'is-selected' : ''}`} onClick={() => onSelectMaterial(material)}><img className="material-option-image" src={MATERIAL_IMAGES[material]} alt={materialLabel(material)} /><span><strong>{materialLabel(material)}</strong><small>{t(`request.materialDescription.${material}`)}</small><em>{material === 'pla' && <span className="material-default-badge"><Icon name="check" size={13} /> {t('request.default')}</span>}<b>{MATERIAL_RATIOS[material] || '1X'}</b></em></span>{selected === material && <Icon name="check" size={18} />}</button>)}</div></div>
-        <div className="material-details"><article className="material-detail-card"><h3>{t('request.color')}</h3><div className="material-color-row">{colors.map((color) => <button type="button" key={color} className={`material-color ${selectedColor === color ? 'is-selected' : ''}`} onClick={() => onSelectColor(color)} aria-label={colorLabel(color)}><span className={`color-dot color-dot-${color}`}>{selectedColor === color && <Icon name="check" size={12} />}</span><small>{colorLabel(color)}</small></button>)}</div></article><article className="material-detail-card"><h3><Icon name="cube" size={17} /> {t('request.materialPropertiesTitle')}</h3><dl><div><dt>{t('request.density')}</dt><dd>{selected && MATERIAL_DENSITIES[selected] ? `${MATERIAL_DENSITIES[selected].toFixed(4)} g/cm³` : selectedRecord?.density ? `${selectedRecord.density.toFixed(4)} g/cm³` : '—'}</dd></div><div><dt>{t('request.priceRatio')}</dt><dd>{MATERIAL_RATIOS[selected || 'pla'] || '1X'}</dd></div></dl></article></div></div>
+      <div className="material-config-layout"><div className="material-options"><div className="material-option-list">{options.map((material) => <button type="button" key={material} className={`material-option-card ${selected === material ? 'is-selected' : ''}`} onClick={() => onSelectMaterial(material)}><span className="material-option-image" style={{ background: MATERIAL_SWATCHES[material] || 'linear-gradient(135deg, #3b82f6, #14b8a6)' }} aria-hidden="true" /><span><strong>{materialLabel(material)}</strong><small>{t(`request.materialDescription.${material}`)}</small><em>{material === 'pla' && <span className="material-default-badge"><Icon name="check" size={13} /> {t('request.default')}</span>}{priceRatio(material) ? <b>{priceRatio(material)}</b> : <b>—</b>}</em></span>{selected === material && <Icon name="check" size={18} />}</button>)}</div></div>
+        <div className="material-details"><article className="material-detail-card"><h3>{t('request.color')}</h3><div className="material-color-row">{colors.map((color) => <button type="button" key={color} className={`material-color ${selectedColor === color ? 'is-selected' : ''}`} onClick={() => onSelectColor(color)} aria-label={colorLabel(color)}><span className={`color-dot color-dot-${color}`}>{selectedColor === color && <Icon name="check" size={12} />}</span><small>{colorLabel(color)}</small></button>)}</div></article><article className="material-detail-card"><h3><Icon name="cube" size={17} /> {t('request.materialPropertiesTitle')}</h3><dl><div><dt>{t('request.density')}</dt><dd>{selectedRecord?.density != null ? `${selectedRecord.density.toFixed(4)} g/cm³` : '—'}</dd></div><div><dt>{t('request.priceRatio')}</dt><dd>{selectedRecord?.pricePerUnit != null && selectedRecord.priceUnit === 'EGP/g' ? priceRatio(selected) : '—'}</dd></div></dl></article></div></div>
       <div className="material-summary"><Icon name="check" size={17} /><strong>{materialLabel(selected || 'pla')}</strong><span className={`color-dot color-dot-${selectedColor}`} />{colorLabel(selectedColor)}<span>{t('request.options.standard')}</span></div>
     </div>;
 };

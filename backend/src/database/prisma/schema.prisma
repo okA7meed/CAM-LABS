@@ -21,6 +21,14 @@ model User {
   taxId         String?
   passwordHash  String?
   preferences   Json?     // { units: "mm", toleranceStandard: "ISO 2768-fine", ... }
+  lastActivityAt DateTime?
+  // Admin-specific fields
+  isAdmin       Boolean   @default(false)
+  adminPermissions Json?  // Array of permission strings for granular access control
+  adminNotes    String?   // Notes about admin user
+  lastLoginAt   DateTime?
+  failedLoginAttempts Int @default(0)
+  lockedUntil   DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -28,7 +36,13 @@ model User {
   quotes        Quote[]
   cadFiles      CadFile[]
   sessions      Session[]
+  auditLogs     AuditLog[]
+  notifications AdminNotification[]
+  payments      Payment[]
 
+  @@index([role])
+  @@index([accountStatus])
+  @@index([isAdmin])
   @@map("users")
 }
 
@@ -46,7 +60,7 @@ model Session {
 }
 
 model Material {
-  id                 String   @id
+  id                 String    @id
   name               String
   technology         String   // SLS, SLA, FDM, CNC, DMLS, Sheet Metal
   category           String   // Polymers, High-Performance, Metals, Resins, Elastomers
@@ -62,9 +76,14 @@ model Material {
   tags               String[]
   colorOptions       String[]
   idealFor           String
-  isCertified        Boolean  @default(true)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  isCertified        Boolean   @default(true)
+  pricePerUnit       Float?
+  priceUnit          String?   // EGP/g, EGP/hour
+  availability       String    @default("IN_STOCK")
+  isActive           Boolean   @default(true)
+  archivedAt         DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   @@map("materials")
 }
@@ -91,10 +110,29 @@ model Order {
   providerOrderRef  String?  // Historical provider reference; active orders use internalOrderRef
   trackingNum       String?  // Historical external tracking field; active orders use CAM LABS tracking
   history           Json     // Array of { step, date, done, desc }
+  paymentStatus     String   @default("Pending")
+  manufacturingStatus String @default("Pending")
+  shippingStatus    String   @default("Pending")
+  shippingAddress   String?
+  shippingMethod    String?
+  shippingCost      String?
+  carrier           String?
+  actualDelivery    String?
+  manufacturerId    String?
+  manufacturer      Manufacturer? @relation(fields: [manufacturerId], references: [id], onDelete: SetNull)
+  pricingEquationVersionId String?
+  pricingEquationVersion   PricingEquationVersion? @relation(fields: [pricingEquationVersionId], references: [id], onDelete: SetNull)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
   cadFiles          OrderCadFile[]
+  events            OrderEvent[]
+  manufacturingRequests ManufacturingRequest[]
+  payments          Payment[]
 
+  @@index([manufacturerId])
+  @@index([userId])
+  @@index([pricingEquationVersionId])
+  @@index([status])
   @@map("orders")
 }
 
@@ -133,9 +171,14 @@ model Quote {
   isSimulated       Boolean  @default(false)
   cadFileIds        Json?    // CAD files included in the authoritative quotation
   pricingBreakdown  Json?    // Authoritative CAM LABS cost components and value sources
+  pricingEquationVersionId String?
+  pricingEquationVersion   PricingEquationVersion? @relation(fields: [pricingEquationVersionId], references: [id], onDelete: SetNull)
+  convertedOrderId  String?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
+  @@index([userId])
+  @@index([pricingEquationVersionId])
   @@map("quotes")
 }
 
@@ -232,3 +275,258 @@ model DfmReport {
 
   @@map("dfm_reports")
 }
+
+model PricingEquation {
+  id                   String                  @id @default(uuid())
+  technology           String                  @unique // FDM, SLA, SLS, CNC_MILLING, CNC_TURNING, LASER_CUTTING
+  name                 String
+  description          String?
+  currentPublishedId   String?
+  draftVersionId       String?
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+
+  versions             PricingEquationVersion[]
+  publications         PricingPublication[]
+  tests                PricingTest[]
+
+  @@map("pricing_equations")
+}
+
+model PricingEquationVersion {
+  id                   String             @id @default(uuid())
+  equationId           String
+  equation             PricingEquation    @relation(fields: [equationId], references: [id], onDelete: Cascade)
+  version              Int
+  status               String             // DRAFT, PUBLISHED, ARCHIVED
+  name                 String?
+  description          String?
+  formulaTree          Json               // Root AST expression
+  customVariables      Json?              // Array of { code, name, description, unit, dataType, formulaTree, dependencies, isEnabled }
+  constantsSnapshot    Json?              // Snapshot of { [key: string]: { value: number, unit: string, description?: string } }
+  breakdownConfig      Json?              // Custom breakdown mappings
+  publishedAt          DateTime?
+  publishedBy          String?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  publications         PricingPublication[]
+  quotes               Quote[]
+  orders               Order[]
+
+  @@unique([equationId, version])
+  @@index([equationId, status])
+  @@map("pricing_equation_versions")
+}
+
+model PricingVariable {
+  id                   String             @id @default(uuid())
+  technology           String?            // null = global, or technology name
+  code                 String             @unique // e.g. "Weight", "Volume", "MachineTime"
+  name                 String
+  description          String?
+  type                 String             // PREDEFINED, CUSTOM
+  unit                 String             // mm, mm2, mm3, g, kg, hour, minute, second, EGP, percentage, unitless
+  dataType             String             @default("number") // number, boolean, string
+  formulaTree          Json?              // AST if custom
+  dependencies         String[]           @default([])
+  isEnabled            Boolean            @default(true)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  @@map("pricing_variables")
+}
+
+model PricingConstant {
+  id                   String             @id @default(uuid())
+  technology           String?            // null = global, or technology name
+  key                  String             @unique // e.g. "PLA_PRICE", "MACHINE_HOURLY_RATE", "PROFIT_MARGIN"
+  name                 String
+  value                Float
+  unit                 String             // EGP/g, EGP/hour, percentage, etc.
+  description          String?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  @@map("pricing_constants")
+}
+
+model PricingTest {
+  id                   String             @id @default(uuid())
+  equationId           String
+  equation             PricingEquation    @relation(fields: [equationId], references: [id], onDelete: Cascade)
+  technology           String
+  cadFileId            String?
+  inputParams          Json               // { materialId, infill, layerHeight, quantity, etc. }
+  draftResult          Json?              // Output & breakdown of draft calculation
+  publishedResult      Json?              // Output & breakdown of published calculation
+  comparison           Json?              // { diffEgp, percentDiff, itemizedDiff }
+  createdAt            DateTime           @default(now())
+
+  @@index([equationId, createdAt])
+  @@map("pricing_tests")
+}
+
+model PricingPublication {
+  id                   String                 @id @default(uuid())
+  equationId           String
+  equation             PricingEquation        @relation(fields: [equationId], references: [id], onDelete: Cascade)
+  versionId            String
+  version              PricingEquationVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  publishedBy          String
+  notes                String?
+  snapshot             Json                   // Full snapshot of equation AST, custom variables, constants
+  publishedAt          DateTime               @default(now())
+
+  @@index([equationId, publishedAt])
+  @@map("pricing_publications")
+}
+
+// Admin Panel Models
+
+model Manufacturer {
+  id                  String   @id @default(uuid())
+  companyName         String   @unique
+  contactPerson       String
+  email               String
+  phone               String?
+  location            String?
+  address             String?
+  supportedTechnologies String[] // ["FDM", "SLA", "SLS", "CNC_MILLING", "CNC_TURNING", "LASER_CUTTING"]
+  supportedMaterials  String[]
+  capacity            Int?     // Maximum concurrent orders
+  availability        String   @default("AVAILABLE") // AVAILABLE, BUSY, OFFLINE
+  currentOrders       Int      @default(0)
+  completedOrders     Int      @default(0)
+  performanceRating   Float?   // 0-5 scale
+  status              String   @default("ACTIVE") // ACTIVE, INACTIVE, SUSPENDED
+  notes               String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  orders              Order[]
+  manufacturingRequests ManufacturingRequest[]
+
+  @@index([status])
+  @@index([availability])
+  @@map("manufacturers")
+}
+
+model ManufacturingRequest {
+  id                  String   @id @default(uuid())
+  orderId             String
+  order               Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  manufacturerId      String?
+  manufacturer        Manufacturer? @relation(fields: [manufacturerId], references: [id], onDelete: SetNull)
+  technology          String
+  material            String
+  quantity            Int
+  requiredDate        String?
+  status              String   @default("PENDING") // PENDING, ACCEPTED, REJECTED, IN_PROGRESS, COMPLETED, CANCELLED
+  createdAt           DateTime @default(now())
+  acceptedAt          DateTime?
+  startedAt           DateTime?
+  completedAt         DateTime?
+  notes               String?
+  estimatedCompletion String?
+  actualCompletion    String?
+
+  @@index([orderId])
+  @@index([manufacturerId])
+  @@index([status])
+  @@map("manufacturing_requests")
+}
+
+model OrderEvent {
+  id                  String   @id @default(uuid())
+  orderId             String
+  order               Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  eventType           String   // ORDER_CREATED, CAD_UPLOADED, QUOTE_GENERATED, ORDER_CONFIRMED, MANUFACTURER_ASSIGNED, PRODUCTION_STARTED, PRODUCTION_COMPLETED, QA_PASSED, QA_FAILED, SHIPPED, DELIVERED, CANCELLED
+  description         String
+  metadata            Json?
+  createdAt           DateTime @default(now())
+
+  @@index([orderId])
+  @@index([eventType])
+  @@index([createdAt])
+  @@map("order_events")
+}
+
+model Payment {
+  id                  String   @id @default(uuid())
+  orderId             String?
+  order               Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  userId              String?
+  user                User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  amount              Float
+  currency            String   @default("EGP")
+  paymentMethod       String?  // CREDIT_CARD, BANK_TRANSFER, CASH, etc.
+  paymentStatus       String   @default("PENDING") // PENDING, PAID, FAILED, REFUNDED, PARTIALLY_REFUNDED
+  transactionId       String?  @unique
+  refundedAmount      Float?   @default(0)
+  refundReason        String?
+  metadata            Json?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([orderId])
+  @@index([userId])
+  @@index([paymentStatus])
+  @@map("payments")
+}
+
+model AuditLog {
+  id                  String   @id @default(uuid())
+  userId              String?
+  user                User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action              String   // CREATE, UPDATE, DELETE, PUBLISH, ASSIGN, etc.
+  entityType          String   // ORDER, QUOTE, USER, MANUFACTURER, PRICING_CONSTANT, etc.
+  entityId            String?
+  oldValue            Json?
+  newValue            Json?
+  ipAddress           String?
+  userAgent           String?
+  sessionId           String?
+  metadata            Json?
+  createdAt           DateTime @default(now())
+
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model AdminNotification {
+  id                  String   @id @default(uuid())
+  userId              String?
+  user                User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type                String   // NEW_ORDER, NEW_CUSTOMER, FAILED_UPLOAD, PAYMENT_FAILED, MANUFACTURING_REQUEST, etc.
+  title               String
+  message             String
+  metadata            Json?
+  isRead              Boolean  @default(false)
+  priority            String   @default("INFO") // INFO, WARNING, ERROR, SUCCESS
+  createdAt           DateTime @default(now())
+  readAt              DateTime?
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([type])
+  @@index([createdAt])
+  @@map("admin_notifications")
+}
+
+model SystemSetting {
+  key         String   @id
+  group       String
+  value       Json
+  description String?
+  updatedBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([group])
+  @@map("system_settings")
+}
+

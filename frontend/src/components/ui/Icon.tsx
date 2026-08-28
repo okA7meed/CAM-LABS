@@ -17,6 +17,7 @@ export type IconName =
   | 'layers'
   | 'layers3'
   | 'loader'
+  | 'menu'
   | 'review'
   | 'reset'
   | 'send'
@@ -46,6 +47,7 @@ const paths: Record<IconName, React.ReactNode> = {
   send: <path d="m22 2-7 20-4-9-9-4 20-7ZM22 2 11 13" />,
   technology: <path d="M12 3 3 8l9 5 9-5-9-5Zm-6 8v5l6 3 6-3v-5M3 16l9 5 9-5" />,
   trash: <path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v6m4-6v6" />,
+  menu: <path d="M4 6h16M4 12h16M4 18h16" />,
   upload: <path d="M12 16V4m0 0L7 9m5-5 5 5M5 14v5h14v-5" />,
 };
 

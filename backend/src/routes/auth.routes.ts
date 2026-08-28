@@ -9,6 +9,7 @@ import { createSession, deleteSession, extractSessionToken, SESSION_COOKIE_NAME 
 import { requireAuth } from '../middleware/auth.middleware';
 import { toSafeUser } from '../auth/types';
 import { ROLES } from '../auth/roles';
+import { AdminAuthService } from '../services/admin-auth.service';
 
 const router = Router();
 
@@ -22,7 +23,7 @@ const phoneSchema = z.string().trim().regex(/^(?=.*\d)[0-9+() -]{7,40}$/, 'A val
 const registrationSchema = credentialsSchema.extend({
   name: z.string().trim().min(2).max(120),
   company: z.string().trim().max(160).optional().default('Independent'),
-  phone: phoneSchema,
+  phone: phoneSchema.optional(),
 });
 
 const cookieOptions = (expiresAt?: Date) => [
@@ -90,6 +91,23 @@ router.post('/login', async (req: Request, res: Response, next) => {
     const session = await createSession(user.id);
     setSessionCookie(res, session.token, session.expiresAt);
     ApiResponseHelper.success(res, { user: toSafeUser(user) }, 'Login successful');
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Admin login endpoint with enhanced security
+router.post('/admin/login', async (req: Request, res: Response, next) => {
+  try {
+    const data = parseBody(credentialsSchema, req.body);
+    const ipAddress = req.ip || req.socket.remoteAddress;
+    const userAgent = req.headers['user-agent'];
+
+    const result = await AdminAuthService.adminLogin(data.email, data.password, ipAddress, userAgent);
+    setSessionCookie(res, result.token, result.expiresAt);
+    // Session auth is established through the HttpOnly cam_labs_session cookie;
+    // the raw token must NOT be exposed in the response body.
+    ApiResponseHelper.success(res, { user: result.user }, 'Admin login successful');
   } catch (error) {
     next(error);
   }

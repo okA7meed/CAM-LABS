@@ -8,6 +8,7 @@ const state = vi.hoisted(() => {
     name: 'Test Engineer',
     email: 'test@example.com',
     role: 'CUSTOMER',
+    isAdmin: false,
     accountStatus: 'ACTIVE',
     company: 'Test Co',
     phone: null,
@@ -17,6 +18,9 @@ const state = vi.hoisted(() => {
     taxId: null,
     preferences: null,
     passwordHash: '',
+    failedLoginAttempts: 0,
+    lockedUntil: null,
+    lastLoginAt: null,
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
     updatedAt: new Date('2026-01-01T00:00:00.000Z'),
   };
@@ -45,6 +49,9 @@ const state = vi.hoisted(() => {
         sessions.clear();
         return undefined;
       }),
+    },
+    auditLog: {
+      create: vi.fn(async () => ({ id: 'log-1' })),
     },
   };
   return { user, sessions, prisma };
@@ -91,6 +98,9 @@ describe('authentication foundation', () => {
     state.prisma.session.deleteMany.mockClear();
     state.sessions.clear();
     state.user.passwordHash = await hashPassword('ValidPass1');
+    state.user.role = 'CUSTOMER';
+    state.user.isAdmin = false;
+    state.user.accountStatus = 'ACTIVE';
   });
 
   it('hashes passwords and never returns the hash during registration', async () => {
@@ -165,6 +175,25 @@ describe('authentication foundation', () => {
     expect(response.status).toBe(200);
     expect(response.headers['set-cookie'][0]).toContain('Max-Age=0');
     expect(state.prisma.session.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it('admin login issues HttpOnly cookie and never exposes the token in the body', async () => {
+    state.user.role = 'SUPER_ADMIN';
+    state.user.isAdmin = true;
+    state.user.accountStatus = 'ACTIVE';
+    state.user.passwordHash = await hashPassword('ValidAdminPass1!');
+
+    const response = await request(createTestApp())
+      .post('/api/v1/auth/admin/login')
+      .send({ email: state.user.email, password: 'ValidAdminPass1!' });
+
+    expect(response.status).toBe(200);
+    expect(response.headers['set-cookie'][0]).toContain('HttpOnly');
+    expect(response.body.data.user.role).toBe('SUPER_ADMIN');
+    expect(response.body.data.user.passwordHash).toBeUndefined();
+    expect(response.body.data.token).toBeUndefined();
+    expect(response.body.data.expiresAt).toBeUndefined();
+    expect(JSON.stringify(response.body)).not.toContain('token');
   });
 
   it('centralizes role and ownership decisions', async () => {

@@ -311,6 +311,13 @@ export class ApiService {
     });
   }
 
+  static async adminLogin(email: string, password: string) {
+    return this.requestRequired<{ user: User }>('/auth/admin/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    });
+  }
+
   static async register(data: { name: string; email: string; password: string; company?: string; phone: string }) {
     return this.requestRequired<{ user: User }>('/auth/register', {
       method: 'POST',
@@ -326,10 +333,99 @@ export class ApiService {
     return this.request<User>('/auth/me');
   }
 
+  static async getAdminSettings() {
+    return this.requestRequired<any>('/admin/settings');
+  }
+
+  static async updateAdminSetting(section: string, key: string, value: unknown, description?: string) {
+    return this.requestRequired<any>('/admin/settings', {
+      method: 'PUT',
+      body: JSON.stringify({ section, key, value, description }),
+    });
+  }
+
+  static async getAdminUrl() {
+    return this.requestRequired<{ adminUrl: string }>('/admin/settings/admin-url');
+  }
+
   static async updateProfile(profileData: Partial<User>) {
     return this.request<User>('/auth/profile', {
       method: 'PUT',
       body: JSON.stringify(profileData),
     });
   }
+
+  // ─── Equation Builder & Pricing Engine Administration ─────────────────────────
+  static async getPricingEquations() {
+    return this.requestRequired<any[]>('/admin/pricing/equations');
+  }
+
+  static async getPricingEquation(technology: string) {
+    return this.requestRequired<any>(`/admin/pricing/equations/${technology}`);
+  }
+
+  static async saveDraftEquation(technology: string, payload: {
+    formulaTree: any;
+    customVariables: any[];
+    constantsSnapshot?: Record<string, any>;
+    name?: string;
+    description?: string;
+  }) {
+    return this.requestRequired<any>(`/admin/pricing/equations/${technology}/draft`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  static async testPricingEquation(technology: string, payload: {
+    isDraft?: boolean;
+    modelContext: Record<string, any>;
+    customVariablesOverride?: any[];
+    formulaTreeOverride?: any;
+    constantsOverride?: Record<string, any>;
+  }) {
+    return this.requestRequired<any>(`/admin/pricing/equations/${technology}/test`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  static async comparePricingEquations(technology: string, payload: {
+    modelContext: Record<string, any>;
+    draftFormulaOverride?: any;
+    draftCustomVariablesOverride?: any[];
+  }) {
+    return this.requestRequired<any>(`/admin/pricing/equations/${technology}/compare`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  static async publishPricingEquation(technology: string, payload: {
+    notes?: string;
+  }) {
+    return this.requestRequired<any>(`/admin/pricing/equations/${technology}/publish`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  static async getPricingConstants() {
+    return this.requestRequired<any[]>('/admin/pricing/constants');
+  }
+
+  static async updatePricingConstant(payload: {
+    key: string;
+    name: string;
+    value: number;
+    unit: string;
+    description?: string;
+    technology?: string;
+  }) {
+    return this.requestRequired<any>('/admin/pricing/constants', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
 }
+

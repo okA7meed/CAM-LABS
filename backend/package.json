@@ -7,12 +7,16 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
+    "prisma": "npm run prisma:validate && npm run prisma:generate",
     "prisma:generate": "prisma generate --schema=src/database/prisma/schema.prisma",
     "prisma:validate": "prisma validate --schema=src/database/prisma/schema.prisma",
     "prisma:migrate": "prisma migrate dev --schema=src/database/prisma/schema.prisma",
     "prisma:seed": "tsx src/database/prisma/seed.ts",
     "test": "vitest run",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "bootstrap-admin": "tsx src/scripts/bootstrap-admin.ts",
+    "backfill-manufacturing": "tsx src/scripts/backfill-manufacturing.ts",
+    "cleanup-legacy-data": "tsx src/scripts/cleanup-legacy-data.ts"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

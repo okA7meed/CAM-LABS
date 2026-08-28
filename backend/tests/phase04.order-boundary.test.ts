@@ -5,6 +5,9 @@ const state = vi.hoisted(() => ({
   dispatchOrder: vi.fn(),
   orderCreate: vi.fn(),
   cadFindMany: vi.fn(),
+  profileAddress: '10 Tahrir Square, Cairo, Egypt',
+  mfgRequestCreate: vi.fn(async () => ({ id: 'mfg-1' })),
+  orderEventCreate: vi.fn(async () => ({ id: 'evt-1' })),
 }));
 
 vi.mock('../src/config/database', () => ({
@@ -13,8 +16,14 @@ vi.mock('../src/config/database', () => ({
       findUnique: vi.fn(async () => state.quote),
       update: vi.fn(async () => state.quote),
     },
+    user: {
+      findUnique: vi.fn(async () => ({ address: state.profileAddress })),
+    },
     cadFile: { findMany: state.cadFindMany, updateMany: vi.fn() },
-    order: { create: state.orderCreate },
+    order: { create: state.orderCreate, update: vi.fn(async () => ({ id: 'order-1' })) },
+    manufacturingRequest: { create: state.mfgRequestCreate },
+    orderEvent: { create: state.orderEventCreate },
+    manufacturer: { findUnique: vi.fn(async () => ({ id: 'cell-1', companyName: 'CAM LABS Internal Manufacturing Cell' })) },
   }),
 }));
 
@@ -80,6 +89,40 @@ describe('Phase 04 order trust boundary', () => {
     state.orderCreate.mockResolvedValue({ id: 'order-1', totalCost: '$15.00' });
     state.cadFindMany.mockReset();
     state.cadFindMany.mockResolvedValue([readyCadFile()]);
+  });
+
+  it('resolves shipping address from the customer profile and never a fixed placeholder', async () => {
+    const order = await OrdersService.createOrder(orderRequest({ shippingAddress: '' }));
+    expect(order).not.toBeNull();
+    expect(state.dispatchOrder.mock.calls[0][0].shippingAddress).toBe('10 Tahrir Square, Cairo, Egypt');
+    const createData = state.orderCreate.mock.calls[0][0].data;
+    expect(createData.shippingAddress).toBe('10 Tahrir Square, Cairo, Egypt');
+  });
+
+  it('prefers an explicit submitted shipping address over the profile address', async () => {
+    const order = await OrdersService.createOrder(orderRequest({ shippingAddress: '15 Sheikh Zayed, Giza' }));
+    expect(order).not.toBeNull();
+    expect(state.dispatchOrder.mock.calls[0][0].shippingAddress).toBe('15 Sheikh Zayed, Giza');
+    expect(state.orderCreate.mock.calls[0][0].data.shippingAddress).toBe('15 Sheikh Zayed, Giza');
+  });
+
+  it('never charges a platform service fee: order total equals the quoted price and serviceFee is null', async () => {
+    state.quote = makeQuote({ totalPrice: '1,480.00 EGP' });
+    const order = await OrdersService.createOrder(orderRequest({ totalCost: '999.00 EGP', serviceFee: '1.00 EGP' }));
+    const createData = state.orderCreate.mock.calls[0][0].data;
+    expect(createData.totalCost).toBe('1,480.00 EGP');
+    expect(createData.serviceFee).toBeNull();
+    expect(order).not.toBeNull();
+  });
+
+  it('records an in-house manufacturing request and order events (no external provider)', async () => {
+    await OrdersService.createOrder(orderRequest());
+    expect(state.mfgRequestCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ orderId: 'order-1', status: 'PENDING', manufacturerId: 'cell-1' }) }),
+    );
+    const eventTypes = state.orderEventCreate.mock.calls.map((call) => call[0].data.eventType);
+    expect(eventTypes).toContain('ORDER_CREATED');
+    expect(eventTypes).toContain('MANUFACTURER_ASSIGNED');
   });
 
   it('rejects client price, fee, provider price, and expiration tampering', async () => {

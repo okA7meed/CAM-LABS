@@ -141,6 +141,7 @@ export interface ManufacturingDispatchResult {
   status: 'Queued' | 'Dispatched' | 'In Production';
   estimatedCompletion: string;
   internalOrderRef: string;
+  telemetry?: Record<string, unknown>;
 }
 
 export interface IManufacturingEngine {

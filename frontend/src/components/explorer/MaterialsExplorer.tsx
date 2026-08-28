@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { MaterialCard } from './MaterialCard';
-import { MATERIALS_DATA } from '../../data/materialsData';
+import { useMaterials } from '../../hooks/useMaterials';
 import { useTranslation } from 'react-i18next';
 import { SectionReveal } from '../ui/Reveal';
 
 
 export const MaterialsExplorer: React.FC = () => {
   const { t } = useTranslation();
+  const { materials, loading, error, refetch } = useMaterials();
   const [activeTech, setActiveTech] = useState<string>('ALL');
   const [activeCat, setActiveCat] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -30,7 +31,7 @@ export const MaterialsExplorer: React.FC = () => {
     { label: t('materials.elastomers'), value: 'Elastomers' },
   ];
 
-  const filteredMaterials = MATERIALS_DATA.filter((mat) => {
+  const filteredMaterials = materials.filter((mat) => {
     const matchTech = activeTech === 'ALL' || mat.technology.toLowerCase() === activeTech.toLowerCase();
     const matchCat = activeCat === 'ALL' || mat.category.toLowerCase() === activeCat.toLowerCase();
     const q = searchQuery.toLowerCase().trim();
@@ -116,7 +117,37 @@ export const MaterialsExplorer: React.FC = () => {
 
         {/* Materials Grid */}
         <div className="materials-grid" id="materials-explorer-grid">
-          {filteredMaterials.length === 0 ? (
+          {loading ? (
+            <div
+              style={{
+                gridColumn: '1 / -1',
+                textAlign: 'center',
+                padding: 'var(--space-12)',
+                background: 'var(--cam-surface-1)',
+                borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--cam-border-subtle)',
+                color: 'var(--cam-text-muted)',
+              }}
+            >
+              {t('materials.loading')}
+            </div>
+          ) : error ? (
+            <div
+              style={{
+                gridColumn: '1 / -1',
+                textAlign: 'center',
+                padding: 'var(--space-12)',
+                background: 'var(--cam-surface-1)',
+                borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--cam-border-subtle)',
+              }}
+            >
+              <p style={{ color: 'var(--cam-text-muted)', fontSize: '1rem' }}>{error}</p>
+              <button className="btn btn-sm btn-outline" style={{ marginTop: 'var(--space-4)' }} onClick={refetch}>
+                {t('materials.reset')}
+              </button>
+            </div>
+          ) : filteredMaterials.length === 0 ? (
             <div
               style={{
                 gridColumn: '1 / -1',

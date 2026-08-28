@@ -51,6 +51,9 @@ export const DashboardView: React.FC = () => {
             <div className="dashboard-user-meta">{currentUser.role} · {currentUser.company}</div>
           </div>
           <div className="dashboard-actions-cluster">
+            <button className="btn btn-sm btn-outline" onClick={() => setActiveView('equation-builder')}>
+              <Icon name="technology" size={14} /> Equation Builder
+            </button>
             <button className="btn btn-sm btn-outline" onClick={() => { setActiveView('materials'); document.getElementById('materials-section')?.scrollIntoView({ behavior: 'smooth' }); }}>{t('dashboard.materials')}</button>
             <button className="btn btn-sm btn-outline" onClick={() => setActiveView('profile')}>{t('dashboard.preferences')}</button>
             <button className="btn btn-primary cam-shine-auto" onClick={() => startManufacturingRequest()}>{t('nav.startManufacturing')}</button>

@@ -8,12 +8,30 @@ export const getPrismaClient = (): PrismaClient => {
     prismaInstance = new PrismaClient({
       log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
     });
-
-    prismaInstance.$connect()
-      .then(() => Logger.info('PostgreSQL connected via Prisma Client.'))
-      .catch((err: Error) => {
-        Logger.warn('PostgreSQL database not yet running locally. Services will operate in memory-fallback mode:', err.message);
-      });
   }
   return prismaInstance;
+};
+
+/**
+ * Establishes the database connection at server startup.
+ *
+ * Production fails fast and clearly: the server refuses to start when the
+ * database is unavailable, so business data is never silently switched to an
+ * in-memory stand-in.
+ *
+ * Development may continue without PostgreSQL so local-only flows can be
+ * explored, but the situation is always logged as a warning.
+ */
+export const verifyDatabaseConnection = async (): Promise<void> => {
+  const prisma = getPrismaClient();
+  try {
+    await prisma.$connect();
+    Logger.info('PostgreSQL connected via Prisma Client.');
+  } catch (error) {
+    if (process.env.NODE_ENV === 'production') {
+      Logger.error('FATAL: PostgreSQL is unavailable. Refusing to start in production with business data at risk.');
+      throw error;
+    }
+    Logger.warn(`PostgreSQL is unavailable (${error instanceof Error ? error.message : String(error)}). Running in development mode without database persistence.`);
+  }
 };

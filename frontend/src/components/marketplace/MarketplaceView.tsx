@@ -44,7 +44,7 @@ const marketplaceProcessKeys: Record<string, string> = {
   FDM: 'market.processFdm',
 };
 export const MarketplaceView: React.FC = () => {
-  const { addOrder, setActiveView, showToast } = useStore();
+  const { startManufacturingRequest, showToast } = useStore();
   const { t } = useTranslation();
   const [selectedProduct, setSelectedProduct] = useState<MarketplaceProduct | null>(null);
   const [quantity, setQuantity] = useState(1);
@@ -64,16 +64,8 @@ export const MarketplaceView: React.FC = () => {
 
   const sendRequest = () => {
     if (!selectedProduct) return;
-    addOrder({
-      partName: customText ? `${selectedProduct.name} - ${customText}` : selectedProduct.name,
-      technology: selectedProduct.process,
-      material: `${selectedMaterial} / ${selectedColor}`,
-      quantity,
-      totalCost: selectedProduct.price,
-      tolerance: 'Standard production tolerance',
-    });
-    showToast('Manufacturing Request Sent', `${selectedProduct.name} is now in the CAM LABS review queue.`, 'success');
-    setActiveView('dashboard');
+    showToast('Manufacturing Request Started', `${selectedProduct.name} has been added to your CAM LABS manufacturing configuration. The final price is calculated from the actual CAD geometry.`, 'success');
+    startManufacturingRequest();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 

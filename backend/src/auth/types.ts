@@ -1,4 +1,4 @@
-import { Role } from './roles';
+import { normalizeRole, Role } from './roles';
 
 export interface AuthenticatedUser {
   id: string;
@@ -38,14 +38,4 @@ export const toSafeUser = (user: Omit<AuthenticatedUser, 'role'> & { role: strin
   };
 };
 
-const normalizeRoleForResponse = (role: string): Role => {
-  switch (role) {
-    case 'MAKER':
-    case 'ENGINEER':
-    case 'ADMIN':
-    case 'SUPER_ADMIN':
-      return role;
-    default:
-      return 'CUSTOMER';
-  }
-};
+const normalizeRoleForResponse = (role: string): Role => normalizeRole(role);

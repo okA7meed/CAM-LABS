@@ -3,6 +3,14 @@ import { Logger } from '../utils/logger';
 import { QuotesService } from './quotes.service';
 import { getPrismaClient } from '../config/database';
 import { Order, Prisma } from '@prisma/client';
+import { ManufacturingDispatchResult } from '../providers/manufacturing/IManufacturingProvider';
+import { AppError } from '../utils/errors';
+import { randomInt } from 'crypto';
+
+interface CreateOrderInternalOptions {
+  /** Server-issued order id reserved atomically against the source quote. */
+  reservedOrderId?: string;
+}
 
 /**
  * Orders Service
@@ -44,35 +52,51 @@ export class OrdersService {
   }
 
   /**
+   * Generate a server-side order identifier. Callers can never influence
+   * the primary key — the raw, unpredictable sequence prevents crafted PK
+   * collisions from interfering with order creation (hardening).
+   */
+  private static generateOrderId(): string {
+    return `CAM-2026-${randomInt(100000, 1000000)}`;
+  }
+
+  /**
    * Create and dispatch a new manufacturing order
    */
   static async createOrder(
-    orderData: Partial<Order> & { surfaceFinish?: string; cadFileIds?: string[]; cadFileConfigs?: Array<{ cadFileId: string; configuration?: Record<string, unknown>; totalCost?: string }>; guestCadId?: string }
+    orderData: Partial<Order> & { surfaceFinish?: string; cadFileIds?: string[]; cadFileConfigs?: Array<{ cadFileId: string; configuration?: Record<string, unknown>; totalCost?: string }>; guestCadId?: string },
+    internal: CreateOrderInternalOptions = {}
   ): Promise<Order> {
     const prisma = getPrismaClient();
 
     // NEW (Phase 04): Validate quote is not expired
-    if (!orderData.quoteId) throw new Error('A valid quote is required before an order can be submitted.');
+    if (!orderData.quoteId) throw new AppError('A valid quote is required before an order can be submitted.', 400, 'QUOTE_REQUIRED');
     const quote = await prisma.quote.findUnique({ where: { id: orderData.quoteId } });
-    if (!quote || (quote.userId && quote.userId !== orderData.userId)) throw new Error('Quote is invalid or does not belong to this customer.');
+    if (!quote || quote.userId !== orderData.userId) throw new AppError('Quote is invalid or does not belong to this customer.', 403, 'QUOTE_NOT_OWNED');
+    if (quote.convertedOrderId && quote.convertedOrderId !== internal.reservedOrderId) {
+      throw new AppError('This quote has already been converted to an order.', 409, 'QUOTE_ALREADY_CONVERTED');
+    }
     if (!(await this.validateQuoteValidity(orderData.quoteId))) {
-      throw new Error(`Quote ${orderData.quoteId} has expired or is invalid. Please request a fresh quotation.`);
+      throw new AppError(`Quote ${orderData.quoteId} has expired or is invalid. Please request a fresh quotation.`, 400, 'QUOTE_EXPIRED');
     }
     if (quote.technology !== (orderData.technology || '') || quote.material !== (orderData.material || '') || quote.quantity !== (orderData.quantity || 1)) {
-      throw new Error('The submitted manufacturing configuration does not match the quoted configuration.');
+      throw new AppError('The submitted manufacturing configuration does not match the quoted configuration.', 400, 'CONFIG_MISMATCH');
     }
 
     const cadFileIds = [...new Set(orderData.cadFileIds || [])];
     const quotedCadFileIds = Array.isArray(quote.cadFileIds) ? quote.cadFileIds.map(String).sort() : [];
-    if (quotedCadFileIds.length > 0 && quotedCadFileIds.join(',') !== [...cadFileIds].sort().join(',')) {
-      throw new Error('The submitted CAD files do not match the quoted files.');
+    const submittedIds = [...cadFileIds].sort();
+    // Guard in BOTH directions: an order must reference exactly the same CAD
+    // files that were quoted — never fewer, never more, never a different set.
+    if (quotedCadFileIds.join(',') !== submittedIds.join(',')) {
+      throw new AppError('The submitted CAD files do not match the quoted files.', 400, 'CAD_MISMATCH');
     }
     if (cadFileIds.length > 0) {
       const files = await prisma.cadFile.findMany({
         where: { id: { in: cadFileIds }, OR: [{ userId: orderData.userId }, { userId: null, guestId: orderData.guestCadId }] },
         include: { versions: { orderBy: { version: 'desc' }, take: 1 } },
       });
-      if (files.length !== cadFileIds.length) throw new Error('One or more CAD files do not belong to this customer.');
+      if (files.length !== cadFileIds.length) throw new AppError('One or more CAD files do not belong to this customer.', 403, 'CAD_NOT_OWNED');
       const hasUnreadyFile = files.some((file) => {
         const version = file.versions[0];
         const metadata = version?.metadata as { geometryStatus?: string; supportLevel?: string; volume?: number; surfaceArea?: number; dimensions?: unknown } | null;
@@ -84,11 +108,23 @@ export class OrdersService {
           || !metadata.surfaceArea
           || !metadata.dimensions;
       });
-      if (hasUnreadyFile) throw new Error('All CAD files must complete valid engineering analysis before an order can be submitted.');
+      if (hasUnreadyFile) throw new AppError('All CAD files must complete valid engineering analysis before an order can be submitted.', 400, 'CAD_NOT_READY');
       if (orderData.guestCadId) await prisma.cadFile.updateMany({ where: { id: { in: cadFileIds }, userId: null, guestId: orderData.guestCadId }, data: { userId: orderData.userId, guestId: null } });
     }
-    const orderId =
-      orderData.id || `CAM-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+    const orderId = internal.reservedOrderId || this.generateOrderId();
+
+    // Shipping address resolution: prefer the submitted value, otherwise fall
+    // back to the customer profile address. No hardcoded placeholder addresses.
+    let profileAddress = '';
+    if (orderData.userId) {
+      try {
+        const customerUser = await prisma.user.findUnique({ where: { id: orderData.userId } });
+        profileAddress = customerUser?.address?.trim() || '';
+      } catch (err: any) {
+        Logger.warn(`[OrdersService] Could not load profile address: ${err.message}`);
+      }
+    }
+    const shippingAddress = orderData.shippingAddress?.trim() || profileAddress || 'To be confirmed with customer';
 
     const engine = getManufacturingEngine();
     const dispatchResult = await engine.dispatchOrder({
@@ -98,7 +134,7 @@ export class OrdersService {
       quantity: orderData.quantity || 1,
       tolerance: orderData.tolerance || '±0.15 mm (ISO 2768-m)',
       surfaceFinish: orderData.surfaceFinish || 'Standard Micro Bead-Blasted',
-      shippingAddress: '742 Innovation Way, Bldg 4, San Francisco, CA', // Example address
+      shippingAddress,
     });
 
     const history: Prisma.JsonArray = [
@@ -150,12 +186,16 @@ export class OrdersService {
         progressStep: 1,
         manufacturingCost: quote.manufacturingCost,
         totalCost: quote.totalPrice,
+        serviceFee: null, // No platform service fee is charged
+        shippingAddress,
+        shippingMethod: 'Express Courier',
+        carrier: 'CAM LABS Express',
         tolerance: orderData.tolerance || '±0.15 mm (ISO 2768-m)',
         provider: dispatchResult.engineName,
         providerOrderRef: dispatchResult.internalOrderRef,
         trackingNum: dispatchResult.trackingId,
         history,
-        cadFiles: cadFileIds.length > 0 ? { create: cadFileIds.map((cadFileId) => { const config = orderData.cadFileConfigs?.find((candidate) => candidate.cadFileId === cadFileId); return { cadFileId, configuration: config?.configuration as Prisma.InputJsonValue | undefined, totalCost: config?.totalCost }; }) } : undefined,
+        cadFiles: cadFileIds.length > 0 ? { create: cadFileIds.map((cadFileId) => { const config = orderData.cadFileConfigs?.find((candidate) => candidate.cadFileId === cadFileId); return { cadFileId, configuration: config?.configuration as Prisma.InputJsonValue | undefined }; }) } : undefined,
       },
       include: { cadFiles: { include: { cadFile: true } } },
     });
@@ -164,44 +204,123 @@ export class OrdersService {
       `[OrdersService] Created and queued internal CAM LABS order ${newOrder.id}`
     );
 
+    await this.persistManufacturingRequest(newOrder, dispatchResult).catch((error) => {
+      Logger.error(`[OrdersService] Manufacturing request persistence failed for ${newOrder.id}: ${error.message}`);
+    });
+
     return newOrder;
   }
 
+  private static readonly INTERNAL_MANUFACTURER = 'CAM LABS Internal Manufacturing Cell';
+
   /**
-   * Convert an existing approved quote into a production order
+   * Records the in-house manufacturing request (internal cell) and the
+   * ORDER_CREATED / MANUFACTURER_ASSIGNED events. CAM LABS never dispatches
+   * to external providers.
+   */
+  private static async persistManufacturingRequest(order: Order, dispatchResult: ManufacturingDispatchResult): Promise<void> {
+    const prisma = getPrismaClient();
+    const cell = await prisma.manufacturer.findUnique({ where: { companyName: this.INTERNAL_MANUFACTURER } });
+    const manufacturerId = cell?.id ?? undefined;
+
+    await prisma.manufacturingRequest.create({
+      data: {
+        orderId: order.id,
+        manufacturerId,
+        technology: order.technology,
+        material: order.material,
+        quantity: order.quantity,
+        status: 'PENDING',
+        estimatedCompletion: dispatchResult.estimatedCompletion,
+        notes: 'CAM LABS in-house production cell',
+      },
+    });
+
+    await prisma.orderEvent.create({
+      data: {
+        orderId: order.id,
+        eventType: 'ORDER_CREATED',
+        description: 'Order created and queued in CAM LABS internal manufacturing.',
+      },
+    });
+
+    if (manufacturerId) {
+      await prisma.orderEvent.create({
+        data: {
+          orderId: order.id,
+          eventType: 'MANUFACTURER_ASSIGNED',
+          description: `Manufacturing assigned to ${this.INTERNAL_MANUFACTURER}.`,
+          metadata: { manufacturerId },
+        },
+      });
+      await prisma.order.update({
+        where: { id: order.id },
+        data: { manufacturerId },
+      });
+    }
+  }
+
+  /**
+   * Convert an existing approved quote into a production order.
+   *
+   * Conversion is guarded against double-spend: the quote is reserved
+   * atomically (convertedOrderId set where it is currently null). A second
+   * concurrent conversion matches zero rows and fails with 409 BEFORE any
+   * order row is written, so a quote can only ever produce one order.
    */
   static async convertQuoteToOrder(quoteId: string): Promise<Order | null> {
     const prisma = getPrismaClient();
     const quote = await QuotesService.getQuoteById(quoteId);
-    if (!quote) return null;
-
+    if (!quote) throw new AppError('Quote not found.', 404, 'QUOTE_NOT_FOUND');
+    if (quote.convertedOrderId) {
+      throw new AppError('This quote has already been converted to an order.', 409, 'QUOTE_ALREADY_CONVERTED');
+    }
     if (!(await this.validateQuoteValidity(quoteId))) {
-      throw new Error(`Quote ${quoteId} has expired or is invalid. Please request a fresh quotation.`);
+      throw new AppError(`Quote ${quoteId} has expired or is invalid. Please request a fresh quotation.`, 400, 'QUOTE_EXPIRED');
     }
 
-    const updatedQuote = await prisma.quote.update({
-      where: { id: quoteId },
-      data: { status: 'Approved' },
+    const orderId = this.generateOrderId();
+    const reserved = await prisma.quote.updateMany({
+      where: { id: quoteId, convertedOrderId: null },
+      data: { status: 'Approved', convertedOrderId: orderId },
     });
+    if (reserved.count !== 1) {
+      throw new AppError('This quote has already been converted to an order.', 409, 'QUOTE_ALREADY_CONVERTED');
+    }
 
-    const newOrder = await this.createOrder({
-      userId: quote.userId,
-      quoteId: quote.id,
-      partName: quote.partName,
-      technology: quote.technology,
-      material: quote.material,
-      quantity: quote.quantity,
-      totalCost: quote.totalPrice,
-      tolerance:
-        quote.toleranceGrade === 'precision'
-          ? '±0.025 mm (ISO 2768-f)'
-          : '±0.15 mm (ISO 2768-m)',
-      surfaceFinish: quote.surfaceFinish || undefined,
-    });
-    
-    Logger.info(`[OrdersService] Converted quote ${updatedQuote.id} to order ${newOrder.id}.`);
+    try {
+      const quoteCadFileIds: string[] = Array.isArray(quote.cadFileIds) ? quote.cadFileIds.map(String) : [];
+      const newOrder = await this.createOrder(
+        {
+          userId: quote.userId,
+          quoteId: quote.id,
+          partName: quote.partName,
+          technology: quote.technology,
+          material: quote.material,
+          quantity: quote.quantity,
+          totalCost: quote.totalPrice,
+          tolerance:
+            quote.toleranceGrade === 'precision'
+              ? '±0.025 mm (ISO 2768-f)'
+              : '±0.15 mm (ISO 2768-m)',
+          surfaceFinish: quote.surfaceFinish || undefined,
+          cadFileIds: quoteCadFileIds,
+          cadFileConfigs: quoteCadFileIds.map((cadFileId) => ({ cadFileId })),
+        },
+        { reservedOrderId: orderId }
+      );
 
-    return newOrder;
+      Logger.info(`[OrdersService] Converted quote ${quote.id} to order ${newOrder.id}.`);
+      return newOrder;
+    } catch (err) {
+      // Roll the reservation back so the quote remains redeemable if the
+      // order could not be created (e.g. transient engine failure).
+      await prisma.quote.update({
+        where: { id: quoteId },
+        data: { convertedOrderId: null, status: quote.status },
+      }).catch(() => undefined);
+      throw err;
+    }
   }
 
   /**

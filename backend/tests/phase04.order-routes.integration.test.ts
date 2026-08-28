@@ -21,8 +21,12 @@ vi.mock('../src/middleware/auth.middleware', () => ({
 vi.mock('../src/config/database', () => ({
   getPrismaClient: () => ({
     quote: { findUnique: vi.fn(async () => state.quote), update: vi.fn(async () => state.quote) },
+    user: { findUnique: vi.fn(async () => ({ address: null })) },
     cadFile: { findMany: state.cadFindMany, updateMany: vi.fn() },
-    order: { create: state.orderCreate },
+    order: { create: state.orderCreate, update: vi.fn(async () => ({ id: 'order-1' })) },
+    manufacturingRequest: { create: vi.fn(async () => ({ id: 'mfg-1' })) },
+    orderEvent: { create: vi.fn(async () => ({ id: 'evt-1' })) },
+    manufacturer: { findUnique: vi.fn(async () => ({ id: 'cell-1', companyName: 'CAM LABS Internal Manufacturing Cell' })) },
   }),
 }));
 
@@ -79,18 +83,18 @@ describe('Phase 04 order HTTP trust boundary', () => {
   it('rejects expired quotes over HTTP before dispatch', async () => {
     state.quote = makeQuote({ validUntil: new Date(Date.now() - 1000).toISOString() });
     const response = await request(createApp()).post('/api/v1/orders').send(orderBody());
-    expect(response.status).toBe(409);
+    expect(response.status).toBe(400);
     expect(response.body.error.message).toMatch(/expired|invalid/i);
     expect(state.dispatchOrder).not.toHaveBeenCalled();
   });
 
   it.each([
-    ['wrong quote owner', () => { state.quote = makeQuote({ userId: 'user-b' }); return orderBody(); }],
-    ['configuration mismatch', () => orderBody({ material: 'ABS' })],
-    ['CAD mismatch', () => orderBody({ cadFileIds: ['file-b'] })],
-  ])('rejects %s over HTTP', async (_label, buildBody) => {
+    ['wrong quote owner', () => { state.quote = makeQuote({ userId: 'user-b' }); return orderBody(); }, 403],
+    ['configuration mismatch', () => orderBody({ material: 'ABS' }), 400],
+    ['CAD mismatch', () => orderBody({ cadFileIds: ['file-b'] }), 400],
+  ])('rejects %s over HTTP', async (_label, buildBody, expectedStatus) => {
     const response = await request(createApp()).post('/api/v1/orders').send(buildBody());
-    expect(response.status).toBe(409);
+    expect(response.status).toBe(expectedStatus);
     expect(state.dispatchOrder).not.toHaveBeenCalled();
   });
 
@@ -101,7 +105,7 @@ describe('Phase 04 order HTTP trust boundary', () => {
   ])('rejects %s CAD files over HTTP', async (_label, version) => {
     state.cadFindMany.mockResolvedValue([readyCadFile(version)]);
     const response = await request(createApp()).post('/api/v1/orders').send(orderBody());
-    expect(response.status).toBe(409);
+    expect(response.status).toBe(400);
     expect(state.dispatchOrder).not.toHaveBeenCalled();
   });
 });

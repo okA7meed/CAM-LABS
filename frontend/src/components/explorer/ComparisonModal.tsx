@@ -1,15 +1,16 @@
 import React from 'react';
 import { useStore } from '../../context/StoreContext';
-import { MATERIALS_DATA } from '../../data/materialsData';
+import { useMaterials } from '../../hooks/useMaterials';
 import { useTranslation } from 'react-i18next';
 
 export const ComparisonModal: React.FC = () => {
   const { isComparisonModalOpen, closeComparisonModal, comparisonList } = useStore();
   const { t } = useTranslation();
+  const { materials } = useMaterials();
 
   if (!isComparisonModalOpen) return null;
 
-  const comparedMaterials = MATERIALS_DATA.filter((m) => comparisonList.includes(m.id));
+  const comparedMaterials = materials.filter((m) => comparisonList.includes(m.id));
 
   return (
     <div className="modal-overlay active">

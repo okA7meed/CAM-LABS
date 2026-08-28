@@ -621,7 +621,7 @@ select.form-control {
   border-radius: var(--radius-md);
   padding: var(--space-8) var(--space-4);
   text-align: center;
-  background-color: rgba(17, 24, 39, 0.6);
+  background-color: var(--cam-surface-1);
   cursor: pointer;
   transition: all var(--transition-fast);
   position: relative;
@@ -753,7 +753,7 @@ select.form-control {
   align-items: center;
   justify-content: flex-end;
   gap: var(--space-3);
-  background-color: rgba(0, 0, 0, 0.2);
+  background-color: var(--cam-surface-2);
 }
 
 /* Configurator journey and live quote surface */
@@ -1107,12 +1107,12 @@ select.form-control {
 .cam-table {
   width: 100%;
   border-collapse: collapse;
-  text-align: left;
+  text-align: start;
   font-size: 0.875rem;
 }
 
 .cam-table th {
-  background-color: rgba(31, 41, 55, 0.5);
+  background-color: var(--cam-surface-2);
   color: var(--cam-text-muted);
   font-family: var(--font-mono);
   font-size: 0.75rem;
@@ -1135,4 +1135,47 @@ select.form-control {
 
 .cam-table tbody tr:hover {
   background-color: var(--cam-surface-hover);
+}
+
+/* ==========================================================================
+   Admin Panel — Navigation & Theme-aware shell helpers
+   ========================================================================== */
+.admin-nav-item {
+  color: var(--cam-text-muted);
+}
+
+.admin-nav-item:hover {
+  background: var(--cam-surface-hover);
+  color: var(--cam-text-primary);
+}
+
+.admin-nav-item:active {
+  background: var(--cam-blue-subtle);
+  color: var(--cam-blue-primary);
+}
+
+.admin-nav-item[aria-current='page'] {
+  background: var(--cam-blue-subtle);
+  color: var(--cam-blue-primary);
+  font-weight: 600;
+  border-inline-start: 3px solid var(--cam-blue-primary);
+}
+
+.admin-nav-toggle:hover {
+  background: var(--cam-surface-3);
+  color: var(--cam-text-primary);
+}
+
+.admin-panel-card {
+  background-color: var(--cam-surface-1);
+  border: 1px solid var(--cam-border-subtle);
+  border-radius: var(--radius-lg);
+}
+
+.admin-muted {
+  color: var(--cam-text-muted);
+}
+
+.admin-faint {
+  color: var(--cam-text-faint);
 }

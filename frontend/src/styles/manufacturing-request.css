@@ -185,7 +185,7 @@
 @media (max-width: 900px) { .file-setup-workspace { grid-template-columns: 1fr; }.file-setup-sidebar { min-height: 0; }.file-setup-list { max-height: 300px; }.file-setup-add { margin-top: var(--space-4); }.file-setup-detail { padding: var(--space-4); } }
 @media (max-width: 560px) { .geometry-properties-heading { align-items: flex-start; flex-direction: column; }.file-setup-detail-header { flex-direction: column; }.file-setup-detail .geometry-canvas-panel, .file-setup-detail .geometry-canvas { min-height: 330px; } }
 
-/* Config stage: mirrors the MakersGate Basic/Advanced profile composition. */
+/* Config stage: mirror the CAM LABS engineering configuration first-pass layout. */
 .config-reference { display: grid; gap: 24px; max-width: 800px; margin: 0 auto; }
 .config-reference-tabs { display: inline-grid; grid-template-columns: 1fr 1fr; width: min(100%, 465px); margin: 0 auto; padding: 5px; border: 1px solid var(--cam-border-subtle); border-radius: 16px; background: var(--cam-surface-2); }
 .config-reference-tabs button { display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-height: 58px; border: 0; border-radius: 12px; background: transparent; color: var(--cam-text-muted); cursor: pointer; font: 700 1rem var(--font-sans); transition: background-color .25s ease, color .25s ease, box-shadow .25s ease; }
@@ -440,7 +440,7 @@
 	.request-progress-track span { transition: none; }
 }
 
-/* Material workspace proportions match the MakersGate quote step. */
+/* Material workspace proportions match the CAM LABS quote step. */
 .request-shell:has(.step-material) {
 	max-width: none;
 }

@@ -319,25 +319,22 @@ export const ProfileView: React.FC = () => {
                   <label className="form-label">{t('profile.apiSecret')}</label>
                   <div className="input-with-icon">
                     <input
-                      type="password"
+                      type="text"
                       readOnly
                       className="form-control font-mono"
-                      value="cam_live_88491024910481029418291048"
+                      placeholder={t('profile.apiNotConfigured')}
+                      value=""
                     />
-                    <button
-                      type="button"
-                      className="input-btn-right"
-                      onClick={() => showToast('Copied', 'API Key copied to clipboard.', 'success')}
-                    >
-                      {t('profile.copy')}
-                    </button>
                   </div>
+                  <p style={{ color: 'var(--cam-text-muted)', fontSize: '0.8125rem', marginTop: 'var(--space-2)' }}>
+                    {t('profile.apiNotConfiguredDescription')}
+                  </p>
                 </div>
 
                 <div className="stat-card" style={{ marginTop: 'var(--space-4)' }}>
                   <div className="stat-label">{t('profile.sdkStatus')}</div>
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8125rem', color: 'var(--cam-text-secondary)', marginTop: '4px' }}>
-                    {t('profile.readyIntegration')}
+                    {t('profile.apiNotConfigured')}
                   </div>
                 </div>
               </div>

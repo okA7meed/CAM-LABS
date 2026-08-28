@@ -37,9 +37,21 @@ interface StoreContextType {
   openOrderTimeline: (order: Order) => void;
   closeOrderTimeline: () => void;
 
+  selectedAdminOrderId: string | null;
+  selectedAdminCustomerId: string | null;
+  selectedAdminManufacturerId: string | null;
+  selectedAdminManufacturingRequestId: string | null;
+  selectedAdminQuoteId: string | null;
+  selectedAdminCadFileId: string | null;
+  openAdminOrderDetail: (id: string) => void;
+  openAdminCustomerDetail: (id: string) => void;
+  openAdminManufacturerDetail: (id: string) => void;
+  openAdminManufacturingRequestDetail: (id: string) => void;
+  openAdminQuoteDetail: (id: string) => void;
+  openAdminCadFileDetail: (id: string) => void;
+  closeAdminDetail: () => void;
+
   // Actions
-  addOrder: (orderData: Partial<Order>) => Order;
-  addQuote: (quoteData: Partial<Quote>) => Quote;
   approveQuote: (quoteId: string) => void;
   addCadFile: (fileData: Partial<CadFile>) => CadFile;
   toggleComparison: (materialId: string) => void;
@@ -99,6 +111,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isOrderTimelineOpen, setIsOrderTimelineOpen] = useState(false);
+
+  const [selectedAdminOrderId, setSelectedAdminOrderId] = useState<string | null>(null);
+  const [selectedAdminCustomerId, setSelectedAdminCustomerId] = useState<string | null>(null);
+  const [selectedAdminManufacturerId, setSelectedAdminManufacturerId] = useState<string | null>(null);
+  const [selectedAdminManufacturingRequestId, setSelectedAdminManufacturingRequestId] = useState<string | null>(null);
+  const [selectedAdminQuoteId, setSelectedAdminQuoteId] = useState<string | null>(null);
+  const [selectedAdminCadFileId, setSelectedAdminCadFileId] = useState<string | null>(null);
 
   // Sync with localStorage
   useEffect(() => {
@@ -162,72 +181,80 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setSelectedOrder(null);
   };
 
+  const closeAdminDetail = () => {
+    setSelectedAdminOrderId(null);
+    setSelectedAdminCustomerId(null);
+    setSelectedAdminManufacturerId(null);
+    setSelectedAdminManufacturingRequestId(null);
+    setSelectedAdminQuoteId(null);
+    setSelectedAdminCadFileId(null);
+  };
+
+  const openAdminOrderDetail = (id: string) => {
+    closeAdminDetail();
+    setSelectedAdminOrderId(id);
+    setActiveView('admin-order-detail');
+  };
+
+  const openAdminCustomerDetail = (id: string) => {
+    closeAdminDetail();
+    setSelectedAdminCustomerId(id);
+    setActiveView('admin-customer-detail');
+  };
+
+  const openAdminManufacturerDetail = (id: string) => {
+    closeAdminDetail();
+    setSelectedAdminManufacturerId(id);
+    setActiveView('admin-manufacturer-detail');
+  };
+
+  const openAdminManufacturingRequestDetail = (id: string) => {
+    closeAdminDetail();
+    setSelectedAdminManufacturingRequestId(id);
+    setActiveView('admin-manufacturing-request-detail');
+  };
+
+  const openAdminQuoteDetail = (id: string) => {
+    closeAdminDetail();
+    setSelectedAdminQuoteId(id);
+    setActiveView('admin-quote-detail');
+  };
+
+  const openAdminCadFileDetail = (id: string) => {
+    closeAdminDetail();
+    setSelectedAdminCadFileId(id);
+    setActiveView('admin-cad-file-detail');
+  };
+
   // Data Actions
-  const addOrder = (orderData: Partial<Order>): Order => {
-    const newOrder: Order = {
-      id: `CAM-2026-${Math.floor(1000 + Math.random() * 9000)}`,
-      partName: orderData.partName || 'Custom_Component.step',
-      technology: orderData.technology || 'Industrial 3D Printing',
-      material: orderData.material || 'PA 12 (Nylon 12)',
-      quantity: orderData.quantity || 1,
-      date: new Date().toISOString().split('T')[0],
-      estDelivery: '2026-08-22',
-      status: 'In Review',
-      statusBadge: 'badge-blue',
-      progressStep: 1,
-      totalCost: orderData.totalCost || '240.00 EGP',
-      tolerance: orderData.tolerance || '±0.05 mm',
-      trackingNum: orderData.trackingNum || `CAM-TRK-${Math.floor(100000 + Math.random() * 900000)}`,
-      history: [
-        { step: 'CAD Geometry Verification', date: 'Just now', done: true, desc: 'Automated DFM verification confirmed by CAM LABS.' },
-        { step: 'CAM Toolpath & Slicing', date: 'Pending', done: false, desc: 'Queued in CAM LABS internal production.' },
-        { step: 'Fabrication & Sintering / Milling', date: 'Pending', done: false, desc: 'Manufacturing execution.' },
-        { step: 'Zeiss CMM Laser QA Inspection', date: 'Pending', done: false, desc: 'Tolerance verification against ISO 2768.' },
-        { step: 'Express Delivery Dispatch', date: 'Pending', done: false, desc: 'Global express courier dispatch.' },
-      ],
-      ...orderData,
+  const approveQuote = async (quoteId: string) => {
+    const convert = async () => {
+      try {
+        const order = await ApiService.approveQuote(quoteId);
+        setQuotes((prev) => prev.filter((quote) => quote.id !== quoteId));
+        let ordersUpdated = false;
+        if (order && order.id) {
+          setOrders((prev) => [order, ...prev.filter((o) => o.id !== order.id)]);
+          ordersUpdated = true;
+        }
+        try {
+          const freshOrders = await ApiService.getOrders();
+          if (freshOrders) {
+            setOrders(freshOrders);
+            ordersUpdated = true;
+          }
+        } catch {
+          // Keep the converted order; the list refresh is best-effort.
+        }
+        return ordersUpdated;
+      } catch (error: any) {
+        showToast('Order Creation Failed', error?.message || 'Could not convert the quote to an order.', 'error');
+        return false;
+      }
     };
 
-    setOrders((prev) => [newOrder, ...prev]);
-    ApiService.createOrder(newOrder);
-    return newOrder;
-  };
-
-  const addQuote = (quoteData: Partial<Quote>): Quote => {
-    const validUntilDate = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-
-    const newQuote: Quote = {
-      id: `RFQ-2026-${Math.floor(1000 + Math.random() * 9000)}`,
-      partName: quoteData.partName || 'Custom_Part.step',
-      technology: quoteData.technology || 'CNC Machining',
-      material: quoteData.material || 'Aluminum 6061-T6',
-      quantity: quoteData.quantity || 5,
-      leadTime: quoteData.leadTime || '3 - 5 Days',
-      unitPrice: quoteData.unitPrice || '48.00 EGP',
-      totalPrice: quoteData.totalPrice || '240.00 EGP',
-      validUntil: validUntilDate,
-      status: 'Ready for Approval',
-      ...quoteData,
-    };
-
-    setQuotes((prev) => [newQuote, ...prev]);
-    ApiService.createQuote(newQuote);
-    return newQuote;
-  };
-
-  const approveQuote = (quoteId: string) => {
-    const q = quotes.find((quote) => quote.id === quoteId);
-    if (q) {
-      addOrder({
-        partName: q.partName,
-        technology: q.technology,
-        material: q.material,
-        quantity: q.quantity,
-        totalCost: q.totalPrice,
-        tolerance: '±0.05 mm',
-      });
-      setQuotes((prev) => prev.filter((quote) => quote.id !== quoteId));
-      ApiService.approveQuote(quoteId);
+    const converted = await convert();
+    if (converted) {
       showToast('Quote Converted to Order', `Quote ${quoteId} approved and transferred to automated manufacturing queue.`, 'success');
     }
   };
@@ -298,9 +325,20 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         isOrderTimelineOpen,
         openOrderTimeline,
         closeOrderTimeline,
+        selectedAdminOrderId,
+        selectedAdminCustomerId,
+        selectedAdminManufacturerId,
+        selectedAdminManufacturingRequestId,
+        selectedAdminQuoteId,
+        selectedAdminCadFileId,
+        openAdminOrderDetail,
+        openAdminCustomerDetail,
+        openAdminManufacturerDetail,
+        openAdminManufacturingRequestDetail,
+        openAdminQuoteDetail,
+        openAdminCadFileDetail,
+        closeAdminDetail,
 
-        addOrder,
-        addQuote,
         approveQuote,
         addCadFile,
         toggleComparison,
