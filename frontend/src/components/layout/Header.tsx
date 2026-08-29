@@ -4,6 +4,7 @@ import { useStore } from '../../context/StoreContext';
 import { ViewType } from '../../types';
 import { Logo } from './Logo';
 import { HeaderPreferences } from './HeaderPreferences';
+import { UserAvatar, getUserAvatarColor } from '../ui/UserAvatar';
 import { useTranslation } from 'react-i18next';
 
 interface HeaderProps {
@@ -185,18 +186,19 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav }) => {
         <div className="header-actions">
           <HeaderPreferences />
           {isAuthenticated && currentUser && (
-            <span className="persona-select-btn" aria-label="Authenticated account">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0066FF" strokeWidth="2">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                <circle cx="12" cy="7" r="4" />
-              </svg>
-              <span>{currentUser.name.split(' ')[0]} ({currentUser.role})</span>
-            </span>
+            <button
+              className="user-profile-chip"
+              onClick={() => handleNavClick('profile')}
+              aria-label={t('nav.accountMenuFor', { name: currentUser.name })}
+              title={currentUser.name}
+            >
+              <UserAvatar name={currentUser.name} color={getUserAvatarColor(currentUser)} size="sm" />
+              <span className="user-profile-name">{currentUser.name}</span>
+            </button>
           )}
 
           {isAuthenticated ? (
             <>
-              <button className="header-sign-in" onClick={() => handleNavClick('equation-builder')}>Equation Builder</button>
               <button className="header-sign-in" onClick={() => handleNavClick('dashboard')}>{t('nav.dashboard')}</button>
               <button className="header-sign-in" onClick={() => void logout()}>{t('nav.signOut')}</button>
             </>

@@ -3,6 +3,8 @@ import { useAuth } from '../../context/AuthContext';
 import { useStore } from '../../context/StoreContext';
 import { useTranslation } from 'react-i18next';
 import { OptionalMark, RequiredMark } from '../ui/FieldLabel';
+import { AvatarColor, AVATAR_COLORS } from '../../types';
+import { UserAvatar, getUserAvatarColor } from '../ui/UserAvatar';
 
 type ProfileTab = 'personal' | 'manufacturing' | 'security' | 'api';
 
@@ -28,6 +30,7 @@ export const ProfileView: React.FC = () => {
   );
   const [dfmToggle, setDfmToggle] = useState(currentUser?.preferences?.dfmNotifications ?? true);
   const [dispatchToggle, setDispatchToggle] = useState(currentUser?.preferences?.dispatchAlerts ?? true);
+  const [avatarColor, setAvatarColor] = useState<AvatarColor>(getUserAvatarColor(currentUser));
 
   if (!currentUser) {
     return <main className="dashboard-layout"><div className="container"><p>{t('profile.signInRequired')}</p></div></main>;
@@ -51,6 +54,7 @@ export const ProfileView: React.FC = () => {
         toleranceStandard: toleranceStd,
         dfmNotifications: dfmToggle,
         dispatchAlerts: dispatchToggle,
+        avatarColor,
       },
     });
     showToast('Preferences Applied', `Default manufacturing unit set to ${units.toUpperCase()}.`, 'success');
@@ -261,6 +265,36 @@ export const ProfileView: React.FC = () => {
                     <span className="checkbox-mark"></span>
                     <span>{t('profile.alerts')}</span>
                   </label>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">{t('profile.avatarColor')}</label>
+                  <div className="avatar-color-select" role="radiogroup" aria-labelledby="avatar-color-label">
+                    {AVATAR_COLORS.map((color) => (
+                      <button
+                        key={color}
+                        type="button"
+                        role="radio"
+                        aria-checked={avatarColor === color}
+                        aria-label={t(`profile.avatarColor.${color}`)}
+                        className={`avatar-color-option avatar-${color} ${avatarColor === color ? 'selected' : ''}`}
+                        onClick={() => setAvatarColor(color)}
+                      />
+                    ))}
+                  </div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 'var(--space-3)',
+                      marginTop: 'var(--space-4)',
+                      color: 'var(--cam-text-muted)',
+                      fontSize: '0.8125rem',
+                    }}
+                  >
+                    <UserAvatar name={currentUser.name} color={avatarColor} size="md" />
+                    <span>{t('profile.avatarColorPreview')}</span>
+                  </div>
                 </div>
 
                 <div style={{ marginTop: 'var(--space-6)', display: 'flex', justifyContent: 'flex-end' }}>

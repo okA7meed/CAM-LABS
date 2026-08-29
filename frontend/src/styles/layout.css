@@ -276,26 +276,66 @@
 .header-cta:hover { background: var(--cam-blue-hover); color: #fff; box-shadow: 0 8px 20px var(--cam-blue-glow); transform: translateY(-2px); }
 .header-cta:active { transform: translateY(0); }
 
-.persona-select-btn {
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
+.user-profile-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   height: var(--navbar-control-height);
-  padding: 0 0.75rem;
+  padding: 0 10px 0 5px;
   background: var(--cam-surface-2);
   border: 1px solid var(--cam-border-medium);
+  border-radius: 999px;
   color: var(--cam-text-secondary);
-  --btn-block-size: var(--navbar-control-height);
-  border-radius: var(--btn-radius);
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  white-space: nowrap;
+  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
 }
 
-.persona-select-btn:hover {
-  border-color: var(--cam-blue-primary);
+.user-profile-chip:hover {
   color: var(--cam-text-primary);
+  background: var(--cam-surface-1);
+  border-color: var(--cam-border-strong);
+  transform: translateY(-1px);
 }
+
+.user-profile-chip:active { transform: translateY(0); }
+.user-profile-chip:focus-visible { outline: 2px solid var(--cam-blue-primary); outline-offset: 2px; }
+
+.user-profile-name {
+  font: 600 0.75rem var(--font-sans);
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Circular User Avatar */
+.user-avatar {
+  --avatar-size: 28px;
+  width: var(--avatar-size);
+  height: var(--avatar-size);
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: #fff;
+  font: 600 calc(var(--avatar-size) * 0.5) var(--font-sans);
+  line-height: 1;
+  user-select: none;
+  text-align: center;
+}
+
+.user-avatar-sm { --avatar-size: 28px; }
+.user-avatar-md { --avatar-size: 36px; }
+.user-avatar-lg { --avatar-size: 48px; }
+
+.avatar-blue { background: var(--cam-blue-primary); }
+.avatar-red { background: var(--cam-danger); }
+.avatar-green { background: var(--cam-success); }
+.avatar-purple { background: #8B5CF6; }
+.avatar-orange { background: #F97316; }
+.avatar-yellow { background: #F59E0B; }
 
 /* Mobile Hamburger & Drawer */
 .mobile-nav-toggle {
@@ -373,7 +413,9 @@
 
 @media (max-width: 900px) {
   .header-container { gap: var(--space-2); padding-inline: var(--space-3); }
-  .persona-select-btn, .header-sign-in { display: none; }
+  .header-sign-in { display: none; }
+  .user-profile-name { display: none; }
+  .user-profile-chip { padding: 0 5px; }
   .header-actions { min-width: 0; gap: 6px; }
   .brand-logo { width: 96px; }
 }
@@ -383,8 +425,7 @@
   .header-container { padding-left: var(--space-3); padding-right: var(--space-3); }
   .brand-logo { width: 92px; height: 38px; }
   .header-actions { gap: 6px; }
-  .header-sign-in,
-  .persona-select-btn { display: none; }
+  .header-sign-in { display: none; }
   .nav-preferences { gap: 6px; }
   .header-cta { width: var(--navbar-control-height); height: var(--navbar-control-height); padding: 0; --btn-block-size: var(--navbar-control-height); border-radius: var(--btn-radius); }
   .header-cta span { display: none; }

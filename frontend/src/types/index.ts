@@ -26,11 +26,16 @@ export interface Material {
   isActive?: boolean;
 }
 
+export type AvatarColor = 'blue' | 'red' | 'green' | 'purple' | 'orange' | 'yellow';
+
+export const AVATAR_COLORS: AvatarColor[] = ['blue', 'red', 'green', 'purple', 'orange', 'yellow'];
+
 export interface UserPreferences {
   units: 'mm' | 'in';
   toleranceStandard: string;
   dfmNotifications: boolean;
   dispatchAlerts: boolean;
+  avatarColor?: AvatarColor;
 }
 
 export interface User {
