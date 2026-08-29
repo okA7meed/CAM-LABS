@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { SectionReveal, StaggerReveal } from '../ui/Reveal';
 
 export const AboutSection: React.FC = () => {
-  const { startManufacturingRequest } = useStore();
+  const { openComingSoon } = useStore();
   const { t } = useTranslation();
 
   const valueProps = [
@@ -151,7 +151,7 @@ export const AboutSection: React.FC = () => {
               {t('about.missionDescription')}
             </p>
           </div>
-          <button className="btn btn-primary" onClick={() => startManufacturingRequest()}>
+          <button className="btn btn-primary" onClick={() => openComingSoon()}>
             {t('about.startRequest')}
           </button>
         </div>

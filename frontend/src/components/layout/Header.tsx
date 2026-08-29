@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useStore } from '../../context/StoreContext';
 import { ViewType } from '../../types';
@@ -6,6 +6,7 @@ import { Logo } from './Logo';
 import { HeaderPreferences } from './HeaderPreferences';
 import { UserAvatar, getUserAvatarColor } from '../ui/UserAvatar';
 import { useTranslation } from 'react-i18next';
+import { isRequestFlowView } from '../../constants/navigation';
 
 interface HeaderProps {
   onToggleMobileNav: () => void;
@@ -20,7 +21,7 @@ const SCROLL_SECTIONS: Array<{ id: string; view: ViewType }> = [
   { id: 'about', view: 'about' },
 ];
 
-const NON_LANDING_VIEWS: ViewType[] = ['dashboard', 'profile', 'marketplace', 'manufacturing-request', 'equation-builder'];
+const NON_LANDING_VIEWS: ViewType[] = ['dashboard', 'profile', 'marketplace', 'manufacturing-request', 'coming-soon', 'equation-builder'];
 
 export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav }) => {
   const { currentUser, isAuthenticated, logout } = useAuth();
@@ -28,8 +29,6 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav }) => {
   const { t } = useTranslation();
   const [scrolled, setScrolled] = useState(false);
   const navRef = useRef<HTMLElement | null>(null);
-  const linkRefs = useRef<Map<ViewType, HTMLAnchorElement | null>>(new Map());
-  const [indicator, setIndicator] = useState({ left: 0, width: 0, visible: false });
 
   useEffect(() => {
     const handleScroll = () => {
@@ -40,6 +39,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav }) => {
   }, []);
 
   const isLandingView = !NON_LANDING_VIEWS.includes(activeView);
+  const isInsideRequestFlow = isRequestFlowView(activeView);
 
   // Track the section currently sitting at the "activation line" just below the sticky header,
   // using a hairline IntersectionObserver root so exactly one section is active at a time.
@@ -91,26 +91,6 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav }) => {
     };
   }, [isLandingView, setActiveView]);
 
-  // Slide the active-item indicator to the current nav link
-  useLayoutEffect(() => {
-    const updateIndicator = () => {
-      const navEl = navRef.current;
-      const activeLink = linkRefs.current.get(activeView);
-      if (!navEl || !activeLink) {
-        setIndicator((prev) => (prev.visible ? { ...prev, visible: false } : prev));
-        return;
-      }
-      const navRect = navEl.getBoundingClientRect();
-      const linkRect = activeLink.getBoundingClientRect();
-      const inset = 7;
-      setIndicator({ left: linkRect.left - navRect.left + inset, width: linkRect.width - inset * 2, visible: true });
-    };
-
-    updateIndicator();
-    window.addEventListener('resize', updateIndicator);
-    return () => window.removeEventListener('resize', updateIndicator);
-  }, [activeView]);
-
   const handleNavClick = (view: ViewType, sectionId?: string) => {
     setActiveView(view);
     if (view === 'dashboard' || view === 'profile') {
@@ -158,11 +138,8 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav }) => {
           {navigationItems.map(({ label, view, sectionId }) => (
             <a
               key={view}
-              ref={(el) => {
-                linkRefs.current.set(view, el);
-              }}
               href={`#${sectionId || view}`}
-              className={`nav-link ${activeView === view ? 'active' : ''}`}
+              className="nav-link"
               aria-current={activeView === view ? 'page' : undefined}
               onClick={(event) => {
                 event.preventDefault();
@@ -172,15 +149,6 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav }) => {
               {label}
             </a>
           ))}
-          <span
-            className="nav-active-indicator"
-            aria-hidden="true"
-            style={{
-              transform: `translateX(${indicator.left}px)`,
-              width: `${indicator.width}px`,
-              opacity: indicator.visible ? 1 : 0,
-            }}
-          />
         </nav>
 
         <div className="header-actions">
@@ -211,19 +179,21 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav }) => {
             </button>
           )}
 
-          <button
-            className="header-cta cam-shine-auto"
-            onClick={() => startManufacturingRequest()}
-            id="header-start-manufacturing-btn"
-            aria-label={t('nav.startManufacturing')}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <polygon points="12 2 2 7 12 12 22 7 12 2" />
-              <polyline points="2 17 12 22 22 17" />
-              <polyline points="2 12 12 17 22 12" />
-            </svg>
-            <span>{t('nav.startManufacturing')}</span>
-          </button>
+          {!isInsideRequestFlow && (
+            <button
+              className="header-cta cam-shine-auto"
+              onClick={() => startManufacturingRequest()}
+              id="header-start-manufacturing-btn"
+              aria-label={t('nav.startManufacturing')}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <polygon points="12 2 2 7 12 12 22 7 12 2" />
+                <polyline points="2 17 12 22 22 17" />
+                <polyline points="2 12 12 17 22 12" />
+              </svg>
+              <span>{t('nav.startManufacturing')}</span>
+            </button>
+          )}
 
           <button
             className="mobile-nav-toggle"

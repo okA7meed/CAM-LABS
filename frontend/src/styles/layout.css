@@ -105,18 +105,6 @@
   padding: 0;
 }
 
-.nav-active-indicator {
-  position: absolute;
-  left: 0;
-  bottom: 4px;
-  height: 2px;
-  border-radius: var(--radius-full);
-  background: var(--cam-blue-primary);
-  pointer-events: none;
-  transition: transform 280ms cubic-bezier(0.16, 1, 0.3, 1), width 280ms cubic-bezier(0.16, 1, 0.3, 1), opacity 200ms ease;
-  will-change: transform, width;
-}
-
 .nav-link {
   position: relative;
   display: inline-flex;
@@ -128,19 +116,46 @@
   color: var(--cam-text-muted);
   border-radius: 4px;
   white-space: nowrap;
-  transition: color var(--transition-fast), background-color var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
+  transition: color 250ms ease, background-color 250ms ease, box-shadow 250ms ease;
   cursor: pointer;
 }
 
+/* New hover effect: text turns CAM LABS Blue (no background fill) */
 .nav-link:hover {
-  color: var(--cam-text-primary);
-  background-color: var(--cam-surface-1);
+  color: var(--cam-blue-primary);
 }
 
-.nav-link.active {
-  color: var(--cam-text-primary);
-  background: var(--cam-blue-subtle);
-  box-shadow: inset 0 0 0 1px var(--cam-border-blue);
+/* Per-item hover underline — layout-safe (absolutely positioned, no dimension change).
+   Grows LEFT → RIGHT from under the text via transform-origin: left + scaleX. */
+.nav-link::after {
+  content: '';
+  position: absolute;
+  inset-inline: 0.625rem;
+  bottom: 5px;
+  height: 2px;
+  border-radius: var(--radius-full);
+  background: var(--cam-blue-primary);
+  transform: scaleX(0);
+  transform-origin: left;
+  opacity: 0;
+  transition: transform 280ms ease, opacity 200ms ease;
+  pointer-events: none;
+}
+
+[dir='rtl'] .nav-link::after {
+  transform-origin: right;
+}
+
+.nav-link:hover::after,
+.nav-link:focus-visible::after {
+  transform: scaleX(1);
+  opacity: 1;
+}
+
+/* Subtle, non-box focus indicator (no blue rectangle): blue text + the same
+   underline used for hover, revealed on keyboard focus. */
+.nav-link:focus-visible {
+  color: var(--cam-blue-primary);
 }
 
 .header-actions {
@@ -914,6 +929,52 @@
   color: var(--cam-cyan-tech);
 }
 
+/* ── Light mode: re-target the hero strips' dark palettes ─────────────────
+   Both .hero-benefits and .hero-cad-stage carry their own dark color
+   palettes via custom properties. Re-map those tokens to the existing light
+   theme variables so the bands adapt alongside [data-theme='light'] instead
+   of staying dark. Dark mode is left untouched. */
+[data-theme='light'] .hero-benefits {
+  --hb-bg-deep: var(--cam-surface-2);
+  --hb-bg-hi: var(--cam-surface-1);
+  --hb-ink: var(--cam-text-primary);
+  --hb-muted: var(--cam-text-muted);
+  --hb-border: var(--cam-border-medium);
+  --hb-divider: var(--cam-border-subtle);
+  --hb-accent: var(--cam-blue-primary);
+  background:
+    radial-gradient(ellipse 80% 90% at 50% -10%, rgba(0, 102, 255, 0.06), transparent 60%),
+    linear-gradient(180deg, var(--hb-bg-hi) 0%, var(--hb-bg-deep) 100%);
+}
+
+[data-theme='light'] .hero-cad-stage {
+  --cad-chrome-top: var(--cam-surface-1);
+  --cad-chrome-bottom: var(--cam-surface-2);
+  --cad-chrome-flat: var(--cam-surface-1);
+  --cad-window-border: var(--cam-border-medium);
+  --cad-window-text: var(--cam-text-primary);
+  --cad-window-muted: var(--cam-text-muted);
+  --cad-window-faint: var(--cam-text-faint);
+  --cad-accent: var(--cam-blue-primary);
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+[data-theme='light'] .cad-canvas-wrapper {
+  background:
+    radial-gradient(ellipse at 50% 44%, rgba(0, 102, 255, 0.06), transparent 62%),
+    repeating-linear-gradient(0deg, rgba(15, 23, 42, 0.05) 0 1px, transparent 1px 44px),
+    repeating-linear-gradient(90deg, rgba(15, 23, 42, 0.05) 0 1px, transparent 1px 44px),
+    #eef2f7;
+}
+
+[data-theme='light'] .cad-controls-hud {
+  background: rgba(15, 23, 42, 0.05);
+}
+
+[data-theme='light'] .hero-cad-stage .hud-btn:hover {
+  background: rgba(15, 23, 42, 0.06);
+}
+
 @media (max-width: 900px) {
   .cad-canvas-wrapper {
     height: 340px;
@@ -1306,3 +1367,120 @@
     text-align: center;
   }
 }
+
+/* ── Coming Soon ─────────────────────────────────────────────────────────
+   Theme-aware placeholder page reached from the Mission "Start Your Request"
+   CTA. Colors come exclusively from the shared --cam-* design tokens so it
+   adapts to both light and dark themes without a dedicated theme system. */
+.coming-soon-view {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(2.5rem, 6vw, 5rem) var(--space-4);
+  background: var(--cam-bg);
+  min-height: calc(100vh - var(--header-height));
+}
+
+.coming-soon-wrap {
+  width: 100%;
+}
+
+.coming-soon-card {
+  max-width: 560px;
+  margin-inline: auto;
+  padding: clamp(2rem, 5vw, 3.5rem);
+  background: var(--cam-surface-1);
+  border: 1px solid var(--cam-border-medium);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.coming-soon-mark {
+  margin-bottom: var(--space-6);
+  color: var(--cam-blue-primary);
+}
+
+.coming-soon-logo {
+  height: 44px;
+  width: auto;
+}
+
+.coming-soon-kicker {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--cam-blue-primary);
+  margin-bottom: var(--space-3);
+}
+
+.coming-soon-title {
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 5vw, 3rem);
+  letter-spacing: -0.02em;
+  color: var(--cam-text-primary);
+  line-height: 1.05;
+  margin-bottom: var(--space-4);
+}
+
+.coming-soon-description {
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--cam-text-muted);
+  max-width: 40ch;
+  margin-bottom: var(--space-8);
+}
+
+.coming-soon-contact {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-8);
+}
+
+.coming-soon-contact-label {
+  font-size: 0.8125rem;
+  color: var(--cam-text-secondary);
+}
+
+.coming-soon-email {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--cam-blue-primary);
+  text-decoration: none;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  transition: color var(--transition-fast), border-color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.coming-soon-email:hover,
+.coming-soon-email:focus-visible {
+  color: var(--cam-blue-hover);
+  border-color: var(--cam-border-blue);
+  background: var(--cam-blue-subtle);
+}
+
+.coming-soon-email:focus-visible {
+  outline: 2px solid var(--cam-blue-primary);
+  outline-offset: 1px;
+}
+
+.coming-soon-back {
+  min-width: 200px;
+}
+
+.coming-soon-back:focus-visible {
+  outline: 2px solid var(--cam-blue-primary);
+  outline-offset: 2px;
+}
+

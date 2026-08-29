@@ -24,6 +24,7 @@ import { DashboardView } from './components/dashboard/DashboardView';
 import { ProfileView } from './components/profile/ProfileView';
 import { MarketplaceView } from './components/marketplace/MarketplaceView';
 import { ManufacturingRequestView } from './components/manufacturing/ManufacturingRequestView';
+import { ComingSoonView } from './components/coming-soon/ComingSoonView';
 import { EquationBuilderView } from './components/admin/EquationBuilderView';
 import { AdminLoginView } from './components/admin/AdminLoginView';
 import { AdminDashboardView } from './components/admin/AdminDashboardView';
@@ -107,6 +108,7 @@ export const App: React.FC = () => {
       {!isLoading && activeView === 'profile' && isAuthenticated && <ProfileView />}
       {!isLoading && activeView === 'marketplace' && <MarketplaceView />}
       {!isLoading && activeView === 'manufacturing-request' && <ManufacturingRequestView />}
+      {!isLoading && activeView === 'coming-soon' && <ComingSoonView />}
       {!isLoading && activeView === 'equation-builder' && <EquationBuilderView />}
 
       {/* Admin Views */}
@@ -134,7 +136,7 @@ export const App: React.FC = () => {
       {!isLoading && activeView === 'admin-settings' && isAuthenticated && currentUser?.role?.includes('ADMIN') && <AdminSettingsView />}
       {!isLoading && activeView === 'admin-pricing' && isAuthenticated && currentUser?.role?.includes('ADMIN') && <AdminPricingView />}
 
-      {!isLoading && activeView !== 'marketplace' && activeView !== 'manufacturing-request' && activeView !== 'equation-builder' && !activeView.startsWith('admin-') && (activeView !== 'dashboard' || !isAuthenticated) && (activeView !== 'profile' || !isAuthenticated) && (
+      {!isLoading && activeView !== 'marketplace' && activeView !== 'manufacturing-request' && activeView !== 'coming-soon' && activeView !== 'equation-builder' && !activeView.startsWith('admin-') && (activeView !== 'dashboard' || !isAuthenticated) && (activeView !== 'profile' || !isAuthenticated) && (
         <main id="view-landing">
           <HeroSection />
           <ServicesSection />

@@ -135,7 +135,7 @@ export interface ToastMessage {
   type: 'success' | 'error' | 'info' | 'warning';
 }
 
-export type ViewType = 'home' | 'services' | 'materials' | 'workflow' | 'about' | 'dashboard' | 'profile' | 'marketplace' | 'manufacturing-request' | 'equation-builder'
+export type ViewType = 'home' | 'services' | 'materials' | 'workflow' | 'about' | 'dashboard' | 'profile' | 'marketplace' | 'manufacturing-request' | 'coming-soon' | 'equation-builder'
   | 'admin-login' | 'admin-dashboard'
   | 'admin-orders' | 'admin-order-detail'
   | 'admin-customers' | 'admin-customer-detail'

@@ -2,6 +2,7 @@ import React from 'react';
 import { useStore } from '../../context/StoreContext';
 import { ViewType } from '../../types';
 import { useTranslation } from 'react-i18next';
+import { isRequestFlowView } from '../../constants/navigation';
 
 interface MobileNavProps {
   isOpen: boolean;
@@ -9,8 +10,9 @@ interface MobileNavProps {
 }
 
 export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose }) => {
-  const { setActiveView, startManufacturingRequest, openAuthModal } = useStore();
+  const { setActiveView, activeView, startManufacturingRequest, openAuthModal } = useStore();
   const { t } = useTranslation();
+  const isInsideRequestFlow = isRequestFlowView(activeView);
 
   const handleLinkClick = (view: ViewType, sectionId?: string) => {
     setActiveView(view);
@@ -111,21 +113,23 @@ export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose }) => {
       </a>
 
       <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-        <button
-          className="btn btn-primary cam-shine-auto"
-          style={{ width: '100%' }}
-          onClick={() => {
-            onClose();
-            startManufacturingRequest();
-          }}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginRight: '6px' }}>
-            <polygon points="12 2 2 7 12 12 22 7 12 2" />
-            <polyline points="2 17 12 22 22 17" />
-            <polyline points="2 12 12 17 22 12" />
-          </svg>
-          {t('nav.startManufacturing')}
-        </button>
+        {!isInsideRequestFlow && (
+          <button
+            className="btn btn-primary cam-shine-auto"
+            style={{ width: '100%' }}
+            onClick={() => {
+              onClose();
+              startManufacturingRequest();
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginRight: '6px' }}>
+              <polygon points="12 2 2 7 12 12 22 7 12 2" />
+              <polyline points="2 17 12 22 22 17" />
+              <polyline points="2 12 12 17 22 12" />
+            </svg>
+            {t('nav.startManufacturing')}
+          </button>
+        )}
         <button
           className="btn btn-outline"
           style={{ width: '100%' }}

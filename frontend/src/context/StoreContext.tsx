@@ -14,6 +14,7 @@ interface StoreContextType {
 
   // Modals state
   startManufacturingRequest: () => void;
+  openComingSoon: () => void;
 
   isAuthModalOpen: boolean;
   authModalTab: 'login' | 'register';
@@ -150,6 +151,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Modals controls
   const startManufacturingRequest = () => {
     setActiveView('manufacturing-request');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const openComingSoon = () => {
+    setActiveView('coming-soon');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -303,6 +309,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setActiveView,
 
         startManufacturingRequest,
+        openComingSoon,
 
         isAuthModalOpen,
         authModalTab,
