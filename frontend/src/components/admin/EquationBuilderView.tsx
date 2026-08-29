@@ -315,7 +315,7 @@ export const EquationBuilderView: React.FC = () => {
                 borderRadius: '8px',
                 padding: '24px',
                 marginBottom: '20px',
-                fontFamily: 'monospace',
+                fontFamily: "'Google Sans', sans-serif",
                 fontSize: '18px',
                 color: '#4ade80',
               }}>

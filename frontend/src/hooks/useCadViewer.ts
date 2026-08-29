@@ -273,7 +273,7 @@ export const useCadViewer = (canvasRef: React.RefObject<HTMLCanvasElement | null
       const bbSize = 130 * zoom.current;
       ctx.strokeRect(cx - bbSize / 2, cy - bbSize / 2, bbSize, bbSize);
       ctx.setLineDash([]);
-      ctx.font = "10px 'JetBrains Mono', monospace";
+      ctx.font = "10px 'Google Sans', sans-serif";
       ctx.fillStyle = 'rgba(229, 231, 235, 0.75)';
       ctx.fillText('X: 120.00 mm', cx - bbSize / 2, cy + bbSize / 2 + 14);
       ctx.fillText('Y: 85.00 mm', cx + bbSize / 2 - 70, cy + bbSize / 2 + 14);

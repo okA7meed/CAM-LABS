@@ -3,7 +3,7 @@
    Precision Digital Manufacturing Platform
    ========================================================================== */
 
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@700;800;900&family=DM+Sans:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@700;800;900&family=DM+Sans:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;600;700&family=Google+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
 :root {
   /* Brand Colors */
@@ -43,7 +43,10 @@
   --font-sans: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-display: 'Space Grotesk', var(--font-sans);
   --font-arabic: 'IBM Plex Sans Arabic', 'Segoe UI', sans-serif;
-  --font-mono: 'JetBrains Mono', SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  /* Google Sans is the project's new technical/data typeface. It replaces the
+     former JetBrains Mono everywhere that previously used var(--font-mono). */
+  --font-google-sans: 'Google Sans', var(--font-sans);
+  --font-mono: var(--font-google-sans);
   /* Space Grotesk / IBM Plex Sans Arabic stop at 700; these ship real 900 faces for the hero headline. */
   --font-hero-display: 'DM Sans', var(--font-sans);
   --font-hero-arabic: 'Noto Sans Arabic', var(--font-arabic);

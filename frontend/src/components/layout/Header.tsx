@@ -151,10 +151,6 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav }) => {
           }}
         >
           <Logo className="brand-logo" />
-          <div className="network-status-badge">
-            <span className="dot"></span>
-            <span>{t('nav.productionOnline')}</span>
-          </div>
         </a>
 
         <nav className="desktop-nav" aria-label={t('nav.main')} ref={navRef}>

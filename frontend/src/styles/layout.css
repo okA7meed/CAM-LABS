@@ -97,29 +97,6 @@
   align-self: flex-start;
 }
 
-.network-status-badge {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: var(--navbar-control-height);
-  padding: 5px 9px;
-  background: var(--cam-surface-1);
-  border: 1px solid var(--cam-border-subtle);
-  border-radius: var(--radius-md);
-  font-family: var(--font-mono);
-  font-size: 0.625rem;
-  letter-spacing: 0.035em;
-  text-transform: uppercase;
-  color: var(--cam-text-muted);
-}
-
-.network-status-badge .dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background-color: var(--cam-success);
-}
-
 .desktop-nav {
   position: relative;
   display: flex;
@@ -323,13 +300,13 @@
 /* Mobile Hamburger & Drawer */
 .mobile-nav-toggle {
   display: none;
-  width: 44px;
-  height: 44px;
+  width: var(--navbar-control-height);
+  height: var(--navbar-control-height);
   align-items: center;
   justify-content: center;
   background: var(--cam-surface-2);
-  border: 1px solid var(--cam-border-medium);
-  --btn-block-size: 44px;
+  border: 1px solid var(--cam-border-subtle);
+  --btn-block-size: var(--navbar-control-height);
   border-radius: var(--btn-radius);
   color: var(--cam-text-primary);
   cursor: pointer;
@@ -337,7 +314,9 @@
   transition: border-color var(--transition-fast), background-color var(--transition-fast), transform var(--transition-fast);
 }
 
+.mobile-nav-toggle svg { width: 20px; height: 20px; }
 .mobile-nav-toggle:hover { border-color: var(--cam-border-blue); background: var(--cam-blue-subtle); transform: translateY(-1px); }
+.mobile-nav-toggle:active { transform: scale(0.94); }
 
 .mobile-menu-drawer {
   position: fixed;
@@ -386,9 +365,6 @@
   .desktop-nav {
     display: none;
   }
-  .network-status-badge {
-    display: none;
-  }
   .header-container { grid-template-columns: 1fr auto; }
   .mobile-nav-toggle {
     display: inline-flex;
@@ -409,8 +385,8 @@
   .header-actions { gap: 6px; }
   .header-sign-in,
   .persona-select-btn { display: none; }
-  .nav-preferences { gap: 4px; }
-  .header-cta { width: 44px; height: 44px; padding: 0; --btn-block-size: 44px; border-radius: var(--btn-radius); }
+  .nav-preferences { gap: 6px; }
+  .header-cta { width: var(--navbar-control-height); height: var(--navbar-control-height); padding: 0; --btn-block-size: var(--navbar-control-height); border-radius: var(--btn-radius); }
   .header-cta span { display: none; }
   .mobile-menu-drawer { top: 64px; left: 0; right: 0; bottom: 0; border-radius: 0; padding: var(--space-4); }
 }
@@ -439,10 +415,9 @@
 [dir='rtl'] .mobile-menu-drawer { inset-inline: 0; }
 [dir='rtl'] .header-cta svg { transform: scaleX(-1); }
 [dir='rtl'] .hero-cta-group svg { transform: scaleX(-1); }
-[dir='rtl'] .hero-metrics-ticker, [dir='rtl'] .services-grid, [dir='rtl'] .footer-grid { direction: rtl; }
+[dir='rtl'] .hero-benefits, [dir='rtl'] .services-grid, [dir='rtl'] .footer-grid { direction: rtl; }
 [dir='rtl'] input, [dir='rtl'] textarea, [dir='rtl'] select { text-align: start; }
 [dir='rtl'] .section-badge,
-[dir='rtl'] .network-status-badge,
 [dir='rtl'] .nav-menu { direction: rtl; }
 [dir='rtl'] .section-badge-dot { margin-inline-end: 0; margin-inline-start: 6px; }
 [dir='rtl'] .hero-metric,
@@ -462,7 +437,7 @@
 .hero-section {
   position: relative;
   padding-top: var(--space-12);
-  padding-bottom: var(--space-16);
+  padding-bottom: 0;
   overflow: hidden;
 }
 
@@ -485,20 +460,13 @@
   z-index: 10;
 }
 
-.hero-badge-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  margin-bottom: var(--space-5);
-  flex-wrap: wrap;
-}
-
 .hero-title {
   font-family: var(--font-hero-display);
   font-size: clamp(2.5rem, 5vw, 3.875rem);
   font-weight: 900;
   line-height: 1.1;
   letter-spacing: -0.03em;
+  margin-top: var(--space-5);
   margin-bottom: var(--space-6);
 }
 
@@ -541,38 +509,122 @@
   margin-bottom: var(--space-10);
 }
 
-.hero-metrics-ticker {
+/* Manufacturing Feature Strip — full-width industrial band */
+.hero-benefits {
+  --hb-bg-deep: #0a0f1e;
+  --hb-bg-hi: #0d1426;
+  --hb-ink: #eef2fb;
+  --hb-muted: #8a93a8;
+  --hb-border: rgba(148, 163, 184, 0.16);
+  --hb-divider: rgba(148, 163, 184, 0.14);
+  --hb-accent: #4d9bff;
+
+  font-family: var(--font-google-sans), var(--font-arabic), sans-serif;
+  width: 100vw;
+  margin-inline: calc(50% - 50vw);
+  margin-top: clamp(1.5rem, 2.5vw, 2.5rem);
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: var(--space-4);
-  padding-top: var(--space-6);
-  border-top: 1px solid var(--cam-border-subtle);
+  align-items: stretch;
+  background:
+    radial-gradient(ellipse 80% 90% at 50% -10%, rgba(0, 102, 255, 0.14), transparent 60%),
+    linear-gradient(180deg, var(--hb-bg-hi) 0%, var(--hb-bg-deep) 100%);
+  border-top: 1px solid var(--hb-border);
+  border-bottom: 1px solid var(--hb-border);
+  padding-block: clamp(1.1rem, 1.5vw, 1.3rem);
+}
+
+.hero-benefit-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(0.875rem, 1.5vw, 1.25rem);
+  padding-inline: clamp(1rem, 2vw, 2rem);
+  border-inline-start: 1px solid var(--hb-divider);
+}
+
+.hero-benefit-item:first-child {
+  border-inline-start: 0;
+}
+
+.hero-benefit-icon {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  color: var(--hb-ink);
+  opacity: 0.92;
+}
+
+.hero-benefit-icon svg { width: 30px; height: 30px; }
+
+.hero-benefit-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.hero-benefit-val {
+  font-size: clamp(1.15rem, 2vw, 1.7rem);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--hb-ink);
+  line-height: 1.05;
+  white-space: nowrap;
+}
+
+.hero-benefit-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--hb-muted);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+@media (max-width: 1024px) {
+  .hero-benefit-item {
+    flex-direction: column;
+    gap: clamp(0.5rem, 1.5vw, 0.65rem);
+    padding-inline: clamp(0.75rem, 2vw, 1.5rem);
+    text-align: center;
+  }
+
+  .hero-benefit-icon svg { width: 26px; height: 26px; }
+  .hero-benefit-val { font-size: clamp(1.05rem, 2.2vw, 1.4rem); }
+  .hero-benefit-label { letter-spacing: 0.1em; }
 }
 
 @media (max-width: 640px) {
-  .hero-metrics-ticker {
-    grid-template-columns: repeat(2, 1fr);
-    gap: var(--space-4);
+  .hero-benefits {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0;
+    row-gap: clamp(1.25rem, 4vw, 1.5rem);
+    padding-block: clamp(1rem, 4vw, 1.25rem);
   }
-}
 
-.hero-metric-item {
-  display: flex;
-  flex-direction: column;
-}
+  .hero-benefit-item {
+    flex-direction: row;
+    justify-content: flex-start;
+    align-items: center;
+    text-align: start;
+    gap: clamp(0.5rem, 2.5vw, 0.75rem);
+    padding-inline: clamp(0.875rem, 3.5vw, 1.25rem);
+  }
 
-.hero-metric-val {
-  font-family: var(--font-mono);
-  font-size: 1.375rem;
-  font-weight: 700;
-  color: var(--cam-text-primary);
-}
+  .hero-benefit-body {
+    gap: 2px;
+    min-width: 0;
+  }
 
-.hero-metric-label {
-  font-size: 0.75rem;
-  color: var(--cam-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  .hero-benefit-item:nth-child(odd) {
+    border-inline-start: 0;
+  }
+
+  .hero-benefit-icon svg { width: 20px; height: 20px; }
+  .hero-benefit-val { font-size: clamp(0.95rem, 3.5vw, 1.05rem); white-space: normal; }
+  .hero-benefit-label { font-size: 0.64rem; letter-spacing: 0.07em; white-space: normal; text-wrap: balance; }
 }
 
 /* Hero 3D CAD Showcase Stage — macOS-inspired engineering application window */

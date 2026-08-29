@@ -3,6 +3,7 @@ import { CadViewerStage } from './CadViewerStage';
 import { AnimatedHeadline } from './AnimatedHeadline';
 import { useStore } from '../../context/StoreContext';
 import { useTranslation } from 'react-i18next';
+import { Icon } from '../ui/Icon';
 
 /** Maximum pointer-driven offset of the CAD stage, in pixels. */
 const STAGE_TILT_RANGE = 6;
@@ -47,14 +48,6 @@ export const HeroSection: React.FC = () => {
         <div className="hero-grid">
           {/* Hero Marketing Copy */}
           <div className="hero-content">
-            <div className="hero-badge-row cam-hero-in" style={{ '--cam-hero-delay': '60ms' } as React.CSSProperties}>
-              <div className="section-badge">
-                <span className="section-badge-dot"></span>
-                <span>{t('hero.standards')}</span>
-              </div>
-              <span className="badge badge-blue">{t('hero.tolerance')}</span>
-            </div>
-
             <h1 className="hero-title cam-hero-in" style={{ '--cam-hero-delay': '160ms' } as React.CSSProperties}>
               <span className="hero-title-prefix">{t('hero.digitalCad')}</span>{' '}
               <span className="hero-title-action">
@@ -95,26 +88,6 @@ export const HeroSection: React.FC = () => {
                 {t('actions.exploreServices')}
               </a>
             </div>
-
-            {/* Platform Metrics Ticker */}
-            <div className="hero-metrics-ticker cam-hero-in" style={{ '--cam-hero-delay': '520ms' } as React.CSSProperties}>
-              <div className="hero-metric-item">
-                <span className="hero-metric-val">± 0.025 mm</span>
-                <span className="hero-metric-label">{t('hero.cncMachining')}</span>
-              </div>
-              <div className="hero-metric-item">
-                <span className="hero-metric-val">50+</span>
-                <span className="hero-metric-label">{t('hero.engineeringPolymers')}</span>
-              </div>
-              <div className="hero-metric-item">
-                <span className="hero-metric-val">24 - 48h</span>
-                <span className="hero-metric-label">{t('hero.rapidDispatch')}</span>
-              </div>
-              <div className="hero-metric-item">
-                <span className="hero-metric-val">99.94%</span>
-                <span className="hero-metric-label">{t('hero.firstPassQa')}</span>
-              </div>
-            </div>
           </div>
 
           {/* Hero 3D CAD Showcase Stage */}
@@ -126,6 +99,38 @@ export const HeroSection: React.FC = () => {
             onMouseLeave={handleStagePointerLeave}
           >
             <CadViewerStage />
+          </div>
+        </div>
+
+        {/* Manufacturing Trust Strip — full-width feature strip */}
+        <div className="hero-benefits cam-hero-in" style={{ '--cam-hero-delay': '520ms' } as React.CSSProperties}>
+          <div className="hero-benefit-item">
+            <span className="hero-benefit-icon"><Icon name="precision" size={22} /></span>
+            <span className="hero-benefit-body">
+              <span className="hero-benefit-val">{t('hero.precisionValue')}</span>
+              <span className="hero-benefit-label">{t('hero.precision')}</span>
+            </span>
+          </div>
+          <div className="hero-benefit-item">
+            <span className="hero-benefit-icon"><Icon name="clock" size={22} /></span>
+            <span className="hero-benefit-body">
+              <span className="hero-benefit-val">{t('hero.fastTurnaroundValue')}</span>
+              <span className="hero-benefit-label">{t('hero.fastTurnaround')}</span>
+            </span>
+          </div>
+          <div className="hero-benefit-item">
+            <span className="hero-benefit-icon"><Icon name="shieldCheck" size={22} /></span>
+            <span className="hero-benefit-body">
+              <span className="hero-benefit-val">{t('hero.secure')}</span>
+              <span className="hero-benefit-label">{t('hero.cadProtection')}</span>
+            </span>
+          </div>
+          <div className="hero-benefit-item">
+            <span className="hero-benefit-icon"><Icon name="mapPin" size={22} /></span>
+            <span className="hero-benefit-body">
+              <span className="hero-benefit-val">{t('hero.egypt')}</span>
+              <span className="hero-benefit-label">{t('hero.localProduction')}</span>
+            </span>
           </div>
         </div>
       </div>
