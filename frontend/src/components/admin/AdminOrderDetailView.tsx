@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../../context/StoreContext';
 import { AdminLayout } from './AdminLayout';
+import { ApiService } from '../../services/api';
 
 export const AdminOrderDetailView: React.FC = () => {
   const { t } = useTranslation();
@@ -11,6 +12,11 @@ export const AdminOrderDetailView: React.FC = () => {
   const [manufacturerId, setManufacturerId] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [approving, setApproving] = useState(false);
+  const [editPriceOpen, setEditPriceOpen] = useState(false);
+  const [newPrice, setNewPrice] = useState('');
+  const [priceReason, setPriceReason] = useState('');
+  const [savingPrice, setSavingPrice] = useState(false);
 
   const load = async () => {
     if (!selectedAdminOrderId) return;
@@ -58,6 +64,44 @@ export const AdminOrderDetailView: React.FC = () => {
 
   const timeline = useMemo(() => order?.events || [], [order]);
 
+  const approveOrder = async () => {
+    if (!selectedAdminOrderId) return;
+    setApproving(true);
+    try {
+      await ApiService.adminApproveOrder(selectedAdminOrderId);
+      showToast(t('admin.orderDetail.approveSuccessTitle'), t('admin.orderDetail.approveSuccess'), 'success');
+      await load();
+    } catch (err: any) {
+      showToast('Error', err?.message || t('admin.orderDetail.approveFailed'), 'error');
+    } finally {
+      setApproving(false);
+    }
+  };
+
+  const canApprove = order && !['Delivered', 'Cancelled', 'Quality Inspection'].includes(order.status);
+
+  const updatePrice = async () => {
+    if (!selectedAdminOrderId) return;
+    const price = Number(newPrice);
+    if (!Number.isFinite(price) || price <= 0) {
+      showToast('Error', t('admin.orderDetail.invalidPrice'), 'error');
+      return;
+    }
+    setSavingPrice(true);
+    try {
+      await ApiService.adminUpdateOrderPrice(selectedAdminOrderId, price, priceReason || undefined);
+      showToast(t('admin.orderDetail.priceSuccessTitle'), t('admin.orderDetail.priceSuccess'), 'success');
+      setEditPriceOpen(false);
+      setNewPrice('');
+      setPriceReason('');
+      await load();
+    } catch (err: any) {
+      showToast('Error', err?.message || t('admin.orderDetail.priceFailed'), 'error');
+    } finally {
+      setSavingPrice(false);
+    }
+  };
+
   if (!selectedAdminOrderId) {
     return <AdminLayout title={t('admin.orderDetail.title')}><div style={{ color: 'var(--cam-text-muted)' }}>{t('admin.orderDetail.noSelected')}</div></AdminLayout>;
   }
@@ -75,6 +119,9 @@ export const AdminOrderDetailView: React.FC = () => {
               {t('admin.orderDetail.backToOrders')}
             </button>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <button className="btn btn-sm btn-primary" onClick={approveOrder} disabled={approving || !canApprove} title={canApprove ? t('admin.orderDetail.approveTooltip') : t('admin.orderDetail.noApprove')}>
+                {approving ? t('admin.approving') : t('admin.orderDetail.approveOrder')}
+              </button>
               <span className="badge badge-primary">{order.status}</span>
               <span className="badge badge-neutral">{order.paymentStatus}</span>
               <span className="badge badge-neutral">{order.manufacturingStatus}</span>
@@ -153,6 +200,24 @@ export const AdminOrderDetailView: React.FC = () => {
               <DetailItem label={t('admin.orderDetail.finalPrice')} value={order.totalCost} />
               <DetailItem label={t('admin.orderDetail.pricingVersion')} value={order.pricingEquationVersion ? `v${order.pricingEquationVersion.version}` : '—'} />
               <DetailItem label={t('admin.orderDetail.equationName')} value={order.pricingEquationVersion?.name || '—'} />
+            </div>
+            <div style={{ marginTop: '16px', display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+              <button className="btn btn-sm btn-outline" onClick={() => { setEditPriceOpen((open) => !open); setNewPrice(''); setPriceReason(''); }}>
+                {editPriceOpen ? t('admin.orderDetail.cancelPriceEdit') : t('admin.orderDetail.editPrice')}
+              </button>
+              {editPriceOpen && (
+                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'end', background: 'var(--cam-surface-2)', padding: '14px', borderRadius: '8px', width: '100%' }}>
+                  <div style={{ minWidth: '200px', flex: 1 }}>
+                    <label style={{ display: 'block', color: 'var(--cam-text-muted)', fontSize: '12px', marginBottom: '6px' }}>{t('admin.orderDetail.newPrice')}</label>
+                    <input className="form-control" type="number" min="0" step="0.01" value={newPrice} onChange={(e) => setNewPrice(e.target.value)} placeholder="0.00" style={{ width: '100%' }} />
+                  </div>
+                  <div style={{ minWidth: '240px', flex: 2 }}>
+                    <label style={{ display: 'block', color: 'var(--cam-text-muted)', fontSize: '12px', marginBottom: '6px' }}>{t('admin.orderDetail.priceReason')}</label>
+                    <input className="form-control" value={priceReason} onChange={(e) => setPriceReason(e.target.value)} placeholder={t('admin.orderDetail.priceReasonPlaceholder')} style={{ width: '100%' }} />
+                  </div>
+                  <button className="btn btn-primary" onClick={updatePrice} disabled={savingPrice}>{savingPrice ? t('admin.saving') : t('admin.orderDetail.applyPrice')}</button>
+                </div>
+              )}
             </div>
           </div>
 

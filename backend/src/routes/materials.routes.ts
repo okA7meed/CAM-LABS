@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { ApiResponseHelper } from '../utils/response';
+import { sendSafeRouteError } from '../utils/errors';
 import { getPrismaClient } from '../config/database';
 import { Logger } from '../utils/logger';
 
@@ -40,7 +41,7 @@ router.get('/', async (_req: Request, res: Response) => {
     ApiResponseHelper.success(res, materials, `${materials.length} materials returned`);
   } catch (err: any) {
     Logger.error(`[Materials] Catalog fetch failed: ${err.message}`);
-    ApiResponseHelper.error(res, 'MATERIALS_FETCH_ERROR', err.message, 500);
+    sendSafeRouteError(res, err, { code: 'MATERIALS_FETCH_ERROR', message: 'The request could not be completed.', status: 500 });
   }
 });
 
@@ -55,7 +56,7 @@ router.get('/:id', async (req: Request, res: Response) => {
     ApiResponseHelper.success(res, material);
   } catch (err: any) {
     Logger.error(`[Materials] Single material fetch failed: ${err.message}`);
-    ApiResponseHelper.error(res, 'MATERIALS_FETCH_ERROR', err.message, 500);
+    sendSafeRouteError(res, err, { code: 'MATERIALS_FETCH_ERROR', message: 'The request could not be completed.', status: 500 });
   }
 });
 

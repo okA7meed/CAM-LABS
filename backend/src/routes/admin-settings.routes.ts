@@ -1,7 +1,9 @@
 import { Router, Request, Response } from 'express';
 import { requireSuperAdmin, requireAnyAdmin } from '../middleware/admin.middleware';
 import { ApiResponseHelper } from '../utils/response';
+import { sendSafeRouteError } from '../utils/errors';
 import { AdminService } from '../services/admin.service';
+import { Logger } from '../utils/logger';
 import { Prisma } from '@prisma/client';
 
 const router = Router();
@@ -16,7 +18,7 @@ router.get('/', requireAnyAdmin, async (req: Request, res: Response) => {
     const settings = await AdminService.getSettingsSnapshot();
     ApiResponseHelper.success(res, settings, 'System settings retrieved');
   } catch (error: any) {
-    ApiResponseHelper.error(res, 'SETTINGS_ERROR', error.message, 500);
+    sendSafeRouteError(res, error, { code: 'SETTINGS_ERROR', message: 'The request could not be completed.', status: 500 });
   }
 });
 
@@ -50,16 +52,25 @@ router.put('/', requireSuperAdmin, async (req: Request, res: Response) => {
 
     ApiResponseHelper.success(res, { section, key, value }, 'Setting updated successfully');
   } catch (error: any) {
-    ApiResponseHelper.error(res, 'SETTINGS_UPDATE_ERROR', error.message, 400);
+    sendSafeRouteError(res, error, { code: 'SETTINGS_UPDATE_ERROR', message: 'The request could not be completed.', status: 400 });
   }
 });
 
 // ============================================================================
 // ADMIN ROUTE CONFIGURATION
 // ============================================================================
+// Public by design: the login screen resolves the admin URL before any session
+// exists. On failure we fall back to the default path instead of leaking
+// internals — and the handler must catch, because Express 4 does not route
+// async rejections to the error middleware (the request would hang).
 router.get('/admin-url', async (_req: Request, res: Response) => {
-  const adminUrl = await AdminService.getSystemSetting<string>('adminUrl');
-  ApiResponseHelper.success(res, { adminUrl: adminUrl || '/admin' }, 'Admin URL retrieved');
+  try {
+    const adminUrl = await AdminService.getSystemSetting<string>('adminUrl');
+    ApiResponseHelper.success(res, { adminUrl: adminUrl || '/admin' }, 'Admin URL retrieved');
+  } catch (error) {
+    Logger.warn(`[AdminSettings] admin-url lookup failed, using default: ${error instanceof Error ? error.message : String(error)}`);
+    ApiResponseHelper.success(res, { adminUrl: '/admin' }, 'Admin URL retrieved');
+  }
 });
 
 export default router;

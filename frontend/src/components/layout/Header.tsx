@@ -92,6 +92,11 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav }) => {
   }, [isLandingView, setActiveView]);
 
   const handleNavClick = (view: ViewType, sectionId?: string) => {
+    // Admin users land on the admin dashboard when they click "Dashboard".
+    if (view === 'dashboard' && currentUser?.role?.includes('ADMIN')) {
+      window.location.href = '/admin';
+      return;
+    }
     setActiveView(view);
     if (view === 'dashboard' || view === 'profile') {
       window.scrollTo({ top: 0, behavior: 'smooth' });

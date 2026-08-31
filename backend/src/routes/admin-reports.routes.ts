@@ -228,6 +228,8 @@ router.get('/customers', requireOperationsAdmin, async (req: Request, res: Respo
     const totalCustomers = customers.length;
     const activeCustomers = customers.filter(c => c.accountStatus === 'ACTIVE').length;
     const totalOrders = customers.reduce((sum, c) => sum + c._count.orders, 0);
+    // Credentials must never leave the server — not even into admin reports.
+    const safeCustomers = customers.map(({ passwordHash: _passwordHash, ...safeCustomer }) => safeCustomer);
     // totalCost is a string field, calculate manually
     const spendingOrders = await prisma.order.findMany({
       where: { status: { in: ['Delivered', 'In Production'] } },
@@ -244,7 +246,7 @@ router.get('/customers', requireOperationsAdmin, async (req: Request, res: Respo
       totalOrders,
       totalSpending: totalSpendingValue.toFixed(2),
       currency: 'EGP',
-      customers,
+      customers: safeCustomers,
     }, 'Customer report generated');
   } catch (error: any) {
     if (error instanceof AppError) { ApiResponseHelper.error(res, error.code, error.message, error.statusCode); return; } ApiResponseHelper.error(res, 'CUSTOMER_REPORT_ERROR', 'Report could not be generated.', 500);

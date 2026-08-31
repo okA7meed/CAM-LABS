@@ -5,11 +5,25 @@ import { AdminService } from '../services/admin.service';
 import { getPrismaClient } from '../config/database';
 import { requireAnyAdmin, requireSuperAdmin, requireOperationsAdmin, requirePricingAdmin, requireSupportAdmin, requireFinanceAdmin } from '../middleware/admin.middleware';
 import { requireAuth } from '../middleware/auth.middleware';
-import { AppError } from '../utils/errors';
+import { AppError, sendSafeRouteError } from '../utils/errors';
 import { AdminAuthService } from '../services/admin-auth.service';
 import { isRole } from '../auth/roles';
 
 const router = Router();
+
+/**
+ * Format a numeric price consistently with existing Order.totalCost values
+ * (e.g. "7,284.51 EGP"). Extracts the currency code already stored on the
+ * order, or falls back to the platform default. The database is authoritative
+ * for the stored value — this only renders the final currency suffix.
+ */
+const formatOrderPrice = (amount: number, previousValue?: string | null): string => {
+  const currency = previousValue?.match(/[A-Z]{3}|EGP|\$|€/)?.[0] || 'EGP';
+  const localized = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
+  if (currency === '$') return `$${localized}`;
+  if (currency === '€') return `€${localized}`;
+  return `${localized} ${currency}`;
+};
 
 // ============================================================================
 // DASHBOARD
@@ -20,7 +34,7 @@ router.get('/dashboard', requireAnyAdmin, async (req: Request, res: Response) =>
     const stats = await AdminService.getDashboardStats();
     ApiResponseHelper.success(res, stats, 'Dashboard statistics retrieved');
   } catch (error: any) {
-    ApiResponseHelper.error(res, 'DASHBOARD_ERROR', error.message, 500);
+    sendSafeRouteError(res, error, { code: 'DASHBOARD_ERROR', message: 'The request could not be completed.', status: 500 });
   }
 });
 
@@ -33,7 +47,7 @@ router.get('/users', requireSuperAdmin, async (req: Request, res: Response) => {
     const adminUsers = await AdminService.getAdminUsers();
     ApiResponseHelper.success(res, adminUsers, 'Admin users retrieved');
   } catch (error: any) {
-    ApiResponseHelper.error(res, 'ADMIN_USERS_ERROR', error.message, 500);
+    sendSafeRouteError(res, error, { code: 'ADMIN_USERS_ERROR', message: 'The request could not be completed.', status: 500 });
   }
 });
 
@@ -96,7 +110,7 @@ router.put('/users/:id', requireSuperAdmin, async (req: Request, res: Response) 
     const { passwordHash, ...safeUser } = user as any;
     ApiResponseHelper.success(res, safeUser, 'Admin user updated');
   } catch (error: any) {
-    ApiResponseHelper.error(res, 'UPDATE_ADMIN_ERROR', error.message, 400);
+    sendSafeRouteError(res, error, { code: 'UPDATE_ADMIN_ERROR', message: 'The request could not be completed.', status: 400 });
   }
 });
 
@@ -167,7 +181,7 @@ router.get('/orders', requireOperationsAdmin, async (req: Request, res: Response
 
     ApiResponseHelper.success(res, { orders, total }, 'Orders retrieved');
   } catch (error: any) {
-    ApiResponseHelper.error(res, 'ORDERS_ERROR', error.message, 500);
+    sendSafeRouteError(res, error, { code: 'ORDERS_ERROR', message: 'The request could not be completed.', status: 500 });
   }
 });
 
@@ -220,7 +234,7 @@ router.get('/orders/:id', requireOperationsAdmin, async (req: Request, res: Resp
 
     ApiResponseHelper.success(res, order, 'Order details retrieved');
   } catch (error: any) {
-    ApiResponseHelper.error(res, 'ORDER_ERROR', error.message, 500);
+    sendSafeRouteError(res, error, { code: 'ORDER_ERROR', message: 'The request could not be completed.', status: 500 });
   }
 });
 
@@ -307,6 +321,129 @@ router.put('/orders/:id/status', requireOperationsAdmin, async (req: Request, re
 });
 
 // ============================================================================
+// SUPER ADMIN — ORDER MANAGEMENT ACTIONS
+// ============================================================================
+
+/**
+ * POST /admin/orders/:id/approve
+ * Review and approve a customer's submitted order. Moves the order from a
+ * review state into production and records the action in the order event
+ * stream and the global audit log. Authorized only for operations-level
+ * admins (super admin / admin / operations admin).
+ */
+router.post('/orders/:id/approve', requireOperationsAdmin, async (req: Request, res: Response) => {
+  try {
+    const schema = z.object({
+      notes: z.string().optional(),
+    });
+    const { notes } = schema.parse(req.body || {});
+    const prisma = getPrismaClient();
+
+    const existing = await prisma.order.findUnique({ where: { id: req.params.id } });
+    if (!existing) {
+      ApiResponseHelper.error(res, 'ORDER_NOT_FOUND', 'Order not found', 404);
+      return;
+    }
+    if (existing.status === 'Cancelled') {
+      throw new AppError('A cancelled order cannot be approved.', 400, 'ORDER_CANCELLED');
+    }
+    if (['Delivered', 'Quality Inspection'].includes(existing.status)) {
+      throw new AppError(`Order is already ${existing.status.toLowerCase()} and cannot be approved again.`, 400, 'ORDER_ALREADY_APPROVED');
+    }
+
+    const approvedStatus = 'In Production';
+    const updatedOrder = await prisma.order.update({
+      where: { id: req.params.id },
+      data: { status: approvedStatus, statusBadge: 'badge-blue' },
+    });
+
+    await prisma.orderEvent.create({
+      data: {
+        orderId: req.params.id,
+        eventType: 'ORDER_APPROVED',
+        description: notes ? `Order approved for production. ${notes}` : 'Order approved for production.',
+        metadata: { approvedBy: req.auth?.id, from: existing.status, to: approvedStatus, notes },
+      },
+    });
+
+    await AdminService.createAuditLog({
+      userId: req.auth?.id,
+      action: 'APPROVE',
+      entityType: 'ORDER',
+      entityId: req.params.id,
+      oldValue: { status: existing.status },
+      newValue: { status: approvedStatus },
+      metadata: { notes },
+    });
+
+    ApiResponseHelper.success(res, updatedOrder, 'Order approved and moved into production');
+  } catch (error: any) {
+    if (error instanceof AppError) {
+      ApiResponseHelper.error(res, error.code, error.message, error.statusCode);
+      return;
+    }
+    ApiResponseHelper.error(res, 'ORDER_APPROVE_ERROR', 'Order could not be approved.', 400);
+  }
+});
+
+/**
+ * PUT /admin/orders/:id/price
+ * Modify the authoritative order price. The backend validates the new value,
+ * persists it on the real database record, and records who changed it, when,
+ * the previous price and the new price in the order event stream and audit log.
+ */
+router.put('/orders/:id/price', requireOperationsAdmin, async (req: Request, res: Response) => {
+  try {
+    const schema = z.object({
+      price: z.number().positive('price must be a positive number'),
+      reason: z.string().optional(),
+    });
+    const { price, reason } = schema.parse(req.body);
+    const prisma = getPrismaClient();
+
+    const existing = await prisma.order.findUnique({ where: { id: req.params.id } });
+    if (!existing) {
+      ApiResponseHelper.error(res, 'ORDER_NOT_FOUND', 'Order not found', 404);
+      return;
+    }
+    const previousPrice = existing.totalCost;
+    const nextPrice = formatOrderPrice(price, existing.totalCost);
+
+    const updatedOrder = await prisma.order.update({
+      where: { id: req.params.id },
+      data: { totalCost: nextPrice },
+    });
+
+    await prisma.orderEvent.create({
+      data: {
+        orderId: req.params.id,
+        eventType: 'PRICE_UPDATED',
+        description: `Order price updated from ${previousPrice} to ${nextPrice}.`,
+        metadata: { previousPrice, newPrice: nextPrice, price, changedBy: req.auth?.id, changedByName: req.auth?.name, reason },
+      },
+    });
+
+    await AdminService.createAuditLog({
+      userId: req.auth?.id,
+      action: 'UPDATE',
+      entityType: 'ORDER',
+      entityId: req.params.id,
+      oldValue: { totalCost: previousPrice },
+      newValue: { totalCost: nextPrice },
+      metadata: { reason },
+    });
+
+    ApiResponseHelper.success(res, updatedOrder, 'Order price updated');
+  } catch (error: any) {
+    if (error instanceof AppError) {
+      ApiResponseHelper.error(res, error.code, error.message, error.statusCode);
+      return;
+    }
+    ApiResponseHelper.error(res, 'ORDER_PRICE_ERROR', 'Order price could not be updated.', 400);
+  }
+});
+
+// ============================================================================
 // MANUFACTURERS
 // ============================================================================
 
@@ -331,7 +468,7 @@ router.get('/manufacturers', requireOperationsAdmin, async (req: Request, res: R
 
     ApiResponseHelper.success(res, { manufacturers, total }, 'Manufacturers retrieved');
   } catch (error: any) {
-    ApiResponseHelper.error(res, 'MANUFACTURERS_ERROR', error.message, 500);
+    sendSafeRouteError(res, error, { code: 'MANUFACTURERS_ERROR', message: 'The request could not be completed.', status: 500 });
   }
 });
 
@@ -366,7 +503,7 @@ router.post('/manufacturers', requireOperationsAdmin, async (req: Request, res: 
 
     ApiResponseHelper.success(res, manufacturer, 'Manufacturer created', 201);
   } catch (error: any) {
-    ApiResponseHelper.error(res, 'CREATE_MANUFACTURER_ERROR', error.message, 400);
+    sendSafeRouteError(res, error, { code: 'CREATE_MANUFACTURER_ERROR', message: 'The request could not be completed.', status: 400 });
   }
 });
 
@@ -416,7 +553,7 @@ router.put('/manufacturers/:id', requireOperationsAdmin, async (req: Request, re
 
     ApiResponseHelper.success(res, updated, 'Manufacturer updated');
   } catch (error: any) {
-    ApiResponseHelper.error(res, 'UPDATE_MANUFACTURER_ERROR', error.message, 400);
+    sendSafeRouteError(res, error, { code: 'UPDATE_MANUFACTURER_ERROR', message: 'The request could not be completed.', status: 400 });
   }
 });
 
@@ -451,7 +588,7 @@ router.get('/manufacturers/:id', requireOperationsAdmin, async (req: Request, re
 
     ApiResponseHelper.success(res, manufacturer, 'Manufacturer details retrieved');
   } catch (error: any) {
-    ApiResponseHelper.error(res, 'MANUFACTURER_ERROR', error.message, 500);
+    sendSafeRouteError(res, error, { code: 'MANUFACTURER_ERROR', message: 'The request could not be completed.', status: 500 });
   }
 });
 
@@ -509,7 +646,7 @@ router.post('/orders/:id/assign-manufacturer', requireOperationsAdmin, async (re
 
     ApiResponseHelper.success(res, order, 'Manufacturer assigned successfully');
   } catch (error: any) {
-    ApiResponseHelper.error(res, 'ASSIGNMENT_ERROR', error.message, 400);
+    sendSafeRouteError(res, error, { code: 'ASSIGNMENT_ERROR', message: 'The request could not be completed.', status: 400 });
   }
 });
 
@@ -552,7 +689,7 @@ router.get('/manufacturing-requests', requireOperationsAdmin, async (req: Reques
 
     ApiResponseHelper.success(res, { requests, total }, 'Manufacturing requests retrieved');
   } catch (error: any) {
-    ApiResponseHelper.error(res, 'MANUFACTURING_REQUESTS_ERROR', error.message, 500);
+    sendSafeRouteError(res, error, { code: 'MANUFACTURING_REQUESTS_ERROR', message: 'The request could not be completed.', status: 500 });
   }
 });
 
@@ -644,7 +781,7 @@ router.get('/manufacturing-requests/:id', requireOperationsAdmin, async (req: Re
 
     ApiResponseHelper.success(res, request, 'Manufacturing request details retrieved');
   } catch (error: any) {
-    ApiResponseHelper.error(res, 'REQUEST_ERROR', error.message, 500);
+    sendSafeRouteError(res, error, { code: 'REQUEST_ERROR', message: 'The request could not be completed.', status: 500 });
   }
 });
 
@@ -679,9 +816,11 @@ router.get('/customers', requireSupportAdmin, async (req: Request, res: Response
       prisma.user.count({ where }),
     ]);
 
-    ApiResponseHelper.success(res, { customers, total }, 'Customers retrieved');
+    // Credentials must never leave the server — not even to admin dashboards.
+    const safeCustomers = customers.map(({ passwordHash: _passwordHash, ...safeCustomer }) => safeCustomer);
+    ApiResponseHelper.success(res, { customers: safeCustomers, total }, 'Customers retrieved');
   } catch (error: any) {
-    ApiResponseHelper.error(res, 'CUSTOMERS_ERROR', error.message, 500);
+    sendSafeRouteError(res, error, { code: 'CUSTOMERS_ERROR', message: 'The request could not be completed.', status: 500 });
   }
 });
 
@@ -717,7 +856,7 @@ router.get('/customers/:id', requireSupportAdmin, async (req: Request, res: Resp
     const { passwordHash, ...safeCustomer } = customer as any;
     ApiResponseHelper.success(res, safeCustomer, 'Customer details retrieved');
   } catch (error: any) {
-    ApiResponseHelper.error(res, 'CUSTOMER_ERROR', error.message, 500);
+    sendSafeRouteError(res, error, { code: 'CUSTOMER_ERROR', message: 'The request could not be completed.', status: 500 });
   }
 });
 
@@ -756,7 +895,7 @@ router.get('/quotes', requireSupportAdmin, async (req: Request, res: Response) =
 
     ApiResponseHelper.success(res, { quotes, total }, 'Quotes retrieved');
   } catch (error: any) {
-    ApiResponseHelper.error(res, 'QUOTES_ERROR', error.message, 500);
+    sendSafeRouteError(res, error, { code: 'QUOTES_ERROR', message: 'The request could not be completed.', status: 500 });
   }
 });
 
@@ -788,7 +927,7 @@ router.get('/quotes/:id', requireSupportAdmin, async (req: Request, res: Respons
 
     ApiResponseHelper.success(res, quote, 'Quote details retrieved');
   } catch (error: any) {
-    ApiResponseHelper.error(res, 'QUOTE_ERROR', error.message, 500);
+    sendSafeRouteError(res, error, { code: 'QUOTE_ERROR', message: 'The request could not be completed.', status: 500 });
   }
 });
 
@@ -834,7 +973,7 @@ router.get('/cad-files', requireSupportAdmin, async (req: Request, res: Response
 
     ApiResponseHelper.success(res, { cadFiles, total }, 'CAD files retrieved');
   } catch (error: any) {
-    ApiResponseHelper.error(res, 'CAD_FILES_ERROR', error.message, 500);
+    sendSafeRouteError(res, error, { code: 'CAD_FILES_ERROR', message: 'The request could not be completed.', status: 500 });
   }
 });
 
@@ -866,7 +1005,7 @@ router.get('/cad-files/:id', requireSupportAdmin, async (req: Request, res: Resp
 
     ApiResponseHelper.success(res, cadFile, 'CAD file details retrieved');
   } catch (error: any) {
-    ApiResponseHelper.error(res, 'CAD_FILE_ERROR', error.message, 500);
+    sendSafeRouteError(res, error, { code: 'CAD_FILE_ERROR', message: 'The request could not be completed.', status: 500 });
   }
 });
 
@@ -896,7 +1035,7 @@ router.get('/materials', requirePricingAdmin, async (req: Request, res: Response
 
     ApiResponseHelper.success(res, { materials, total }, 'Materials retrieved');
   } catch (error: any) {
-    ApiResponseHelper.error(res, 'MATERIALS_ERROR', error.message, 500);
+    sendSafeRouteError(res, error, { code: 'MATERIALS_ERROR', message: 'The request could not be completed.', status: 500 });
   }
 });
 
@@ -1064,7 +1203,7 @@ router.get('/payments', requireFinanceAdmin, async (req: Request, res: Response)
 
     ApiResponseHelper.success(res, { payments, total }, 'Payments retrieved');
   } catch (error: any) {
-    ApiResponseHelper.error(res, 'PAYMENTS_ERROR', error.message, 500);
+    sendSafeRouteError(res, error, { code: 'PAYMENTS_ERROR', message: 'The request could not be completed.', status: 500 });
   }
 });
 
@@ -1086,7 +1225,7 @@ router.get('/audit-logs', requireSuperAdmin, async (req: Request, res: Response)
 
     ApiResponseHelper.success(res, { logs, total }, 'Audit logs retrieved');
   } catch (error: any) {
-    ApiResponseHelper.error(res, 'AUDIT_LOGS_ERROR', error.message, 500);
+    sendSafeRouteError(res, error, { code: 'AUDIT_LOGS_ERROR', message: 'The request could not be completed.', status: 500 });
   }
 });
 
@@ -1103,7 +1242,7 @@ router.get('/notifications', requireAnyAdmin, async (req: Request, res: Response
     );
     ApiResponseHelper.success(res, notifications, 'Notifications retrieved');
   } catch (error: any) {
-    ApiResponseHelper.error(res, 'NOTIFICATIONS_ERROR', error.message, 500);
+    sendSafeRouteError(res, error, { code: 'NOTIFICATIONS_ERROR', message: 'The request could not be completed.', status: 500 });
   }
 });
 
@@ -1116,7 +1255,7 @@ router.put('/notifications/:id/read', requireAnyAdmin, async (req: Request, res:
     }
     ApiResponseHelper.success(res, notification, 'Notification marked as read');
   } catch (error: any) {
-    ApiResponseHelper.error(res, 'NOTIFICATION_ERROR', error.message, 500);
+    sendSafeRouteError(res, error, { code: 'NOTIFICATION_ERROR', message: 'The request could not be completed.', status: 500 });
   }
 });
 

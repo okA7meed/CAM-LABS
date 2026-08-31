@@ -20,7 +20,7 @@ import { AuthModal } from './components/auth/AuthModal';
 import { PersonaModal } from './components/auth/PersonaModal';
 import { ForgotPasswordModal } from './components/auth/ForgotPasswordModal';
 
-import { DashboardView } from './components/dashboard/DashboardView';
+import { OrderCenter } from './components/orders/OrderCenter';
 import { ProfileView } from './components/profile/ProfileView';
 import { MarketplaceView } from './components/marketplace/MarketplaceView';
 import { ManufacturingRequestView } from './components/manufacturing/ManufacturingRequestView';
@@ -104,7 +104,7 @@ export const App: React.FC = () => {
       <MobileNav isOpen={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />
 
       {isLoading && <main id="view-loading"><div className="container loading-state"><div className="skeleton loading-state-mark" /><p>{t('status.resolvingSession')}</p></div></main>}
-      {!isLoading && activeView === 'dashboard' && isAuthenticated && <DashboardView />}
+      {!isLoading && activeView === 'dashboard' && isAuthenticated && <OrderCenter />}
       {!isLoading && activeView === 'profile' && isAuthenticated && <ProfileView />}
       {!isLoading && activeView === 'marketplace' && <MarketplaceView />}
       {!isLoading && activeView === 'manufacturing-request' && <ManufacturingRequestView />}

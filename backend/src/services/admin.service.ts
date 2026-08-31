@@ -2,6 +2,7 @@ import { getPrismaClient } from '../config/database';
 import { Prisma } from '@prisma/client';
 import { Logger } from '../utils/logger';
 import { ROLES } from '../auth/roles';
+import { AppError } from '../utils/errors';
 
 /**
  * Admin Service
@@ -232,8 +233,11 @@ export class AdminService {
       where: { id: userId },
     });
 
-    if (!existingUser) {
-      throw new Error('User not found');
+    // This endpoint manages ADMIN accounts. Regular customers must never be
+    // writable through it — role changes here would otherwise grant the
+    // rank-based RBAC gates to non-admin users.
+    if (!existingUser || !existingUser.isAdmin) {
+      throw new AppError('Admin user not found', 404, 'NOT_FOUND');
     }
 
     const updatedUser = await getPrismaClient().user.update({
@@ -266,7 +270,13 @@ export class AdminService {
    */
   static async resetAdminPassword(userId: string, newPassword: string) {
     const { hashPassword } = await import('../auth/password.service');
-    
+
+    const existingUser = await getPrismaClient().user.findUnique({ where: { id: userId } });
+    // Password reset belongs to admin account management (see updateAdminUser).
+    if (!existingUser || !existingUser.isAdmin) {
+      throw new AppError('Admin user not found', 404, 'NOT_FOUND');
+    }
+
     const user = await getPrismaClient().user.update({
       where: { id: userId },
       data: {
@@ -275,6 +285,10 @@ export class AdminService {
         lockedUntil: null,
       },
     });
+
+    // A reset credential must invalidate every session already issued for the
+    // account — otherwise a compromised admin keeps live access after the reset.
+    await getPrismaClient().session.deleteMany({ where: { userId } });
 
     // Create audit log (without password)
     await this.createAuditLog({

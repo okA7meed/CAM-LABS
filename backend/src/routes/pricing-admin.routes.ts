@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { ApiResponseHelper } from '../utils/response';
+import { sendSafeRouteError } from '../utils/errors';
 import { PricingAdminService } from '../services/pricing-admin.service';
 import { requirePricingAdmin } from '../middleware/admin.middleware';
 
@@ -15,7 +16,7 @@ router.get('/equations', requirePricingAdmin, async (req: Request, res: Response
     const equations = await PricingAdminService.getAllEquations();
     ApiResponseHelper.success(res, equations, 'Pricing equations retrieved');
   } catch (err: any) {
-    ApiResponseHelper.error(res, 'EQUATIONS_FETCH_ERROR', err.message, 500);
+    sendSafeRouteError(res, err, { code: 'EQUATIONS_FETCH_ERROR', message: 'The request could not be completed.', status: 500 });
   }
 });
 
@@ -25,7 +26,7 @@ router.get('/equations/:technology', requirePricingAdmin, async (req: Request, r
     const details = await PricingAdminService.getEquationByTechnology(req.params.technology);
     ApiResponseHelper.success(res, details, `Equation details for ${req.params.technology} retrieved`);
   } catch (err: any) {
-    ApiResponseHelper.error(res, 'EQUATION_FETCH_ERROR', err.message, 500);
+    sendSafeRouteError(res, err, { code: 'EQUATION_FETCH_ERROR', message: 'The request could not be completed.', status: 500 });
   }
 });
 
@@ -46,7 +47,7 @@ router.put('/equations/:technology/draft', requirePricingAdmin, async (req: Requ
     });
     ApiResponseHelper.success(res, draft, `Draft saved for ${req.params.technology}`);
   } catch (err: any) {
-    ApiResponseHelper.error(res, 'DRAFT_SAVE_ERROR', err.message, 400);
+    sendSafeRouteError(res, err, { code: 'DRAFT_SAVE_ERROR', message: 'The request could not be completed.', status: 400 });
   }
 });
 
@@ -67,7 +68,7 @@ router.post('/equations/:technology/test', requirePricingAdmin, async (req: Requ
     });
     ApiResponseHelper.success(res, result, 'Equation test calculation executed');
   } catch (err: any) {
-    ApiResponseHelper.error(res, 'TEST_CALCULATION_ERROR', err.message, 400);
+    sendSafeRouteError(res, err, { code: 'TEST_CALCULATION_ERROR', message: 'The request could not be completed.', status: 400 });
   }
 });
 
@@ -86,7 +87,7 @@ router.post('/equations/:technology/compare', requirePricingAdmin, async (req: R
     });
     ApiResponseHelper.success(res, comparison, 'Draft vs Published equation comparison calculated');
   } catch (err: any) {
-    ApiResponseHelper.error(res, 'COMPARISON_ERROR', err.message, 400);
+    sendSafeRouteError(res, err, { code: 'COMPARISON_ERROR', message: 'The request could not be completed.', status: 400 });
   }
 });
 
@@ -102,7 +103,7 @@ router.post('/equations/:technology/publish', requirePricingAdmin, async (req: R
     });
     ApiResponseHelper.success(res, result, `Equation for ${req.params.technology} published successfully`);
   } catch (err: any) {
-    ApiResponseHelper.error(res, 'PUBLISH_ERROR', err.message, 400);
+    sendSafeRouteError(res, err, { code: 'PUBLISH_ERROR', message: 'The request could not be completed.', status: 400 });
   }
 });
 
@@ -116,7 +117,7 @@ router.get('/constants', requirePricingAdmin, async (req: Request, res: Response
     });
     ApiResponseHelper.success(res, constants, 'Pricing constants retrieved');
   } catch (err: any) {
-    ApiResponseHelper.error(res, 'CONSTANTS_FETCH_ERROR', err.message, 500);
+    sendSafeRouteError(res, err, { code: 'CONSTANTS_FETCH_ERROR', message: 'The request could not be completed.', status: 500 });
   }
 });
 
@@ -137,7 +138,7 @@ router.post('/constants', requirePricingAdmin, async (req: Request, res: Respons
     });
     ApiResponseHelper.success(res, constant, 'Pricing constant updated');
   } catch (err: any) {
-    ApiResponseHelper.error(res, 'CONSTANT_SAVE_ERROR', err.message, 400);
+    sendSafeRouteError(res, err, { code: 'CONSTANT_SAVE_ERROR', message: 'The request could not be completed.', status: 400 });
   }
 });
 

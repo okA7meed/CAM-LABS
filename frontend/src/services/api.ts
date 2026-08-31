@@ -227,10 +227,36 @@ export class ApiService {
     return this.request<Order[]>('/orders');
   }
 
+  static async getOrderById(orderId: string) {
+    return this.request<Order>(`/orders/${encodeURIComponent(orderId)}`);
+  }
+
   static async createOrder(orderData: Partial<Order>) {
     return this.request<Order>('/orders', {
       method: 'POST',
       body: JSON.stringify(orderData),
+    });
+  }
+
+  // ─── Super Admin order management ─────────────────────────────────────────
+  static async adminApproveOrder(orderId: string, notes?: string) {
+    return this.request<Order>(`/admin/orders/${encodeURIComponent(orderId)}/approve`, {
+      method: 'POST',
+      body: JSON.stringify({ notes }),
+    });
+  }
+
+  static async adminUpdateOrderPrice(orderId: string, price: number, reason?: string) {
+    return this.request<Order>(`/admin/orders/${encodeURIComponent(orderId)}/price`, {
+      method: 'PUT',
+      body: JSON.stringify({ price, reason }),
+    });
+  }
+
+  static async adminUpdateOrderStatus(orderId: string, status: string, extra?: { manufacturingStatus?: string; shippingStatus?: string; notes?: string }) {
+    return this.request<Order>(`/admin/orders/${encodeURIComponent(orderId)}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status, ...extra }),
     });
   }
 

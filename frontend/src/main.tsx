@@ -12,6 +12,7 @@ import './styles/components.css';
 import './styles/layout.css';
 import './styles/explorer.css';
 import './styles/dashboard.css';
+import './styles/order-center.css';
 import './styles/marketplace.css';
 import './styles/manufacturing-request.css';
 import './styles/motion.css';

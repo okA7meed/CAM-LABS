@@ -4,6 +4,7 @@ import path from 'node:path';
 import { getPrismaClient } from '../config/database';
 import { ENV } from '../config/env';
 import { AppError, NotFoundError } from '../utils/errors';
+import { Logger } from '../utils/logger';
 import { BasicCadMetadataExtractor, calculateChecksum, createFileScanner, getCadFormat, isCadMimeTypeCompatible } from '../cad/file-processing';
 import { MultipartFile } from '../cad/multipart';
 import { createObjectStorage, ObjectStorage } from '../cad/object-storage';
@@ -215,13 +216,23 @@ export class CadService {
   }
 
   static async processJob(jobId: string): Promise<void> {
-    const claimed = await prisma.cadProcessingJob.updateMany({
-      where: { id: jobId, status: 'PENDING', availableAt: { lte: new Date() } },
-      data: { status: 'PROCESSING', startedAt: new Date(), attempts: { increment: 1 } },
-    });
-    if (claimed.count === 0) return;
+    // processJob is invoked fire-and-forget (`void this.processJob(...)`), so
+    // even the claim/lookup steps must be guarded — a transient DB error here
+    // would otherwise surface as an unhandled rejection and can crash the
+    // process (Node >= 15 default behavior).
+    let job: Prisma.CadProcessingJobGetPayload<{ include: { version: true } }> | null = null;
+    try {
+      const claimed = await prisma.cadProcessingJob.updateMany({
+        where: { id: jobId, status: 'PENDING', availableAt: { lte: new Date() } },
+        data: { status: 'PROCESSING', startedAt: new Date(), attempts: { increment: 1 } },
+      });
+      if (claimed.count === 0) return;
 
-    const job = await prisma.cadProcessingJob.findUnique({ where: { id: jobId }, include: { version: true } });
+      job = await prisma.cadProcessingJob.findUnique({ where: { id: jobId }, include: { version: true } });
+    } catch (error) {
+      Logger.error(`[CadService] CAD job claim failed for ${jobId}:`, error instanceof Error ? error.message : String(error));
+      return;
+    }
     if (!job) return;
     try {
       const data = await storage.read(job.version.storageKey);

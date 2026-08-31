@@ -82,7 +82,30 @@ export interface Order {
   history: OrderMilestone[];
   cadFileIds?: string[];
   cadFileConfigs?: Array<{ cadFileId: string; configuration: Record<string, unknown>; totalCost?: string }>;
-  cadFiles?: Array<{ cadFileId: string; cadFile: CadFile }>;
+  cadFiles?: Array<{ cadFileId: string; cadFile: CadFile; configuration?: Record<string, unknown> }>;
+  events?: OrderEvent[];
+  user?: { id: string; name: string; email: string };
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface OrderEvent {
+  id: string;
+  orderId: string;
+  eventType: string;
+  description: string;
+  metadata?: {
+    previousPrice?: string;
+    newPrice?: string;
+    price?: number;
+    changedByName?: string;
+    changedBy?: string;
+    reason?: string;
+    from?: string;
+    to?: string;
+    [key: string]: unknown;
+  };
+  createdAt: string;
 }
 
 export interface Quote {

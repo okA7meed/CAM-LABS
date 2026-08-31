@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "autoclaw-productivity": {
+      "enabled": true,
+      "type": "streamablehttp",
+      "url": "http://127.0.0.1:19681/mcp"
+    },
+    "autoclaw-github": {
+      "enabled": true,
+      "type": "streamablehttp",
+      "url": "http://127.0.0.1:19681/github/mcp"
+    }
+  },
+  "imports": []
+}

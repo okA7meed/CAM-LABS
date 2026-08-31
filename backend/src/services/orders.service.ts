@@ -111,7 +111,6 @@ export class OrdersService {
       if (hasUnreadyFile) throw new AppError('All CAD files must complete valid engineering analysis before an order can be submitted.', 400, 'CAD_NOT_READY');
       if (orderData.guestCadId) await prisma.cadFile.updateMany({ where: { id: { in: cadFileIds }, userId: null, guestId: orderData.guestCadId }, data: { userId: orderData.userId, guestId: null } });
     }
-    const orderId = internal.reservedOrderId || this.generateOrderId();
 
     // Shipping address resolution: prefer the submitted value, otherwise fall
     // back to the customer profile address. No hardcoded placeholder addresses.
@@ -126,8 +125,29 @@ export class OrdersService {
     }
     const shippingAddress = orderData.shippingAddress?.trim() || profileAddress || 'To be confirmed with customer';
 
+    const orderId = internal.reservedOrderId || this.generateOrderId();
+
+    // Direct submissions (POST /orders) must claim the quote atomically — the
+    // pre-check above is read-then-act, so two concurrent requests could
+    // otherwise both pass it and create two orders from one quote.
+    // convertQuoteToOrder performs its own reservation before calling in.
+    let claimedHere = false;
+    if (!internal.reservedOrderId) {
+      const claimed = await prisma.quote.updateMany({
+        where: { id: orderData.quoteId, convertedOrderId: null },
+        data: { convertedOrderId: orderId },
+      });
+      if (claimed.count !== 1) {
+        throw new AppError('This quote has already been converted to an order.', 409, 'QUOTE_ALREADY_CONVERTED');
+      }
+      claimedHere = true;
+    }
+
+    let newOrder: Order;
+    let dispatchResult: ManufacturingDispatchResult;
+    try {
     const engine = getManufacturingEngine();
-    const dispatchResult = await engine.dispatchOrder({
+    dispatchResult = await engine.dispatchOrder({
       orderId,
       technology: orderData.technology || 'Industrial 3D Printing',
       material: orderData.material || 'PA 12 (Nylon 12)',
@@ -170,7 +190,7 @@ export class OrdersService {
       },
     ];
 
-    const newOrder = await prisma.order.create({
+    newOrder = await prisma.order.create({
       data: {
         id: orderId,
         userId: orderData.userId,
@@ -199,6 +219,13 @@ export class OrdersService {
       },
       include: { cadFiles: { include: { cadFile: true } } },
     });
+    } catch (err) {
+      if (claimedHere) {
+        // Release the reservation so the quote remains redeemable.
+        await prisma.quote.updateMany({ where: { id: orderData.quoteId, convertedOrderId: orderId }, data: { convertedOrderId: null } }).catch(() => undefined);
+      }
+      throw err;
+    }
 
     Logger.info(
       `[OrdersService] Created and queued internal CAM LABS order ${newOrder.id}`
@@ -343,6 +370,13 @@ export class OrdersService {
    */
   static async getOrderById(id: string): Promise<Order | null> {
     const prisma = getPrismaClient();
-    return prisma.order.findUnique({ where: { id }, include: { cadFiles: { include: { cadFile: true } } } });
+    return prisma.order.findUnique({
+      where: { id },
+      include: {
+        cadFiles: { include: { cadFile: true } },
+        events: { orderBy: { createdAt: 'desc' } },
+        user: { select: { id: true, name: true, email: true } },
+      },
+    });
   }
 }

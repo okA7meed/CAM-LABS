@@ -62,14 +62,11 @@ export const CadGeometryViewer: React.FC<{ file: CadFile; onGeometry: (geometry:
   const controlsRef = useRef<OrbitControls | null>(null);
   const modelRef = useRef<THREE.Object3D | null>(null);
   const viewerRootRef = useRef<THREE.Group | null>(null);
-  const gridRef = useRef<THREE.GridHelper | null>(null);
-  const axesRef = useRef<THREE.AxesHelper | null>(null);
+  const orientationRootRef = useRef<THREE.Group | null>(null);
   const [geometry, setGeometry] = useState<CadGeometryData | null>(null);
   const [state, setState] = useState<'loading' | 'processing' | 'ready' | 'unavailable' | 'error'>('loading');
   const [message, setMessage] = useState('');
   const [documentUrl, setDocumentUrl] = useState<string | null>(null);
-  const [gridVisible] = useState(true);
-  const [axesVisible] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const is2D = geometry?.metadata?.geometryKind === '2D';
   const metadata = geometry?.metadata;
@@ -81,6 +78,35 @@ export const CadGeometryViewer: React.FC<{ file: CadFile; onGeometry: (geometry:
   const baseSurfaceArea = setup?.surfaceArea ?? metadata?.surfaceArea ?? null;
   const displayVolume = baseVolume === null ? null : convertVolume(baseVolume, 'mm', unit);
   const displaySurfaceArea = baseSurfaceArea === null ? null : convertArea(baseSurfaceArea, 'mm', unit);
+
+  /**
+   * CAM LABS viewing convention: X = horizontal, Y = depth, Z = vertical/up.
+   *
+   * The viewer works on a Z-up scene (scene.up / camera.up = +Z). Uploaded geometry is kept in
+   * its original file coordinate system, so this transform is the single non-destructive
+   * "viewer transform" that maps a source model's assumed vertical axis onto the scene's Z axis.
+   *
+   * We deliberately do NOT derive orientation from bounding-box extents (largest/smallest
+   * dimension) — that would misfile legitimate flat plates, brackets, enclosures and housings.
+   * The backend does not currently surface per-file up-axis metadata for STEP/IGES/STL/etc., and
+   * STL/OBJ/PLY carry no declared frame, so no world rotation is reliably determinable. In that
+   * case we preserve the model's original orientation (identity), exactly as the convention
+   * requires: "If automatic orientation cannot be determined safely, preserve the original
+   * orientation rather than making a destructive guess."
+   *
+   * The model itself is never animated. Instead the viewer runs a cinematic product-showcase
+   * orbit: the camera travels a slow, continuous 360° path around the stationary model's
+   * bounding-box center (controls.target) while keeping the model centered and at a stable
+   * elevation, so front / side / rear / opposite side are all presented in turn.
+   */
+  const applyViewerOrientation = () => {
+    const orientationRoot = orientationRootRef.current;
+    if (!orientationRoot) return;
+    const up = new THREE.Vector3(0, 0, 1);
+    const identity = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), up);
+    orientationRoot.quaternion.copy(identity);
+    orientationRoot.updateMatrixWorld(true);
+  };
 
   const fitModel = () => {
     const root = viewerRootRef.current; const camera = cameraRef.current; const controls = controlsRef.current;
@@ -96,30 +122,22 @@ export const CadGeometryViewer: React.FC<{ file: CadFile; onGeometry: (geometry:
     const centeredBox = new THREE.Box3().setFromObject(root);
     const centeredCenter = centeredBox.getCenter(new THREE.Vector3());
     const radius = Math.max(sphere.radius, 0.001);
+    camera.up.copy(is2D ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(0, 0, 1));
     const verticalFov = THREE.MathUtils.degToRad(camera.fov);
     const horizontalFov = 2 * Math.atan(Math.tan(verticalFov / 2) * Math.max(camera.aspect, 0.1));
     const limitingFov = Math.min(verticalFov, horizontalFov);
-    const distance = (radius * 1.35) / Math.tan(limitingFov / 2);
-    const direction = is2D ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(1, 0.65, 1).normalize();
+    const padding = 1.45;
+    const distance = (radius * padding) / Math.tan(limitingFov / 2);
+    const direction = is2D ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(1, 0.7, 1).normalize();
     camera.position.copy(centeredCenter).addScaledVector(direction, distance);
-    camera.near = Math.max(radius / 1000, distance - radius * 1.5, 0.001);
-    camera.far = Math.max(distance + radius * 2.5, radius * 10, 100);
+    camera.near = Math.max(radius / 10000, distance - radius * 4, 0.0001);
+    camera.far = Math.max(distance + radius * 6, radius * 24, 100);
     camera.lookAt(centeredCenter);
     camera.updateProjectionMatrix();
     controls.target.copy(centeredCenter);
-    controls.maxDistance = Math.max(radius * 20, distance * 6);
-    controls.minDistance = Math.max(radius / 1000, 0.001);
+    controls.maxDistance = distance * 8;
+    controls.minDistance = Math.min(radius / 50, distance / 12);
     controls.update();
-    const grid = gridRef.current;
-    if (grid) {
-      grid.position.copy(centeredCenter);
-      grid.scale.setScalar(Math.max(radius * 3, 1) / 10);
-    }
-    const axes = axesRef.current;
-    if (axes) {
-      axes.position.copy(centeredCenter);
-      axes.scale.setScalar(Math.max(radius, 1));
-    }
   };
 
   useEffect(() => {
@@ -173,20 +191,29 @@ export const CadGeometryViewer: React.FC<{ file: CadFile; onGeometry: (geometry:
     const mount = mountRef.current; const model = modelRef.current;
     if (state !== 'ready' || !mount || !model) return;
     const scene = new THREE.Scene(); sceneRef.current = scene;
+    scene.up.set(0, 0, 1);
     const theme = getComputedStyle(document.documentElement); scene.background = new THREE.Color(theme.getPropertyValue('--cam-bg').trim() || '#0a0a0a');
     const camera = new THREE.PerspectiveCamera(45, 1, .01, 100000); cameraRef.current = camera;
+    camera.up.set(0, 0, 1);
     const renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); renderer.outputColorSpace = THREE.SRGBColorSpace; mount.appendChild(renderer.domElement);
     const controls = new OrbitControls(camera, renderer.domElement); controls.enableDamping = true; controls.screenSpacePanning = true; controls.enableRotate = !is2D; controlsRef.current = controls;
     scene.add(new THREE.HemisphereLight(0xffffff, 0x26364d, 2.2)); const directional = new THREE.DirectionalLight(0xffffff, 2.4); directional.position.set(4, 7, 5); scene.add(directional);
-    const grid = new THREE.GridHelper(20, 20, 0x4d6480, 0x26364d); if (is2D) grid.rotation.x = Math.PI / 2; grid.visible = gridVisible; gridRef.current = grid; scene.add(grid);
-    const axes = new THREE.AxesHelper(2); axes.visible = axesVisible; axesRef.current = axes;
-    const viewerRoot = new THREE.Group(); viewerRootRef.current = viewerRoot; viewerRoot.add(model); scene.add(axes, viewerRoot);
+    const viewerRoot = new THREE.Group(); viewerRootRef.current = viewerRoot;
+    const orientationRoot = new THREE.Group(); orientationRootRef.current = orientationRoot; orientationRoot.add(model); viewerRoot.add(orientationRoot);
+    scene.add(viewerRoot);
+    applyViewerOrientation();
     fitModel();
-    let frame = 0;
+    let frame = 0; let previous = performance.now();
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    controls.autoRotate = !is2D && !reducedMotion;
+    controls.autoRotateSpeed = 0.6;
     const resize = () => { const rect = mount.getBoundingClientRect(); renderer.setSize(rect.width, rect.height, false); camera.aspect = rect.width / Math.max(rect.height, 1); camera.updateProjectionMatrix(); };
-    const render = () => { controls.update(); renderer.render(scene, camera); frame = requestAnimationFrame(render); };
-    resize(); render(); const observer = new ResizeObserver(resize); observer.observe(mount);
-    return () => { observer.disconnect(); cancelAnimationFrame(frame); controls.dispose(); renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove(); scene.traverse((object) => { if (object instanceof THREE.Mesh) { object.geometry.dispose(); const materials = Array.isArray(object.material) ? object.material : [object.material]; materials.forEach((material) => material.dispose()); } }); sceneRef.current = null; controlsRef.current = null; cameraRef.current = null; viewerRootRef.current = null; };
+    const render = (now: number) => {
+      const delta = Math.min(Math.max((now - previous) / 1000, 0), 0.05); previous = now;
+      controls.update(delta); renderer.render(scene, camera); frame = requestAnimationFrame(render);
+    };
+    resize(); render(performance.now()); const observer = new ResizeObserver(resize); observer.observe(mount);
+    return () => { observer.disconnect(); cancelAnimationFrame(frame); controls.dispose(); renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove(); scene.traverse((object) => { if (object instanceof THREE.Mesh) { object.geometry.dispose(); const materials = Array.isArray(object.material) ? object.material : [object.material]; materials.forEach((material) => material.dispose()); } }); sceneRef.current = null; controlsRef.current = null; cameraRef.current = null; viewerRootRef.current = null; orientationRootRef.current = null; };
   }, [state]);
 
   useEffect(() => {

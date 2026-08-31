@@ -1,12 +1,14 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { Order, Quote, CadFile, ToastMessage, ViewType } from '../types';
-import { INITIAL_ORDERS, INITIAL_QUOTES, INITIAL_CAD_FILES } from '../data/initialData';
 import { ApiService } from '../services/api';
+import { useAuth } from './AuthContext';
 
 interface StoreContextType {
   orders: Order[];
   quotes: Quote[];
   cadFiles: CadFile[];
+  isCustomerDataLoading: boolean;
+  refreshCustomerData: () => Promise<void>;
   comparisonList: string[];
   toasts: ToastMessage[];
   activeView: ViewType;
@@ -61,43 +63,50 @@ interface StoreContextType {
   removeToast: (id: string) => void;
 }
 
-const STORE_STORAGE_KEY = 'CAM_LABS_STORE_DATA_V1';
-
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
 
 export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isAuthenticated, currentUser } = useAuth();
   const [activeView, setActiveView] = useState<ViewType>('home');
 
-  // Stored state
-  const [orders, setOrders] = useState<Order[]>(() => {
-    try {
-      const stored = localStorage.getItem(`${STORE_STORAGE_KEY}_ORDERS`);
-      if (stored) return JSON.parse(stored);
-    } catch (e) {
-      console.warn('Could not read stored orders:', e);
-    }
-    return INITIAL_ORDERS;
-  });
+  // Customer orders / quotes / CAD files are sourced from the database via the
+  // API. They are NEVER seeded with demo data — empty until the user authenticates,
+  // at which point the real records are fetched.
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [quotes, setQuotes] = useState<Quote[]>([]);
+  const [cadFiles, setCadFiles] = useState<CadFile[]>([]);
+  const [isCustomerDataLoading, setIsCustomerDataLoading] = useState(false);
 
-  const [quotes, setQuotes] = useState<Quote[]>(() => {
+  const refreshCustomerData = useCallback(async () => {
+    setIsCustomerDataLoading(true);
     try {
-      const stored = localStorage.getItem(`${STORE_STORAGE_KEY}_QUOTES`);
-      if (stored) return JSON.parse(stored);
-    } catch (e) {
-      console.warn('Could not read stored quotes:', e);
+      const [freshOrders, freshQuotes, freshFiles] = await Promise.all([
+        ApiService.getOrders().catch(() => null),
+        ApiService.getQuotes().catch(() => null),
+        ApiService.getCadFiles().catch(() => null),
+      ]);
+      if (freshOrders) setOrders(freshOrders);
+      if (freshQuotes) setQuotes(freshQuotes.filter((quote) => quote.status !== 'Approved'));
+      if (freshFiles) setCadFiles(freshFiles);
+    } finally {
+      setIsCustomerDataLoading(false);
     }
-    return INITIAL_QUOTES;
-  });
+  }, []);
 
-  const [cadFiles, setCadFiles] = useState<CadFile[]>(() => {
-    try {
-      const stored = localStorage.getItem(`${STORE_STORAGE_KEY}_FILES`);
-      if (stored) return JSON.parse(stored);
-    } catch (e) {
-      console.warn('Could not read stored files:', e);
+  const clearCustomerData = useCallback(() => {
+    setOrders([]);
+    setQuotes([]);
+    setCadFiles([]);
+  }, []);
+
+  // Load the real customer records when authenticated, and clear them on sign-out.
+  useEffect(() => {
+    if (isAuthenticated) {
+      void refreshCustomerData();
+    } else {
+      clearCustomerData();
     }
-    return INITIAL_CAD_FILES;
-  });
+  }, [isAuthenticated, currentUser?.id, refreshCustomerData, clearCustomerData]);
 
   const [comparisonList, setComparisonList] = useState<string[]>([]);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -120,18 +129,17 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [selectedAdminQuoteId, setSelectedAdminQuoteId] = useState<string | null>(null);
   const [selectedAdminCadFileId, setSelectedAdminCadFileId] = useState<string | null>(null);
 
-  // Sync with localStorage
+  // One-time cleanup: purge any legacy demo/localStorage order state written by
+  // the previous dashboard implementation, so it can never resurface.
   useEffect(() => {
-    localStorage.setItem(`${STORE_STORAGE_KEY}_ORDERS`, JSON.stringify(orders));
-  }, [orders]);
-
-  useEffect(() => {
-    localStorage.setItem(`${STORE_STORAGE_KEY}_QUOTES`, JSON.stringify(quotes));
-  }, [quotes]);
-
-  useEffect(() => {
-    localStorage.setItem(`${STORE_STORAGE_KEY}_FILES`, JSON.stringify(cadFiles));
-  }, [cadFiles]);
+    try {
+      Object.keys(localStorage)
+        .filter((key) => key.startsWith('CAM_LABS_STORE_DATA'))
+        .forEach((key) => localStorage.removeItem(key));
+    } catch {
+      /* ignore storage errors */
+    }
+  }, []);
 
   // Toast handler
   const showToast = (title: string, message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
@@ -303,6 +311,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         orders,
         quotes,
         cadFiles,
+        isCustomerDataLoading,
+        refreshCustomerData,
         comparisonList,
         toasts,
         activeView,
