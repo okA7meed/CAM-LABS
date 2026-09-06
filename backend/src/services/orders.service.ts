@@ -133,6 +133,7 @@ export class OrdersService {
     // convertQuoteToOrder performs its own reservation before calling in.
     let claimedHere = false;
     if (!internal.reservedOrderId) {
+      // Check if the quote is already claimed
       const claimed = await prisma.quote.updateMany({
         where: { id: orderData.quoteId, convertedOrderId: null },
         data: { convertedOrderId: orderId },
@@ -142,6 +143,7 @@ export class OrdersService {
       }
       claimedHere = true;
     }
+    // End of claim block - no extra assignments or braces needed
 
     let newOrder: Order;
     let dispatchResult: ManufacturingDispatchResult;

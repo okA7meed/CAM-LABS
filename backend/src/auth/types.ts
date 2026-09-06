@@ -30,11 +30,17 @@ declare global {
   }
 }
 
-export const toSafeUser = (user: Omit<AuthenticatedUser, 'role'> & { role: string; passwordHash?: string | null }): AuthenticatedUser => {
+export const toSafeUser = (
+  user: Omit<AuthenticatedUser, 'role'> & { role: string; passwordHash?: string | null; isAdmin?: boolean }
+): AuthenticatedUser => {
   const { passwordHash: _passwordHash, ...safeUser } = user;
+  let role = normalizeRoleForResponse(user.role);
+  if (role === 'CUSTOMER' && user.isAdmin) {
+    role = 'ADMIN';
+  }
   return {
     ...safeUser,
-    role: normalizeRoleForResponse(user.role),
+    role,
   };
 };
 

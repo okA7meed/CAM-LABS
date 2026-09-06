@@ -27,7 +27,7 @@ const TWO_SIDED_BOUNDS = {
  */
 
 // POST /api/v1/manufacturing/quote
-router.post('/quote', requireAuth, async (req: Request, res: Response) => {
+router.post('/quote', requireAuth, async (req: any, res: any) => {
   try {
     const quantity = Number(req.body?.quantity);
     const volumeCm3 = Number(req.body?.volumeCm3);
@@ -51,7 +51,7 @@ router.post('/quote', requireAuth, async (req: Request, res: Response) => {
 });
 
 // POST /api/v1/manufacturing/dispatch
-router.post('/dispatch', requireAuth, async (req: Request, res: Response) => {
+router.post('/dispatch', requireAuth, async (req: any, res: any) => {
   try {
     const orderId = String(req.body?.orderId || '').trim();
     if (!orderId) {

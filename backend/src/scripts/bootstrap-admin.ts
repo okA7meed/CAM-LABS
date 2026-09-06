@@ -99,8 +99,8 @@ async function bootstrapAdmin() {
 
     console.log('\n=== Bootstrap Complete ===');
     console.log('\nYou can now:');
-    console.log('1. Log in to the Admin Panel at /admin');
-    console.log('2. Use the email and password you specified');
+    console.log('1. Log in to the website with the credentials you specified');
+    console.log('2. Open the Admin Panel at /admin once logged in');
     console.log('3. Create additional admin users through the Admin Panel');
     console.log('\nIMPORTANT: Delete or disable this bootstrap script after initial setup.');
 

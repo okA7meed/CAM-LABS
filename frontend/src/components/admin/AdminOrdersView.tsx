@@ -1,192 +1,230 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../../context/StoreContext';
-import { Icon } from '../ui/Icon';
 import { AdminLayout } from './AdminLayout';
+import { AppliedFilters, EMPTY_FILTERS, OrdersResponse, SortableColumn } from './orders/types';
+import { OrderStatsPanel } from './orders/OrderStatsPanel';
+import { OrdersStatusTabs } from './orders/OrdersStatusTabs';
+import { OrdersToolbar } from './orders/OrdersToolbar';
+import { OrdersTable } from './orders/OrdersTable';
+import { OrdersPagination } from './orders/OrdersPagination';
+import { CreateOrderModal } from './orders/CreateOrderModal';
 
-interface OrderData {
-  id: string;
-  partName: string;
-  technology: string;
-  material: string;
-  quantity: number;
-  status: string;
-  totalCost: string;
-  paymentStatus: string;
-  manufacturingStatus: string;
-  shippingStatus: string;
-  createdAt: string;
-  user?: { id: string; name: string; email: string; company?: string };
-  manufacturer?: { id: string; companyName: string };
-}
+const LIMIT = 20;
 
 export const AdminOrdersView: React.FC = () => {
-  const { showToast, openAdminOrderDetail } = useStore();
   const { t } = useTranslation();
-  const [orders, setOrders] = useState<OrderData[]>([]);
-  const [total, setTotal] = useState(0);
+  const { showToast, openAdminOrderDetail, clearOrderSelection } = useStore();
+
+  const [data, setData] = useState<OrdersResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [page, setPage] = useState(0);
-  const [statusFilter, setStatusFilter] = useState('');
-  const [techFilter, setTechFilter] = useState('');
-  const [search, setSearch] = useState('');
-  const limit = 20;
+  const [sortBy, setSortBy] = useState<SortableColumn | ''>('createdAt');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [filters, setFilters] = useState<AppliedFilters>(EMPTY_FILTERS);
+  const [activeTab, setActiveTab] = useState('all');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [exporting, setExporting] = useState(false);
+  const [statusUpdating, setStatusUpdating] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const searchTimer = useRef<number | null>(null);
 
-  const loadOrders = async () => {
+  const total = data?.total ?? 0;
+  const stats = data?.stats ?? { totalOrders: 0, inReview: 0, inProduction: 0, qualityInspection: 0, completed: 0, cancelled: 0, trend: [] };
+  const facets = data?.filters ?? { technologies: [], materials: [] };
+
+  const hasActiveFilters = Boolean(
+    searchInput ||
+    filters.status ||
+    filters.technology ||
+    filters.material ||
+    filters.startDate ||
+    filters.endDate,
+  );
+
+  const load = useCallback(async () => {
     setLoading(true);
+    setError(false);
     try {
-      const params = new URLSearchParams({ limit: String(limit), offset: String(page * limit) });
-      if (statusFilter) params.set('status', statusFilter);
-      if (techFilter) params.set('technology', techFilter);
+      const params = new URLSearchParams({
+        limit: String(LIMIT),
+        offset: String(page * LIMIT),
+      });
+      if (debouncedSearch) params.set('search', debouncedSearch);
+      if (filters.status) params.set('status', filters.status);
+      if (filters.technology) params.set('technology', filters.technology);
+      if (filters.material) params.set('material', filters.material);
+      if (filters.startDate) params.set('startDate', filters.startDate);
+      if (filters.endDate) params.set('endDate', filters.endDate);
+      if (sortBy) params.set('sortBy', sortBy);
+      params.set('sortDir', sortDir);
 
-      const res = await fetch(`/api/v1/admin/orders?${params}`, { credentials: 'same-origin' });
+      const res = await fetch(`/api/v1/admin/orders?${params.toString()}`, { credentials: 'same-origin' });
       if (!res.ok) throw new Error('Failed to load orders');
-      const data = await res.json();
-      setOrders(data.data.orders || []);
-      setTotal(data.data.total || 0);
-    } catch (err: any) {
-      showToast('Error', err.message || 'Failed to load orders', 'error');
+      const json = (await res.json()) as { data: OrdersResponse };
+      setData(json.data);
+    } catch {
+      setError(true);
     } finally {
       setLoading(false);
     }
+  }, [page, debouncedSearch, filters, sortBy, sortDir]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  useEffect(() => {
+    if (searchTimer.current) window.clearTimeout(searchTimer.current);
+    searchTimer.current = window.setTimeout(() => {
+      setDebouncedSearch(searchInput);
+    }, 320);
+    return () => {
+      if (searchTimer.current) window.clearTimeout(searchTimer.current);
+    };
+  }, [searchInput]);
+
+  const handleSearch = (value: string) => {
+    setSearchInput(value);
+    setPage(0);
   };
 
-  useEffect(() => { loadOrders(); }, [page, statusFilter, techFilter]);
+  const handleFilterChange = (patch: Partial<AppliedFilters>) => {
+    setFilters((current) => ({ ...current, ...patch }));
+    setPage(0);
+  };
 
-  const totalPages = Math.ceil(total / limit);
+  const clearFilters = () => {
+    setSearchInput('');
+    setDebouncedSearch('');
+    setFilters(EMPTY_FILTERS);
+    setPage(0);
+    setActiveTab('all');
+    clearOrderSelection();
+  };
 
-  const getStatusColor = (status: string) => {
-    const colors: Record<string, string> = {
-      'In Review': '#f59e0b',
-      'In Production': '#3b82f6',
-      'Quality Inspection': '#8b5cf6',
-      'Delivered': '#10b981',
-      'Cancelled': '#ef4444',
-    };
-    return colors[status] || '#64748b';
+  const handleTabChange = (tabKey: string) => {
+    setActiveTab(tabKey);
+    const tab = tabKey === 'all' ? '' : (tabKey === 'inReview' ? 'In Review' : tabKey === 'inProduction' ? 'In Production' : tabKey === 'shipped' ? 'Delivered' : 'Completed');
+    setFilters((current) => ({ ...current, status: tab }));
+    setPage(0);
+  };
+
+  const handleSort = (column: SortableColumn) => {
+    setPage(0);
+    if (sortBy === column) {
+      setSortDir((current) => (current === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortBy(column);
+      setSortDir(column === 'createdAt' ? 'desc' : 'asc');
+    }
+  };
+
+  const handleStatusChange = async (orderId: string, status: string) => {
+    if (statusUpdating) return;
+    setStatusUpdating(true);
+    try {
+      const res = await fetch(`/api/v1/admin/orders/${orderId}/status`, {
+        method: 'PUT',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      if (!res.ok) throw new Error(t('admin.orders.statusUpdateFailed'));
+      showToast(t('admin.orders.statusSuccessTitle'), t('admin.orders.statusSuccess', { status }), 'success');
+      await load();
+    } catch (err: any) {
+      showToast('Error', err?.message || t('admin.orders.statusUpdateFailed'), 'error');
+    } finally {
+      setStatusUpdating(false);
+    }
+  };
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const params = new URLSearchParams();
+      if (debouncedSearch) params.set('search', debouncedSearch);
+      if (filters.status) params.set('status', filters.status);
+      if (filters.technology) params.set('technology', filters.technology);
+      if (filters.material) params.set('material', filters.material);
+      if (filters.startDate) params.set('startDate', filters.startDate);
+      if (filters.endDate) params.set('endDate', filters.endDate);
+
+      const res = await fetch(`/api/v1/admin/orders/export?${params.toString()}`, { credentials: 'same-origin' });
+      if (!res.ok) throw new Error(t('admin.orders.exportFailed'));
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `cam-labs-admin-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+      showToast(t('admin.orders.exportSuccessTitle'), t('admin.orders.exportSuccess'), 'success');
+    } catch (err: any) {
+      showToast('Error', err?.message || t('admin.orders.exportFailed'), 'error');
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (
-    <AdminLayout title="Orders Management" subtitle={t('admin.totalOrders', { total })}>
-      {/* Filters */}
-      <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap', alignItems: 'center' }}>
-        <input
-          className="form-control"
-          placeholder="Search orders..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          style={{ width: '240px', padding: '8px 12px', background: 'var(--cam-surface-2)', border: '1px solid var(--cam-border-subtle)', borderRadius: '6px', color: 'var(--cam-text-primary)' }}
+    <AdminLayout
+      title={t('admin.orders.title')}
+      subtitle={t('admin.orders.subtitle', { total })}
+    >
+      <div className="admin-section">
+        {stats && <OrderStatsPanel stats={stats} />}
+
+        <OrdersStatusTabs activeTab={activeTab} onTabChange={handleTabChange} stats={stats} />
+
+        <OrdersToolbar
+          search={searchInput}
+          onSearch={handleSearch}
+          filters={filters}
+          onFilterChange={handleFilterChange}
+          facets={facets}
+          hasActiveFilters={hasActiveFilters}
+          onClearFilters={clearFilters}
+          exporting={exporting}
+          onExport={handleExport}
+          onNewOrder={() => setShowCreateModal(true)}
         />
-        <select
-          className="form-control"
-          value={statusFilter}
-          onChange={(e) => { setStatusFilter(e.target.value); setPage(0); }}
-          style={{ width: '160px', padding: '8px 12px', background: 'var(--cam-surface-2)', border: '1px solid var(--cam-border-subtle)', borderRadius: '6px', color: 'var(--cam-text-primary)' }}
-        >
-          <option value="">{t('admin.filters.allStatuses')}</option>
-          <option value="In Review">{t('admin.status.inReview')}</option>
-          <option value="In Production">{t('admin.status.inProduction')}</option>
-          <option value="Quality Inspection">{t('admin.status.qualityInspection')}</option>
-          <option value="Delivered">{t('admin.status.delivered')}</option>
-          <option value="Cancelled">{t('admin.status.cancelled')}</option>
-        </select>
-        <select
-          className="form-control"
-          value={techFilter}
-          onChange={(e) => { setTechFilter(e.target.value); setPage(0); }}
-          style={{ width: '160px', padding: '8px 12px', background: 'var(--cam-surface-2)', border: '1px solid var(--cam-border-subtle)', borderRadius: '6px', color: 'var(--cam-text-primary)' }}
-        >
-          <option value="">{t('admin.filters.allTechnologies')}</option>
-          <option value="FDM">FDM</option>
-          <option value="SLA">SLA</option>
-          <option value="SLS">SLS</option>
-          <option value="CNC_MILLING">CNC Milling</option>
-          <option value="CNC_TURNING">CNC Turning</option>
-          <option value="LASER_CUTTING">Laser Cutting</option>
-        </select>
-        <button className="btn btn-sm btn-outline" onClick={loadOrders} style={{ padding: '8px 16px' }}>
-          <Icon name="reset" size={14} /> Refresh
-        </button>
-      </div>
 
-      {/* Table */}
-      <div className="table-responsive" style={{ background: 'var(--cam-surface-1)', borderRadius: '12px', border: '1px solid var(--cam-border-subtle)' }}>
-        <table className="cam-table">
-          <thead>
-            <tr>
-              <th>Order ID</th>
-              <th>Customer</th>
-              <th>Part Name</th>
-              <th>Technology</th>
-              <th>Material</th>
-              <th>Qty</th>
-              <th>Total</th>
-              <th>Status</th>
-              <th>Manufacturer</th>
-              <th>Date</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr><td colSpan={11} style={{ textAlign: 'center', padding: '40px', color: 'var(--cam-text-muted)' }}>Loading orders...</td></tr>
-            ) : orders.length === 0 ? (
-              <tr><td colSpan={11} style={{ textAlign: 'center', padding: '40px', color: 'var(--cam-text-muted)' }}>No orders found</td></tr>
-            ) : (
-              orders.map((order) => (
-                <tr key={order.id}>
-                  <td><strong className="mono-primary">{order.id}</strong></td>
-                  <td>{order.user?.name || '—'}</td>
-                  <td style={{ maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{order.partName}</td>
-                  <td><span className="badge badge-neutral">{order.technology}</span></td>
-                  <td style={{ fontSize: '12px' }}>{order.material}</td>
-                  <td>{order.quantity}</td>
-                  <td><strong>{order.totalCost}</strong></td>
-                  <td>
-                    <span style={{
-                      display: 'inline-block',
-                      padding: '3px 8px',
-                      borderRadius: '4px',
-                      fontSize: '11px',
-                      fontWeight: '600',
-                      background: `${getStatusColor(order.status)}20`,
-                      color: getStatusColor(order.status),
-                      border: `1px solid ${getStatusColor(order.status)}40`,
-                    }}>
-                      {order.status}
-                    </span>
-                  </td>
-                  <td style={{ fontSize: '12px' }}>{order.manufacturer?.companyName || '—'}</td>
-                  <td style={{ fontSize: '12px', color: 'var(--cam-text-muted)' }}>{new Date(order.createdAt).toLocaleDateString()}</td>
-                  <td>
-                    <button
-                      className="btn btn-sm btn-outline"
-                      onClick={() => openAdminOrderDetail(order.id)}
-                      style={{ padding: '4px 8px', fontSize: '11px' }}
-                    >
-                      <Icon name="eye" size={12} /> View
-                    </button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+        <OrdersTable
+          orders={data?.orders ?? []}
+          loading={loading}
+          error={error}
+          onRetry={load}
+          sortBy={sortBy}
+          sortDir={sortDir}
+          onSort={handleSort}
+          onView={(order) => openAdminOrderDetail(order.id)}
+          onStatusChange={(order, status) => void handleStatusChange(order.id, status)}
+          hasActiveFilters={hasActiveFilters}
+          onClearFilters={clearFilters}
+        />
 
-      {totalPages > 1 && (
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginTop: '20px' }}>
-          <button className="btn btn-sm btn-outline" disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>
-            Previous
-          </button>
-          <span style={{ color: 'var(--cam-text-muted)', padding: '6px 12px', fontSize: '13px' }}>
-            Page {page + 1} of {totalPages}
-          </span>
-          <button className="btn btn-sm btn-outline" disabled={page >= totalPages - 1} onClick={() => setPage((p) => p + 1)}>
-            Next
-          </button>
-        </div>
-      )}
+        <OrdersPagination
+          total={total}
+          page={page}
+          limit={LIMIT}
+          loading={loading}
+          onPageChange={setPage}
+        />
+
+        {showCreateModal && (
+          <CreateOrderModal
+            onClose={() => setShowCreateModal(false)}
+            onConverted={() => {
+              setShowCreateModal(false);
+              void load();
+            }}
+          />
+        )}
+      </div>
     </AdminLayout>
   );
 };

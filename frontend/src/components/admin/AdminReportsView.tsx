@@ -3,6 +3,18 @@ import { useTranslation } from 'react-i18next';
 import { useStore } from '../../context/StoreContext';
 import { Icon } from '../ui/Icon';
 import { AdminLayout } from './AdminLayout';
+import { StatCard } from './ui/StatCard';
+import { AdminCard, AdminCardBody } from './ui/Card';
+import { Button } from './ui/Button';
+import { EmptyState } from './ui/States';
+
+const SUMMARY_TONES: Record<string, 'blue' | 'green' | 'amber' | 'cyan' | 'purple' | 'magenta'> = {
+  orders: 'blue',
+  total: 'green',
+  revenue: 'green',
+  count: 'cyan',
+  amount: 'purple',
+};
 
 export const AdminReportsView: React.FC = () => {
   const { t } = useTranslation();
@@ -53,74 +65,105 @@ export const AdminReportsView: React.FC = () => {
     }
   };
 
+  const summaryKey = (key: string): string => key.replace(/([A-Z])/g, ' $1').trim().toLowerCase();
+
   return (
     <AdminLayout title={t('admin.reports.title')} subtitle={t('admin.reports.subtitle')}>
-      <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
-        {reports.map((r) => (
-          <button
-            key={r.key}
-            className={`btn btn-sm ${activeReport === r.key ? 'btn-primary' : 'btn-outline'}`}
-            onClick={() => setActiveReport(r.key)}
-          >
-            {r.label}
-          </button>
-        ))}
-      </div>
-
-      <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', alignItems: 'center' }}>
-        <input type="date" className="form-control" value={dateRange.start} onChange={(e) => setDateRange(d => ({ ...d, start: e.target.value }))}
-          style={{ padding: '6px 10px', background: 'var(--cam-surface-2)', border: '1px solid var(--cam-border-subtle)', borderRadius: '6px', color: 'var(--cam-text-primary)' }} />
-        <input type="date" className="form-control" value={dateRange.end} onChange={(e) => setDateRange(d => ({ ...d, end: e.target.value }))}
-          style={{ padding: '6px 10px', background: 'var(--cam-surface-2)', border: '1px solid var(--cam-border-subtle)', borderRadius: '6px', color: 'var(--cam-text-primary)' }} />
-        <button className="btn btn-sm btn-primary" onClick={loadReport}><Icon name="reset" size={14} /> {t('admin.reports.apply')}</button>
-      </div>
-
-      {loading ? (
-        <div style={{ textAlign: 'center', padding: '60px', color: 'var(--cam-text-faint)' }}>{t('admin.reports.loading')}</div>
-      ) : data ? (
-        <div style={{ display: 'grid', gap: '20px' }}>
-          {/* Summary Cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-            {Object.entries(data).filter(([_key, v]) => typeof v === 'number' || typeof v === 'string').slice(0, 6).map(([key, val]) => (
-              <div key={key} style={{ padding: '16px', background: 'var(--cam-surface-1)', borderRadius: '8px', border: '1px solid var(--cam-border-subtle)' }}>
-                <div style={{ fontSize: '11px', color: 'var(--cam-text-faint)', textTransform: 'capitalize', marginBottom: '4px' }}>{key.replace(/([A-Z])/g, ' $1').trim()}</div>
-                <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--cam-text-primary)' }}>{String(val)}</div>
-              </div>
+      <div className="admin-section">
+        <div className="admin-toolbar">
+          <div className="admin-toolbar-filters">
+            {reports.map((r) => (
+              <Button
+                key={r.key}
+                variant={activeReport === r.key ? 'primary' : 'outline'}
+                size="sm"
+                onClick={() => setActiveReport(r.key)}
+              >
+                {r.label}
+              </Button>
             ))}
           </div>
-
-          {/* Breakdown tables */}
-          {data.statusBreakdown && (
-            <div style={{ background: 'var(--cam-surface-1)', borderRadius: '8px', border: '1px solid var(--cam-border-subtle)', padding: '16px' }}>
-              <h4 style={{ color: 'var(--cam-text-secondary)', marginBottom: '12px', fontSize: '14px' }}>{t('admin.reports.statusBreakdown')}</h4>
-              <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-                {Object.entries(data.statusBreakdown).map(([status, count]) => (
-                  <div key={status} style={{ padding: '8px 16px', background: 'var(--cam-surface-2)', borderRadius: '6px' }}>
-                    <span style={{ color: 'var(--cam-text-muted)', fontSize: '12px' }}>{statusLabel(status)}: </span>
-                    <strong style={{ color: 'var(--cam-text-primary)' }}>{String(count)}</strong>
-                  </div>
-                ))}
-              </div>
+          <div className="admin-toolbar-row">
+            <span className="admin-filter admin-date-range">
+              <Icon name="calendar" size={14} className="admin-filter-icon" />
+              <input
+                className="form-control"
+                type="date"
+                value={dateRange.start}
+                onChange={(e) => setDateRange((d) => ({ ...d, start: e.target.value }))}
+                aria-label={t('admin.lists.fromDate')}
+              />
+              <span className="admin-date-sep">{t('admin.lists.toDate')}</span>
+              <input
+                className="form-control"
+                type="date"
+                value={dateRange.end}
+                onChange={(e) => setDateRange((d) => ({ ...d, end: e.target.value }))}
+                aria-label={t('admin.lists.toDate')}
+              />
+            </span>
+            <div className="admin-toolbar-actions">
+              <Button variant="primary" size="sm" icon="reset" onClick={loadReport}>
+                {t('admin.reports.apply')}
+              </Button>
             </div>
-          )}
-
-          {data.technologyBreakdown && (
-            <div style={{ background: 'var(--cam-surface-1)', borderRadius: '8px', border: '1px solid var(--cam-border-subtle)', padding: '16px' }}>
-              <h4 style={{ color: 'var(--cam-text-secondary)', marginBottom: '12px', fontSize: '14px' }}>{t('admin.reports.technologyBreakdown')}</h4>
-              <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-                {Object.entries(data.technologyBreakdown).map(([tech, count]) => (
-                  <div key={tech} style={{ padding: '8px 16px', background: 'var(--cam-surface-2)', borderRadius: '6px' }}>
-                    <span style={{ color: 'var(--cam-text-muted)', fontSize: '12px' }}>{tech}: </span>
-                    <strong style={{ color: 'var(--cam-text-primary)' }}>{String(count)}</strong>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          </div>
         </div>
-      ) : (
-        <div style={{ textAlign: 'center', padding: '60px', color: 'var(--cam-text-faint)' }}>{t('admin.reports.noData')}</div>
-      )}
+
+        <AdminCard>
+          <AdminCardBody>
+            {loading ? (
+              <div style={{ textAlign: 'center', padding: '60px', color: 'var(--admin-text-muted)' }}>
+                {t('admin.reports.loading')}
+              </div>
+            ) : data ? (
+              <div style={{ display: 'grid', gap: '20px' }}>
+                <div className="admin-kpi-grid">
+                  {Object.entries(data).filter(([_key, v]) => typeof v === 'number' || typeof v === 'string').slice(0, 6).map(([key, val]) => (
+                    <StatCard
+                      key={key}
+                      title={key.replace(/([A-Z])/g, ' $1').trim()}
+                      value={String(val)}
+                      icon="database"
+                      tone={SUMMARY_TONES[summaryKey(key)] ?? 'blue'}
+                    />
+                  ))}
+                </div>
+
+                {data.statusBreakdown && (
+                  <div>
+                    <h3 className="admin-card-title" style={{ marginBottom: '12px' }}>{t('admin.reports.statusBreakdown')}</h3>
+                    <div className="admin-card-grid">
+                      {Object.entries(data.statusBreakdown).map(([status, count]) => (
+                        <div key={status}>
+                          <div className="admin-detail-label">{statusLabel(status)}</div>
+                          <div className="admin-detail-value" style={{ fontWeight: 600 }}>{String(count)}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {data.technologyBreakdown && (
+                  <div>
+                    <h3 className="admin-card-title" style={{ marginBottom: '12px' }}>{t('admin.reports.technologyBreakdown')}</h3>
+                    <div className="admin-card-grid">
+                      {Object.entries(data.technologyBreakdown).map(([tech, count]) => (
+                        <div key={tech}>
+                          <div className="admin-detail-label">{tech}</div>
+                          <div className="admin-detail-value" style={{ fontWeight: 600 }}>{String(count)}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <EmptyState icon="database" text={t('admin.reports.noData')} />
+            )}
+          </AdminCardBody>
+        </AdminCard>
+      </div>
     </AdminLayout>
   );
 };

@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { useStore } from '../../context/StoreContext';
 import { AdminLayout } from './AdminLayout';
 import { ApiService } from '../../services/api';
+import { AdminCard, AdminCardHeader, AdminCardBody } from './ui/Card';
+import { Button } from './ui/Button';
 
 export const AdminSettingsView: React.FC = () => {
   const { t } = useTranslation();
@@ -38,7 +40,7 @@ export const AdminSettingsView: React.FC = () => {
   const renderSettingValue = (value: any) => {
     if (Array.isArray(value)) {
       return (
-        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           {value.map((v: string) => (
             <span key={v} className="badge badge-neutral" style={{ fontSize: '10px' }}>{v}</span>
           ))}
@@ -48,7 +50,7 @@ export const AdminSettingsView: React.FC = () => {
     if (typeof value === 'boolean') {
       return <span className={`badge ${value ? 'badge-primary' : 'badge-neutral'}`}>{value ? t('admin.settings.enabled') : t('admin.settings.disabled')}</span>;
     }
-    return <span style={{ color: 'var(--cam-text-primary)' }}>{String(value)}</span>;
+    return <span style={{ color: 'var(--admin-text)' }}>{String(value)}</span>;
   };
 
   const saveAdminUrl = async () => {
@@ -66,67 +68,65 @@ export const AdminSettingsView: React.FC = () => {
   };
 
   if (loading) {
-    return <AdminLayout title={t('admin.settings.title')}><div style={{ textAlign: 'center', padding: '60px', color: 'var(--cam-text-muted)' }}>{t('admin.settings.loading')}</div></AdminLayout>;
+    return <AdminLayout title={t('admin.settings.title')}><div style={{ textAlign: 'center', padding: '60px', color: 'var(--admin-text-muted)' }}>{t('admin.settings.loading')}</div></AdminLayout>;
   }
 
   return (
     <AdminLayout title={t('admin.settings.title')} subtitle={t('admin.settings.subtitle')}>
-      <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
-        {tabs.map((tab) => (
-          <button
-            key={tab.key}
-            className={`btn btn-sm ${activeTab === tab.key ? 'btn-primary' : 'btn-outline'}`}
-            onClick={() => setActiveTab(tab.key)}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {settings && (
-        <div style={{ display: 'grid', gap: '12px' }}>
-          {activeTab === 'admin' && (
-            <div style={{ display: 'grid', gap: '12px', marginBottom: '8px' }}>
-              <div style={{ padding: '14px 16px', background: 'var(--cam-surface-1)', borderRadius: '8px', border: '1px solid var(--cam-border-subtle)' }}>
-                <div style={{ fontSize: '13px', fontWeight: '500', color: 'var(--cam-text-primary)', marginBottom: '8px' }}>{t('admin.settings.adminUrl')}</div>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                  <input
-                    className="form-control"
-                    value={adminUrl}
-                    onChange={(e) => setAdminUrl(e.target.value)}
-                    placeholder="/admin"
-                    style={{ minWidth: '240px', flex: 1 }}
-                  />
-                  <button className="btn btn-primary" onClick={saveAdminUrl} disabled={saving}>
-                    {saving ? t('admin.saving') : t('admin.settings.saveAdminUrl')}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {Object.entries(settings[activeTab] || {}).filter(([key]) => !(activeTab === 'admin' && key === 'adminUrl')).map(([key, value]) => (
-            <div key={key} style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              padding: '14px 16px',
-              background: 'var(--cam-surface-1)',
-              borderRadius: '8px',
-              border: '1px solid var(--cam-border-subtle)',
-            }}>
-              <div>
-                <div style={{ fontSize: '13px', fontWeight: '500', color: 'var(--cam-text-primary)', textTransform: 'capitalize' }}>
-                  {key.replace(/([A-Z])/g, ' $1').trim()}
-                </div>
-              </div>
-              <div>
-                {renderSettingValue(value)}
-              </div>
-            </div>
-          ))}
+      <div className="admin-section">
+        <div className="admin-toolbar">
+          <div className="admin-toolbar-filters">
+            {tabs.map((tab) => (
+              <Button
+                key={tab.key}
+                variant={activeTab === tab.key ? 'primary' : 'outline'}
+                size="sm"
+                onClick={() => setActiveTab(tab.key)}
+              >
+                {tab.label}
+              </Button>
+            ))}
+          </div>
         </div>
-      )}
+
+        {settings && (
+          <AdminCard>
+            <AdminCardHeader title={tabs.find((t) => t.key === activeTab)?.label ?? activeTab} description={t('admin.settings.subtitle')} />
+            <AdminCardBody>
+              {activeTab === 'admin' && (
+                <div style={{ display: 'grid', gap: '12px', marginBottom: '16px' }}>
+                  <div style={{ padding: '14px 16px', background: 'var(--admin-card-2)', borderRadius: '8px', border: '1px solid var(--admin-border)' }}>
+                    <div className="admin-detail-label" style={{ marginBottom: '8px' }}>{t('admin.settings.adminUrl')}</div>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      <input
+                        className="form-control"
+                        value={adminUrl}
+                        onChange={(e) => setAdminUrl(e.target.value)}
+                        placeholder="/admin"
+                        style={{ minWidth: '240px', flex: 1 }}
+                      />
+                      <Button variant="primary" onClick={saveAdminUrl} loading={saving}>
+                        {saving ? t('admin.saving') : t('admin.settings.saveAdminUrl')}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display: 'grid', gap: '12px' }}>
+                {Object.entries(settings[activeTab] || {}).filter(([key]) => !(activeTab === 'admin' && key === 'adminUrl')).map(([key, value]) => (
+                  <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', padding: '12px 16px', background: 'var(--admin-card-2)', borderRadius: '8px', border: '1px solid var(--admin-border)' }}>
+                    <div className="admin-detail-label" style={{ textTransform: 'capitalize', marginBottom: 0 }}>
+                      {key.replace(/([A-Z])/g, ' $1').trim()}
+                    </div>
+                    {renderSettingValue(value)}
+                  </div>
+                ))}
+              </div>
+            </AdminCardBody>
+          </AdminCard>
+        )}
+      </div>
     </AdminLayout>
   );
 };

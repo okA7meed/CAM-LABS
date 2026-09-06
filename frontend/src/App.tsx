@@ -26,7 +26,7 @@ import { MarketplaceView } from './components/marketplace/MarketplaceView';
 import { ManufacturingRequestView } from './components/manufacturing/ManufacturingRequestView';
 import { ComingSoonView } from './components/coming-soon/ComingSoonView';
 import { EquationBuilderView } from './components/admin/EquationBuilderView';
-import { AdminLoginView } from './components/admin/AdminLoginView';
+import { NotFoundView } from './components/common/NotFoundView';
 import { AdminDashboardView } from './components/admin/AdminDashboardView';
 import { AdminOrdersView } from './components/admin/AdminOrdersView';
 import { AdminCustomersView } from './components/admin/AdminCustomersView';
@@ -62,26 +62,64 @@ export const App: React.FC = () => {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [adminBasePath, setAdminBasePath] = useState('/admin');
 
+  const isAdminView = !isLoading && activeView.startsWith('admin-');
+
   useEffect(() => {
-    ApiService.getAdminUrl()
-      .then((result) => {
-        if (result?.adminUrl) setAdminBasePath(result.adminUrl);
-      })
-      .catch(() => undefined);
-  }, []);
+    if (!isLoading && isAuthenticated && currentUser?.role?.includes('ADMIN')) {
+      ApiService.getAdminUrl()
+        .then((result) => {
+          if (result?.adminUrl) setAdminBasePath(result.adminUrl);
+        })
+        .catch(() => undefined);
+    }
+  }, [currentUser?.role, isAuthenticated, isLoading]);
 
   useEffect(() => {
     if (isLoading) return;
 
-    if (window.location.pathname.startsWith(adminBasePath)) {
-      if (isAuthenticated && currentUser?.role?.includes('ADMIN')) {
-        if (activeView === 'admin-login' || !activeView.startsWith('admin-')) {
+    const isAdmin = isAuthenticated && Boolean(currentUser?.role?.includes('ADMIN'));
+    const isAtAdminRoute = window.location.pathname.startsWith(adminBasePath) || window.location.pathname.startsWith('/admin');
+
+    if (isAtAdminRoute) {
+      if (isAdmin) {
+        if (!activeView.startsWith('admin-')) {
           setActiveView('admin-dashboard');
         }
-      } else if (activeView !== 'admin-login') {
-        setActiveView('admin-login');
+      } else {
+        if (activeView !== 'not-found') {
+          setActiveView('not-found');
+        }
+      }
+    } else {
+      if (activeView.startsWith('admin-')) {
+        setActiveView('home');
       }
     }
+  }, [adminBasePath, currentUser?.role, isAuthenticated, isLoading, setActiveView]);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      if (isLoading) return;
+      const isAdmin = isAuthenticated && Boolean(currentUser?.role?.includes('ADMIN'));
+      const isAtAdminRoute = window.location.pathname.startsWith(adminBasePath) || window.location.pathname.startsWith('/admin');
+
+      if (isAtAdminRoute) {
+        if (isAdmin) {
+          if (!activeView.startsWith('admin-')) {
+            setActiveView('admin-dashboard');
+          }
+        } else {
+          setActiveView('not-found');
+        }
+      } else {
+        if (activeView.startsWith('admin-') || activeView === 'not-found') {
+          setActiveView('home');
+        }
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
   }, [activeView, adminBasePath, currentUser?.role, isAuthenticated, isLoading, setActiveView]);
 
   useEffect(() => {
@@ -99,20 +137,20 @@ export const App: React.FC = () => {
   }, [closeAuthModal, closeComparisonModal, closeForgotPassword, closeOrderTimeline, closePersonaModal]);
 
   return (
-    <div className="tech-grid-bg page-enter" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <Header onToggleMobileNav={() => setMobileNavOpen(!mobileNavOpen)} />
-      <MobileNav isOpen={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />
+    <div className={`${isAdminView ? '' : 'tech-grid-bg'} page-enter`} style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+      {!isAdminView && <Header onToggleMobileNav={() => setMobileNavOpen(!mobileNavOpen)} />}
+      {!isAdminView && <MobileNav isOpen={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />}
 
       {isLoading && <main id="view-loading"><div className="container loading-state"><div className="skeleton loading-state-mark" /><p>{t('status.resolvingSession')}</p></div></main>}
+      {!isLoading && activeView === 'not-found' && <NotFoundView />}
       {!isLoading && activeView === 'dashboard' && isAuthenticated && <OrderCenter />}
       {!isLoading && activeView === 'profile' && isAuthenticated && <ProfileView />}
       {!isLoading && activeView === 'marketplace' && <MarketplaceView />}
       {!isLoading && activeView === 'manufacturing-request' && <ManufacturingRequestView />}
       {!isLoading && activeView === 'coming-soon' && <ComingSoonView />}
-      {!isLoading && activeView === 'equation-builder' && <EquationBuilderView />}
+      {!isLoading && activeView === 'equation-builder' && isAuthenticated && currentUser?.role?.includes('ADMIN') && <EquationBuilderView />}
 
       {/* Admin Views */}
-      {!isLoading && activeView === 'admin-login' && <AdminLoginView />}
       {!isLoading && activeView === 'admin-dashboard' && isAuthenticated && currentUser?.role?.includes('ADMIN') && <AdminDashboardView />}
       {!isLoading && activeView === 'admin-orders' && isAuthenticated && currentUser?.role?.includes('ADMIN') && <AdminOrdersView />}
       {!isLoading && activeView === 'admin-order-detail' && isAuthenticated && currentUser?.role?.includes('ADMIN') && <AdminOrderDetailView />}
@@ -136,7 +174,7 @@ export const App: React.FC = () => {
       {!isLoading && activeView === 'admin-settings' && isAuthenticated && currentUser?.role?.includes('ADMIN') && <AdminSettingsView />}
       {!isLoading && activeView === 'admin-pricing' && isAuthenticated && currentUser?.role?.includes('ADMIN') && <AdminPricingView />}
 
-      {!isLoading && activeView !== 'marketplace' && activeView !== 'manufacturing-request' && activeView !== 'coming-soon' && activeView !== 'equation-builder' && !activeView.startsWith('admin-') && (activeView !== 'dashboard' || !isAuthenticated) && (activeView !== 'profile' || !isAuthenticated) && (
+      {!isLoading && activeView !== 'marketplace' && activeView !== 'manufacturing-request' && activeView !== 'coming-soon' && activeView !== 'equation-builder' && activeView !== 'not-found' && !activeView.startsWith('admin-') && (activeView !== 'dashboard' || !isAuthenticated) && (activeView !== 'profile' || !isAuthenticated) && (
         <main id="view-landing">
           <HeroSection />
           <ServicesSection />
@@ -149,7 +187,7 @@ export const App: React.FC = () => {
         </main>
       )}
 
-      <Footer />
+      {!isLoading && !isAdminView && <Footer />}
 
       {/* Interactive Global Overlays & Modals */}
       <AuthModal />

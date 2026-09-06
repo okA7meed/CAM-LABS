@@ -2,6 +2,33 @@ import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../../context/StoreContext';
 import { AdminLayout } from './AdminLayout';
+import { AdminCard, AdminCardBody, AdminCardHeader } from './ui/Card';
+import { DetailsGrid, DetailItem } from './ui/DetailItem';
+import { StatusBadge, StatusTone } from './ui/StatusBadge';
+import { TechBadge } from './ui/TechBadge';
+import { Button } from './ui/Button';
+
+const STATUS_TONES: Record<string, StatusTone> = {
+  ACTIVE: 'delivered',
+  INACTIVE: 'unknown',
+  DISABLED: 'unknown',
+  SUSPENDED: 'cancelled',
+};
+
+const AVAILABILITY_TONES: Record<string, StatusTone> = {
+  AVAILABLE: 'delivered',
+  BUSY: 'review',
+  OFFLINE: 'unknown',
+};
+
+const REQUEST_TONES: Record<string, StatusTone> = {
+  PENDING: 'review',
+  ACCEPTED: 'delivered',
+  REJECTED: 'cancelled',
+  IN_PROGRESS: 'production',
+  COMPLETED: 'delivered',
+  CANCELLED: 'cancelled',
+};
 
 export const AdminManufacturerDetailView: React.FC = () => {
   const { t } = useTranslation();
@@ -26,6 +53,25 @@ export const AdminManufacturerDetailView: React.FC = () => {
 
   useEffect(() => { void load(); }, [selectedAdminManufacturerId]);
 
+  const statusLabel = (status: string): string => {
+    switch (status) {
+      case 'ACTIVE': return t('admin.status.active');
+      case 'INACTIVE': return t('admin.status.inactive');
+      case 'DISABLED': return t('admin.status.disabled');
+      case 'SUSPENDED': return t('admin.status.suspended');
+      default: return status;
+    }
+  };
+
+  const availabilityLabel = (availability: string): string => {
+    switch (availability) {
+      case 'AVAILABLE': return t('admin.status.available');
+      case 'BUSY': return t('admin.status.busy');
+      case 'OFFLINE': return t('admin.status.offline');
+      default: return availability;
+    }
+  };
+
   if (!selectedAdminManufacturerId) {
     return <AdminLayout title={t('admin.manufacturerDetail.title')}><div style={{ color: 'var(--cam-text-muted)' }}>{t('admin.manufacturerDetail.noSelected')}</div></AdminLayout>;
   }
@@ -37,75 +83,122 @@ export const AdminManufacturerDetailView: React.FC = () => {
       ) : !manufacturer ? (
         <div style={{ color: 'var(--cam-text-muted)' }}>{t('admin.manufacturerDetail.notFound')}</div>
       ) : (
-        <div style={{ display: 'grid', gap: '20px' }}>
-          <button className="btn btn-sm btn-outline" onClick={() => { closeAdminDetail(); setActiveView('admin-manufacturers'); }}>
-            {t('admin.manufacturerDetail.backToManufacturers')}
-          </button>
+        <div className="admin-section">
+          <AdminCard>
+            <AdminCardHeader
+              title={manufacturer.companyName || manufacturer.id}
+              description={manufacturer.id}
+              actions={
+                <Button variant="outline" size="sm" icon="arrowLeft" onClick={() => { closeAdminDetail(); setActiveView('admin-manufacturers'); }}>
+                  {t('admin.manufacturerDetail.backToManufacturers')}
+                </Button>
+              }
+            />
+            <AdminCardBody>
+              <DetailsGrid>
+                <DetailItem label={t('admin.manufacturerDetail.manufacturerId')} value={manufacturer.id} />
+                <DetailItem label={t('admin.manufacturerDetail.companyName')} value={manufacturer.companyName} />
+                <DetailItem label={t('admin.manufacturerDetail.contactPerson')} value={manufacturer.contactPerson} />
+                <DetailItem label={t('admin.manufacturerDetail.email')} value={manufacturer.email} />
+                <DetailItem label={t('admin.manufacturerDetail.phone')} value={manufacturer.phone || '—'} />
+                <DetailItem label={t('admin.manufacturerDetail.location')} value={manufacturer.location || '—'} />
+                <DetailItem label={t('admin.manufacturerDetail.status')} value={<StatusBadge status={statusLabel(manufacturer.status)} tone={STATUS_TONES[manufacturer.status] ?? 'unknown'} />} />
+              </DetailsGrid>
+            </AdminCardBody>
+          </AdminCard>
 
-          <Section title={t('admin.manufacturerDetail.basicInformation')}>
-            <Grid>
-              <DetailItem label={t('admin.manufacturerDetail.manufacturerId')} value={manufacturer.id} />
-              <DetailItem label={t('admin.manufacturerDetail.companyName')} value={manufacturer.companyName} />
-              <DetailItem label={t('admin.manufacturerDetail.contactPerson')} value={manufacturer.contactPerson} />
-              <DetailItem label={t('admin.manufacturerDetail.email')} value={manufacturer.email} />
-              <DetailItem label={t('admin.manufacturerDetail.phone')} value={manufacturer.phone || '—'} />
-              <DetailItem label={t('admin.manufacturerDetail.location')} value={manufacturer.location || '—'} />
-              <DetailItem label={t('admin.manufacturerDetail.status')} value={manufacturer.status} />
-            </Grid>
-          </Section>
+          <AdminCard>
+            <AdminCardHeader title={t('admin.manufacturerDetail.capabilities')} />
+            <AdminCardBody>
+              <DetailsGrid>
+                <DetailItem
+                  label={t('admin.manufacturerDetail.supportedTechnologies')}
+                  value={(manufacturer.supportedTechnologies || []).length ? (
+                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                      {(manufacturer.supportedTechnologies || []).map((tech: string) => <TechBadge key={tech} label={tech} />)}
+                    </div>
+                  ) : '—'}
+                />
+                <DetailItem label={t('admin.manufacturerDetail.supportedMaterials')} value={(manufacturer.supportedMaterials || []).join(', ') || '—'} />
+                <DetailItem label={t('admin.manufacturerDetail.capacity')} value={manufacturer.capacity ?? '—'} />
+                <DetailItem label={t('admin.manufacturerDetail.availability')} value={<StatusBadge status={availabilityLabel(manufacturer.availability)} tone={AVAILABILITY_TONES[manufacturer.availability] ?? 'unknown'} />} />
+              </DetailsGrid>
+            </AdminCardBody>
+          </AdminCard>
 
-          <Section title={t('admin.manufacturerDetail.capabilities')}>
-            <Grid>
-              <DetailItem label={t('admin.manufacturerDetail.supportedTechnologies')} value={(manufacturer.supportedTechnologies || []).join(', ') || '—'} />
-              <DetailItem label={t('admin.manufacturerDetail.supportedMaterials')} value={(manufacturer.supportedMaterials || []).join(', ') || '—'} />
-              <DetailItem label={t('admin.manufacturerDetail.capacity')} value={manufacturer.capacity ?? '—'} />
-              <DetailItem label={t('admin.manufacturerDetail.availability')} value={manufacturer.availability} />
-            </Grid>
-          </Section>
+          <AdminCard>
+            <AdminCardHeader title={t('admin.manufacturerDetail.operations')} />
+            <AdminCardBody>
+              <DetailsGrid>
+                <DetailItem label={t('admin.manufacturerDetail.currentOrders')} value={manufacturer.currentOrders ?? 0} />
+                <DetailItem label={t('admin.manufacturerDetail.completedOrders')} value={manufacturer.completedOrders ?? 0} />
+                <DetailItem label={t('admin.manufacturerDetail.performance')} value={manufacturer.performanceRating ? `${manufacturer.performanceRating}/5` : '—'} />
+                <DetailItem label={t('admin.manufacturerDetail.notes')} value={manufacturer.notes || '—'} />
+              </DetailsGrid>
+            </AdminCardBody>
+          </AdminCard>
 
-          <Section title={t('admin.manufacturerDetail.operations')}>
-            <Grid>
-              <DetailItem label={t('admin.manufacturerDetail.currentOrders')} value={manufacturer.currentOrders ?? 0} />
-              <DetailItem label={t('admin.manufacturerDetail.completedOrders')} value={manufacturer.completedOrders ?? 0} />
-              <DetailItem label={t('admin.manufacturerDetail.performance')} value={manufacturer.performanceRating ? `${manufacturer.performanceRating}/5` : '—'} />
-              <DetailItem label={t('admin.manufacturerDetail.notes')} value={manufacturer.notes || '—'} />
-            </Grid>
-          </Section>
+          <AdminCard>
+            <AdminCardHeader title={t('admin.manufacturerDetail.recentOrders')} />
+            <AdminCardBody flush>
+              {(manufacturer.orders || []).length ? (
+                <div className="admin-table-wrap">
+                  <table className="admin-table">
+                    <thead>
+                      <tr>
+                        <th>{t('admin.manufacturingRequests.order')}</th>
+                        <th>{t('admin.manufacturingRequests.technology')}</th>
+                        <th>{t('admin.manufacturerDetail.status')}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(manufacturer.orders || []).map((order: any) => (
+                        <tr key={order.id}>
+                          <td className="mono-primary">{order.id}</td>
+                          <td>{order.technology ? <TechBadge label={order.technology} /> : '—'}</td>
+                          <td><StatusBadge status={order.status || '—'} /></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div style={{ padding: '18px', color: 'var(--cam-text-muted)', fontSize: '13px' }}>{t('admin.lists.empty')}</div>
+              )}
+            </AdminCardBody>
+          </AdminCard>
 
-          <Section title={t('admin.manufacturerDetail.recentOrders')}>
-            <List items={manufacturer.orders || []} renderItem={(order) => <div><strong>{order.id}</strong> · {order.technology} · {order.status}</div>} />
-          </Section>
-
-          <Section title={t('admin.manufacturerDetail.manufacturingRequests')}>
-            <List items={manufacturer.manufacturingRequests || []} renderItem={(request) => <div><strong>{request.id}</strong> · {request.status} · {request.order?.id || '—'}</div>} />
-          </Section>
+          <AdminCard>
+            <AdminCardHeader title={t('admin.manufacturerDetail.manufacturingRequests')} />
+            <AdminCardBody flush>
+              {(manufacturer.manufacturingRequests || []).length ? (
+                <div className="admin-table-wrap">
+                  <table className="admin-table">
+                    <thead>
+                      <tr>
+                        <th>{t('admin.mfgRequestDetail.requestId')}</th>
+                        <th>{t('admin.mfgRequestDetail.orderId')}</th>
+                        <th>{t('admin.mfgRequestDetail.status')}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(manufacturer.manufacturingRequests || []).map((request: any) => (
+                        <tr key={request.id}>
+                          <td className="mono-primary">{request.id}</td>
+                          <td>{request.order?.id || '—'}</td>
+                          <td><StatusBadge status={statusLabel(request.status)} tone={REQUEST_TONES[request.status] ?? 'unknown'} /></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div style={{ padding: '18px', color: 'var(--cam-text-muted)', fontSize: '13px' }}>{t('admin.lists.empty')}</div>
+              )}
+            </AdminCardBody>
+          </AdminCard>
         </div>
       )}
     </AdminLayout>
   );
 };
-
-const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
-  <div className="dashboard-section-panel" style={{ padding: '20px' }}>
-    <h3 style={{ marginBottom: '12px', color: 'var(--cam-text-secondary)' }}>{title}</h3>
-    {children}
-  </div>
-);
-
-const Grid: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>{children}</div>
-);
-
-const DetailItem: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value }) => (
-  <div>
-    <div style={{ fontSize: '11px', color: 'var(--cam-text-faint)', marginBottom: '6px' }}>{label}</div>
-    <div style={{ color: 'var(--cam-text-secondary)' }}>{value || '—'}</div>
-  </div>
-);
-
-const List: React.FC<{ items: any[]; renderItem: (item: any) => React.ReactNode }> = ({ items, renderItem }) => (
-  <div style={{ display: 'grid', gap: '10px' }}>
-    {items.map((item) => <div key={item.id} style={{ padding: '12px', background: 'var(--cam-surface-2)', borderRadius: '8px' }}>{renderItem(item)}</div>)}
-    {items.length === 0 && <div style={{ color: 'var(--cam-text-muted)' }}>No records found.</div>}
-  </div>
-);

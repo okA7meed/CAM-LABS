@@ -1,31 +1,89 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../../context/StoreContext';
 import { AdminLayout } from './AdminLayout';
+import { StatCard } from './ui/StatCard';
+import { AdminCard, AdminCardBody } from './ui/Card';
+import { Button } from './ui/Button';
+import { AdminSearchInput } from './ui/Fields';
+import { Paginator } from './ui/Paginator';
+import { LoadingRows, EmptyState, ErrorState } from './ui/States';
+import { StatusBadge, StatusTone } from './ui/StatusBadge';
+import { TechBadge } from './ui/TechBadge';
+
+const LIMIT = 20;
+
+type ManufacturerStats = {
+  totalManufacturers: number;
+  active: number;
+  inactive: number;
+  suspended: number;
+  available: number;
+  busy: number;
+  offline: number;
+};
+
+const STATUS_TONES: Record<string, StatusTone> = {
+  ACTIVE: 'delivered',
+  INACTIVE: 'unknown',
+  SUSPENDED: 'cancelled',
+};
+
+const AVAILABILITY_TONES: Record<string, StatusTone> = {
+  AVAILABLE: 'delivered',
+  BUSY: 'review',
+  OFFLINE: 'unknown',
+};
 
 export const AdminManufacturersView: React.FC = () => {
   const { t } = useTranslation();
   const { showToast, openAdminManufacturerDetail } = useStore();
+
   const [manufacturers, setManufacturers] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
+  const [stats, setStats] = useState<ManufacturerStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
-  const limit = 20;
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const load = async () => {
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => setSearch(searchInput.trim()), 320);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [searchInput]);
+
+  const load = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
-      const res = await fetch(`/api/v1/admin/manufacturers?limit=${limit}&offset=${page * limit}`, { credentials: 'same-origin' });
-      if (!res.ok) throw new Error('Failed to load');
+      const params = new URLSearchParams({ limit: String(LIMIT), offset: String(page * LIMIT) });
+      if (search) params.set('search', search);
+      const res = await fetch(`/api/v1/admin/manufacturers?${params.toString()}`, { credentials: 'same-origin' });
+      if (!res.ok) throw new Error(t('admin.lists.failedToLoad'));
       const data = await res.json();
-      setManufacturers(data.data.manufacturers || []);
-      setTotal(data.data.total || 0);
+      setManufacturers(data.data.manufacturers ?? []);
+      setTotal(data.data.total ?? 0);
+      if (data.data.stats) setStats(data.data.stats);
     } catch (err: any) {
-      showToast('Error', err.message, 'error');
-    } finally { setLoading(false); }
-  };
+      setError(err.message || String(err));
+      showToast('Error', err.message || t('admin.lists.failedToLoad'), 'error');
+    } finally {
+      setLoading(false);
+    }
+  }, [page, search, t, showToast]);
 
-  useEffect(() => { load(); }, [page]);
+  useEffect(() => { void load(); }, [load]);
+
+  const hasActiveFilters = Boolean(search);
+
+  const clearFilters = () => {
+    setSearchInput('');
+    setSearch('');
+    setPage(0);
+  };
 
   const statusLabel = (status: string): string => {
     switch (status) {
@@ -46,82 +104,114 @@ export const AdminManufacturersView: React.FC = () => {
     }
   };
 
+  const tableCols = 11;
+
   return (
     <AdminLayout title={t('admin.manufacturers.title')} subtitle={t('admin.manufacturers.subtitle', { total })}>
-      <div className="table-responsive" style={{ background: 'var(--cam-surface-1)', borderRadius: '12px', border: '1px solid var(--cam-border-subtle)' }}>
-        <table className="cam-table">
-          <thead>
-            <tr>
-              <th>{t('admin.manufacturers.company')}</th>
-              <th>{t('admin.manufacturers.contact')}</th>
-              <th>{t('admin.manufacturers.email')}</th>
-              <th>{t('admin.manufacturers.location')}</th>
-              <th>{t('admin.manufacturers.technologies')}</th>
-              <th>{t('admin.manufacturers.capacity')}</th>
-              <th>{t('admin.manufacturers.orders')}</th>
-              <th>{t('admin.manufacturers.rating')}</th>
-              <th>{t('admin.manufacturers.status')}</th>
-              <th>{t('admin.manufacturers.availability')}</th>
-              <th>{t('admin.manufacturers.actions')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr><td colSpan={11} style={{ textAlign: 'center', padding: '40px', color: 'var(--cam-text-faint)' }}>{t('admin.manufacturers.loading')}</td></tr>
-            ) : manufacturers.length === 0 ? (
-              <tr><td colSpan={11} style={{ textAlign: 'center', padding: '40px', color: 'var(--cam-text-faint)' }}>{t('admin.manufacturers.empty')}</td></tr>
-            ) : (
-              manufacturers.map((m: any) => (
-                <tr key={m.id}>
-                  <td><strong style={{ color: 'var(--cam-text-secondary)' }}>{m.companyName}</strong></td>
-                  <td style={{ fontSize: '12px' }}>{m.contactPerson}</td>
-                  <td style={{ fontSize: '12px', color: 'var(--cam-text-muted)' }}>{m.email}</td>
-                  <td style={{ fontSize: '12px' }}>{m.location || '—'}</td>
-                  <td>
-                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                      {(m.supportedTechnologies || []).map((t: string) => (
-                        <span key={t} className="badge badge-neutral" style={{ fontSize: '10px' }}>{t}</span>
-                      ))}
-                    </div>
-                  </td>
-                  <td>{m.capacity || '—'}</td>
-                  <td>{m.currentOrders || 0}/{m.completedOrders || 0}</td>
-                  <td>{m.performanceRating ? `${m.performanceRating}/5` : '—'}</td>
-                  <td>
-                    <span className={`badge ${m.status === 'ACTIVE' ? 'badge-primary' : m.status === 'INACTIVE' ? 'badge-warning' : 'badge-error'}`}>
-                      {statusLabel(m.status)}
-                    </span>
-                  </td>
-                  <td>
-                    <span className={`badge ${m.availability === 'AVAILABLE' ? 'badge-primary' : 'badge-warning'}`}>
-                      {availabilityLabel(m.availability)}
-                    </span>
-                  </td>
-                  <td>
-                    <button className="btn btn-sm btn-outline" onClick={() => openAdminManufacturerDetail(m.id)} style={{ padding: '4px 8px', fontSize: '11px' }}>
-                      <strong>{t('admin.lists.view')}</strong>
-                    </button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      <div className="admin-section">
+        {stats && (
+          <div className="admin-kpi-grid">
+            <StatCard title={t('admin.manufacturers.kpiTotal')} value={stats.totalManufacturers} icon="network" tone="blue" />
+            <StatCard title={t('admin.manufacturers.kpiActive')} value={stats.active} icon="check" tone="green" />
+            <StatCard title={t('admin.manufacturers.kpiAvailable')} value={stats.available} icon="check" tone="cyan" />
+            <StatCard title={t('admin.manufacturers.kpiBusy')} value={stats.busy} icon="clock" tone="amber" />
+          </div>
+        )}
 
-      {total > limit && (
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginTop: '20px' }}>
-          <button className="btn btn-sm btn-outline" disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>
-            {t('admin.lists.previous')}
-          </button>
-          <span style={{ color: 'var(--cam-text-muted)', padding: '6px 12px', fontSize: '13px' }}>
-            {t('admin.lists.page', { current: page + 1 })}
-          </span>
-          <button className="btn btn-sm btn-outline" disabled={(page + 1) * limit >= total} onClick={() => setPage((p) => p + 1)}>
-            {t('admin.lists.next')}
-          </button>
+        <div className="admin-toolbar">
+          <AdminSearchInput
+            value={searchInput}
+            onChange={setSearchInput}
+            placeholder={t('admin.manufacturers.searchPlaceholder')}
+            ariaLabel={t('admin.lists.searchPlaceholder')}
+            clearLabel={t('admin.lists.clearFilters')}
+          />
+          {hasActiveFilters && (
+            <Button variant="ghost" size="sm" icon="reset" onClick={clearFilters}>
+              {t('admin.lists.clearFilters')}
+            </Button>
+          )}
         </div>
-      )}
+
+        {hasActiveFilters && (
+          <div className="admin-count">{t('admin.lists.applied', { count: 1 })}</div>
+        )}
+
+        <AdminCard>
+          <AdminCardBody flush>
+            {error ? (
+              <ErrorState text={error} onRetry={() => void load()} retryLabel={t('admin.lists.retry')} />
+            ) : manufacturers.length === 0 && !loading ? (
+              <EmptyState icon="network" text={t('admin.manufacturers.empty')} hint={hasActiveFilters ? t('admin.lists.applied', { count: 1 }) : undefined} />
+            ) : (
+              <div className="admin-table-wrap">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>{t('admin.manufacturers.company')}</th>
+                      <th>{t('admin.manufacturers.contact')}</th>
+                      <th>{t('admin.manufacturers.email')}</th>
+                      <th>{t('admin.manufacturers.location')}</th>
+                      <th>{t('admin.manufacturers.technologies')}</th>
+                      <th className="col-numeric">{t('admin.manufacturers.capacity')}</th>
+                      <th className="col-numeric">{t('admin.manufacturers.orders')}</th>
+                      <th className="col-numeric">{t('admin.manufacturers.rating')}</th>
+                      <th>{t('admin.manufacturers.status')}</th>
+                      <th>{t('admin.manufacturers.availability')}</th>
+                      <th>{t('admin.manufacturers.actions')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loading ? (
+                      <LoadingRows cols={tableCols} />
+                    ) : (
+                      manufacturers.map((m: any) => (
+                        <tr key={m.id}>
+                          <td className="mono-primary">{m.companyName}</td>
+                          <td className="col-hide-md">{m.contactPerson}</td>
+                          <td className="mono-muted col-hide-md">{m.email}</td>
+                          <td>{m.location || '—'}</td>
+                          <td>
+                            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                              {(m.supportedTechnologies || []).map((tech: string) => (
+                                <TechBadge key={tech} label={tech} />
+                              ))}
+                            </div>
+                          </td>
+                          <td className="col-numeric">{m.capacity || '—'}</td>
+                          <td className="col-numeric">{m.currentOrders || 0}/{m.completedOrders || 0}</td>
+                          <td className="col-numeric">{m.performanceRating ? `${m.performanceRating}/5` : '—'}</td>
+                          <td>
+                            <StatusBadge
+                              status={statusLabel(m.status)}
+                              tone={STATUS_TONES[m.status] ?? 'unknown'}
+                            />
+                          </td>
+                          <td>
+                            <StatusBadge
+                              status={availabilityLabel(m.availability)}
+                              tone={AVAILABILITY_TONES[m.availability] ?? 'unknown'}
+                            />
+                          </td>
+                          <td>
+                            <Button variant="outline" size="sm" icon="eye" onClick={() => openAdminManufacturerDetail(m.id)}>
+                              {t('admin.lists.view')}
+                            </Button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </AdminCardBody>
+        </AdminCard>
+
+        {total > LIMIT && (
+          <Paginator total={total} page={page} limit={LIMIT} loading={loading} onPageChange={setPage} />
+        )}
+      </div>
     </AdminLayout>
   );
 };

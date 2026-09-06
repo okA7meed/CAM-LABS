@@ -9,7 +9,7 @@ import { createSession, deleteSession, extractSessionToken, SESSION_COOKIE_NAME 
 import { requireAuth } from '../middleware/auth.middleware';
 import { toSafeUser } from '../auth/types';
 import { ROLES } from '../auth/roles';
-import { AdminAuthService } from '../services/admin-auth.service';
+import { AdminService } from '../services/admin.service';
 
 const router = Router();
 
@@ -74,6 +74,22 @@ router.post('/register', async (req: Request, res: Response, next) => {
     const session = await createSession(user.id);
     setSessionCookie(res, session.token, session.expiresAt);
     ApiResponseHelper.success(res, { user: toSafeUser(user) }, 'Account created successfully', 201);
+
+    // Real business event: a new customer successfully registered.
+    void AdminService.notifySafely({
+      type: 'USER_REGISTERED',
+      entityType: 'USER',
+      entityId: user.id,
+      title: 'New Customer Registered',
+      message: `${user.name} created a new account.`,
+      metadata: {
+        customerId: user.id,
+        customerName: user.name,
+        company: user.company,
+        type: 'USER_REGISTERED',
+      },
+      priority: 'SUCCESS',
+    });
   } catch (error) {
     next(error);
   }
@@ -91,23 +107,25 @@ router.post('/login', async (req: Request, res: Response, next) => {
     const session = await createSession(user.id);
     setSessionCookie(res, session.token, session.expiresAt);
     ApiResponseHelper.success(res, { user: toSafeUser(user) }, 'Login successful');
-  } catch (error) {
-    next(error);
-  }
-});
 
-// Admin login endpoint with enhanced security
-router.post('/admin/login', async (req: Request, res: Response, next) => {
-  try {
-    const data = parseBody(credentialsSchema, req.body);
-    const ipAddress = req.ip || req.socket.remoteAddress;
-    const userAgent = req.headers['user-agent'];
-
-    const result = await AdminAuthService.adminLogin(data.email, data.password, ipAddress, userAgent);
-    setSessionCookie(res, result.token, result.expiresAt);
-    // Session auth is established through the HttpOnly cam_labs_session cookie;
-    // the raw token must NOT be exposed in the response body.
-    ApiResponseHelper.success(res, { user: result.user }, 'Admin login successful');
+    // Real business event: only a genuine successful *login* creates this —
+    // never token validation, middleware probes, page loads or session refreshes.
+    // Admin accounts sign in silently; the bell tracks customer activity.
+    if (!user.isAdmin && user.role === ROLES.CUSTOMER) {
+      void AdminService.notifySafely({
+        type: 'USER_LOGIN',
+        entityType: 'USER',
+        entityId: user.id,
+        title: 'Customer Signed In',
+        message: `${user.name} signed in.`,
+        metadata: {
+          customerId: user.id,
+          customerName: user.name,
+          type: 'USER_LOGIN',
+        },
+        priority: 'INFO',
+      });
+    }
   } catch (error) {
     next(error);
   }

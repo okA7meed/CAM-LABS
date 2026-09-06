@@ -1,4 +1,5 @@
-import { NextFunction, Request, Response } from 'express';
+import { Request, Response, NextFunction } from 'express';
+import { setSecureCookie } from '../utils/cookies';
 import { ApiResponseHelper } from '../utils/response';
 import { extractSessionToken, resolveSession } from '../auth/session.service';
 
@@ -43,7 +44,7 @@ export const resolveCadOwner = async (req: Request, res: Response, next: NextFun
     let guestId = getGuestCadId(req.headers.cookie);
     if (!guestId) {
       guestId = crypto.randomUUID();
-      res.cookie(GUEST_CAD_COOKIE, guestId, { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', maxAge: 1000 * 60 * 60 * 24 });
+      setSecureCookie(res, GUEST_CAD_COOKIE, guestId, { maxAge: 1000 * 60 * 60 * 24 });
     }
     req.cadOwner = { guestId };
     next();

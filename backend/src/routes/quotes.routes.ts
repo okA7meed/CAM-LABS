@@ -4,6 +4,7 @@ import { QuotesService } from '../services/quotes.service';
 import { requireAuth, resolveCadOwner } from '../middleware/auth.middleware';
 import { hasRole, ROLES } from '../auth/roles';
 import { sendSafeRouteError } from '../utils/errors';
+import { AdminService } from '../services/admin.service';
 
 const router = Router();
 
@@ -13,7 +14,7 @@ const QUOTE_STAFF_ROLE = ROLES.SUPPORT_ADMIN;
 const MAX_QUOTE_QUANTITY = 10000;
 
 // GET /api/v1/quotes
-router.get('/', requireAuth, async (req: Request, res: Response) => {
+router.get('/', requireAuth, async (req: any, res: any) => {
   try {
     const isStaff = hasRole(req.auth!.role, [QUOTE_STAFF_ROLE]);
     const userId = isStaff ? undefined : req.auth!.id;
@@ -113,6 +114,21 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
         cadFileIds: body.files.map((file: any) => file.fileId),
         pricing,
       });
+      // Real business event: only after the multi-file quote is committed.
+      void AdminService.notifySafely({
+        type: 'QUOTE',
+        entityType: 'QUOTE',
+        entityId: savedQuote.id,
+        title: 'New Quote Received',
+        message: `A new quote has been submitted${body.partName ? ` for ${body.partName}` : ''}.`,
+        metadata: {
+          quoteId: savedQuote.id,
+          customerId: req.auth!.id,
+          partName: savedQuote.partName || body.partName || null,
+          type: 'QUOTE',
+        },
+        priority: 'INFO',
+      });
       return ApiResponseHelper.success(res, savedQuote, 'Quote saved successfully', 201);
     }
 
@@ -139,6 +155,23 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
     });
 
     ApiResponseHelper.success(res, savedQuote, 'Quote saved successfully', 201);
+
+    // Real business event: never on a failed save — this runs only after the
+    // quote row has been successfully committed.
+    void AdminService.notifySafely({
+      type: 'QUOTE',
+      entityType: 'QUOTE',
+      entityId: savedQuote.id,
+      title: 'New Quote Received',
+      message: `A new quote has been submitted${body.partName ? ` for ${body.partName}` : ''}.`,
+      metadata: {
+        quoteId: savedQuote.id,
+        customerId: req.auth!.id,
+        partName: savedQuote.partName || body.partName || null,
+        type: 'QUOTE',
+      },
+      priority: 'INFO',
+    });
   } catch (err: any) {
     sendSafeRouteError(res, err, { code: 'QUOTE_SAVE_ERROR', message: 'Quote could not be saved.' });
   }

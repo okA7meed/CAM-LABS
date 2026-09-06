@@ -5,6 +5,7 @@ import { getGuestCadId, requireAuth } from '../middleware/auth.middleware';
 import { hasRole, ROLES } from '../auth/roles';
 import { QuotesService } from '../services/quotes.service';
 import { sendSafeRouteError } from '../utils/errors';
+import { AdminService } from '../services/admin.service';
 
 const router = Router();
 
@@ -12,7 +13,7 @@ const router = Router();
 const ORDER_STAFF_ROLE = ROLES.OPERATIONS_ADMIN;
 
 // GET /api/v1/orders
-router.get('/', requireAuth, async (req: Request, res: Response) => {
+router.get('/', requireAuth, async (req: any, res: any) => {
   try {
     const isStaff = hasRole(req.auth!.role, [ORDER_STAFF_ROLE]);
     const userId = isStaff ? undefined : req.auth!.id;
@@ -24,7 +25,7 @@ router.get('/', requireAuth, async (req: Request, res: Response) => {
 });
 
 // GET /api/v1/orders/:id
-router.get('/:id', requireAuth, async (req: Request, res: Response) => {
+router.get('/:id', requireAuth, async (req: any, res: any) => {
   try {
     const order = await OrdersService.getOrderById(req.params.id);
     if (!order) {
@@ -40,17 +41,33 @@ router.get('/:id', requireAuth, async (req: Request, res: Response) => {
 });
 
 // POST /api/v1/orders (Create and queue an internal CAM LABS manufacturing order)
-router.post('/', requireAuth, async (req: Request, res: Response) => {
+router.post('/', requireAuth, async (req: any, res: any) => {
   try {
     const newOrder = await OrdersService.createOrder({ ...req.body, userId: req.auth!.id, guestCadId: getGuestCadId(req.headers.cookie) });
     ApiResponseHelper.success(res, newOrder, 'Order created and queued in CAM LABS manufacturing', 201);
+
+    // Real business event: only after the order rows were successfully created.
+    void AdminService.notifySafely({
+      type: 'ORDER',
+      entityType: 'ORDER',
+      entityId: newOrder.id,
+      title: 'New Order Received',
+      message: `A new order has been created${req.body.partName ? ` for ${req.body.partName}` : ''}.`,
+      metadata: {
+        orderId: newOrder.id,
+        customerId: req.auth!.id,
+        partName: req.body.partName || null,
+        type: 'ORDER',
+      },
+      priority: 'SUCCESS',
+    });
   } catch (err: any) {
     sendSafeRouteError(res, err, { code: 'ORDER_CREATE_ERROR', message: 'Order could not be created.', status: 500 });
   }
 });
 
 // POST /api/v1/orders/convert-quote/:quoteId (Convert approved quote to order)
-router.post('/convert-quote/:quoteId', requireAuth, async (req: Request, res: Response) => {
+router.post('/convert-quote/:quoteId', requireAuth, async (req: any, res: any) => {
   try {
     const quote = await QuotesService.getQuoteById(req.params.quoteId);
     if (!quote) {
@@ -61,6 +78,25 @@ router.post('/convert-quote/:quoteId', requireAuth, async (req: Request, res: Re
     }
     const order = await OrdersService.convertQuoteToOrder(req.params.quoteId);
     ApiResponseHelper.success(res, order, 'Quote approved and converted to manufacturing order', 201);
+
+    if (order?.id) {
+      // Real business event: quote-to-order conversion succeeded.
+      void AdminService.notifySafely({
+        type: 'ORDER',
+        entityType: 'ORDER',
+        entityId: order.id,
+        title: 'New Order Received',
+        message: `A quote was approved and converted to a manufacturing order${quote.partName ? ` for ${quote.partName}` : ''}.`,
+        metadata: {
+          orderId: order.id,
+          quoteId: quote.id,
+          customerId: req.auth!.id,
+          partName: quote.partName || null,
+          type: 'ORDER',
+        },
+        priority: 'SUCCESS',
+      });
+    }
   } catch (err: any) {
     sendSafeRouteError(res, err, { code: 'QUOTE_CONVERSION_ERROR', message: 'Quote could not be converted to an order.' });
   }

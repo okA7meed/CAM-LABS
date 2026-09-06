@@ -1,110 +1,14 @@
-import { getPrismaClient } from '../config/database';
-import { verifyPassword, hashPassword, validatePassword } from '../auth/password.service';
-import { createSession } from '../auth/session.service';
 import { ROLES } from '../auth/roles';
-import { AppError } from '../utils/errors';
-import { AdminService } from './admin.service';
 
 /**
  * Admin Authentication Service
  * 
- * Handles admin-specific authentication including:
- * - Admin login with role verification
- * - Account lockout after failed attempts
- * - Session management for admins
- * - Password requirements for admin accounts
+ * Provides admin password policy enforcement and role/permission helpers used
+ * by the admin panel. Admins authenticate through the same normal website
+ * login as every other user; their role decides what they can access.
  */
 
 export class AdminAuthService {
-  /**
-   * Admin login with role verification
-   */
-  static async adminLogin(email: string, password: string, ipAddress?: string, userAgent?: string) {
-    const prisma = getPrismaClient();
-    const normalizedEmail = email.toLowerCase();
-
-    const user = await prisma.user.findUnique({
-      where: { email: normalizedEmail },
-    });
-
-    if (!user) {
-      throw new AppError('Invalid credentials', 401, 'INVALID_CREDENTIALS');
-    }
-
-    // Check if user is admin
-    if (!user.isAdmin) {
-      throw new AppError('Access denied. Admin access required.', 403, 'NOT_ADMIN');
-    }
-
-    // Check if account is locked
-    if (user.lockedUntil && user.lockedUntil > new Date()) {
-      throw new AppError('Account temporarily locked due to too many failed attempts. Please try again later.', 423, 'ACCOUNT_LOCKED');
-    }
-
-    // Check account status
-    if (user.accountStatus !== 'ACTIVE') {
-      throw new AppError('Account is not active', 403, 'ACCOUNT_INACTIVE');
-    }
-
-    // Verify password
-    const validPassword = user.passwordHash ? await verifyPassword(password, user.passwordHash) : false;
-    if (!validPassword) {
-      // Increment failed login attempts
-      const failedAttempts = (user.failedLoginAttempts || 0) + 1;
-      const updateData: any = { failedLoginAttempts: failedAttempts };
-
-      // Lock account after 5 failed attempts
-      if (failedAttempts >= 5) {
-        updateData.lockedUntil = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
-      }
-
-      await prisma.user.update({
-        where: { id: user.id },
-        data: updateData,
-      });
-
-      throw new AppError('Invalid credentials', 401, 'INVALID_CREDENTIALS');
-    }
-
-    // Reset failed login attempts on successful login
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        failedLoginAttempts: 0,
-        lockedUntil: null,
-        lastLoginAt: new Date(),
-        lastActivityAt: new Date(),
-      },
-    });
-
-    // Create session
-    const session = await createSession(user.id);
-
-    // Create audit log
-    await AdminService.createAuditLog({
-      userId: user.id,
-      action: 'LOGIN',
-      entityType: 'USER',
-      entityId: user.id,
-      ipAddress,
-      userAgent,
-      sessionId: session.sessionId,
-    });
-
-    return {
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        isAdmin: user.isAdmin,
-        accountStatus: user.accountStatus,
-      },
-      token: session.token,
-      expiresAt: session.expiresAt,
-    };
-  }
-
   /**
    * Validate admin password requirements
    */

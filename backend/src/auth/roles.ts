@@ -32,6 +32,9 @@ export const hasRole = (actualRole: string, requiredRoles: readonly Role[]): boo
 };
 
 export const normalizeRole = (value: string | undefined): Role => {
-  if (value && isRole(value)) return value;
+  if (value) {
+    const upper = value.trim().toUpperCase();
+    if (isRole(upper)) return upper;
+  }
   return ROLES.CUSTOMER;
 };

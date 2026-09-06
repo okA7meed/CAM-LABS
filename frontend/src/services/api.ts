@@ -1,6 +1,9 @@
-import { Material, Order, Quote, CadFile, CadUploadResult, User } from '../types';
+import { Material, Order, Quote, CadFile, CadUploadResult, User, AdminNotification, AdminNotificationList, AdminUnreadCount } from '../types';
 
 const API_BASE = '/api/v1';
+
+/** Real-time Admin notification stream (Server-Sent Events). */
+export const ADMIN_NOTIFICATIONS_STREAM = `${API_BASE}/admin/notifications/stream`;
 
 export interface CalculatedQuotationData {
   quoteRef: string;
@@ -337,13 +340,6 @@ export class ApiService {
     });
   }
 
-  static async adminLogin(email: string, password: string) {
-    return this.requestRequired<{ user: User }>('/auth/admin/login', {
-      method: 'POST',
-      body: JSON.stringify({ email, password }),
-    });
-  }
-
   static async register(data: { name: string; email: string; password: string; company?: string; phone: string }) {
     return this.requestRequired<{ user: User }>('/auth/register', {
       method: 'POST',
@@ -367,6 +363,33 @@ export class ApiService {
     return this.requestRequired<any>('/admin/settings', {
       method: 'PUT',
       body: JSON.stringify({ section, key, value, description }),
+    });
+  }
+
+  // ─── Admin notifications ───────────────────────────────────────────────────
+  static async getAdminNotifications(params?: { limit?: number; offset?: number; unreadOnly?: boolean; type?: string }) {
+    const query = new URLSearchParams();
+    if (params?.limit != null) query.set('limit', String(params.limit));
+    if (params?.offset != null) query.set('offset', String(params.offset));
+    if (params?.unreadOnly) query.set('unreadOnly', 'true');
+    if (params?.type) query.set('type', params.type);
+    const qs = query.toString();
+    return this.requestRequired<AdminNotificationList>(`/admin/notifications${qs ? `?${qs}` : ''}`);
+  }
+
+  static async getAdminUnreadCount() {
+    return this.requestRequired<AdminUnreadCount>('/admin/notifications/unread-count');
+  }
+
+  static async markAdminNotificationRead(notificationId: string) {
+    return this.requestRequired<AdminNotification>(`/admin/notifications/${encodeURIComponent(notificationId)}/read`, {
+      method: 'PUT',
+    });
+  }
+
+  static async markAllAdminNotificationsRead() {
+    return this.requestRequired<{ markedRead: number }>('/admin/notifications/read-all', {
+      method: 'PUT',
     });
   }
 

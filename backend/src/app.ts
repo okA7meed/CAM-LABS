@@ -24,23 +24,27 @@ export const createApp = (): Application => {
 
   // ─── Security & Middleware ─────────────────────────────────────────
   app.use(helmet({
-    contentSecurityPolicy: {
-      useDefaults: true,
-      directives: {
-        defaultSrc: ["'self'"],
-        scriptSrc: ["'self'"],
-        styleSrc: ["'self'", "'unsafe-inline'"],
-        imgSrc: ["'self'", "data:", "blob:", "https:"],
-        fontSrc: ["'self'", "data:"],
-        connectSrc: ["'self'"],
-        objectSrc: ["'none'"],
-        frameAncestors: ["'self'"],
-        baseUri: ["'self'"],
-        formAction: ["'self'"],
-      },
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "blob:", "https:"],
+      fontSrc: ["'self'", "data:"],
+      connectSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      frameAncestors: ["'self'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
     },
-    crossOriginEmbedderPolicy: false,
-  }));
+  },
+  crossOriginEmbedderPolicy: false,
+}));
+// Add HSTS for production environments
+if (process.env.NODE_ENV === 'production') {
+  app.use(helmet.hsts({ maxAge: 31536000, includeSubDomains: true }));
+}
 
   app.use(cors({
     origin: ENV.CORS_ORIGIN,
@@ -82,9 +86,6 @@ export const createApp = (): Application => {
   });
   app.use('/api/v1/auth/login', authLimiter);
   app.use('/api/v1/auth/register', authLimiter);
-  // Admin login is a prime credential-stuffing target; rate-limit it just like
-  // the public auth endpoints (the admin-auth service also enforces lockout).
-  app.use('/api/v1/auth/admin/login', authLimiter);
 
   // ─── Request Logging ──────────────────────────────────────────────
   app.use((req, _res, next) => {

@@ -12,15 +12,18 @@ if (environmentIssues.length > 0) {
   environmentIssues.forEach((issue) => Logger.warn(`[Configuration] ${issue}`));
 }
 
-app.listen(ENV.PORT, () => {
-  Logger.info(`
-  ╔══════════════════════════════════════════════════╗
-  ║   CAM LABS Manufacturing API Server              ║
-  ║   Port:    ${String(ENV.PORT).padEnd(38)}║
-  ║   Env:     ${ENV.NODE_ENV.padEnd(38)}║
-  ║   Engine:   CAM LABS Internal Manufacturing       ║
-  ╚══════════════════════════════════════════════════╝
-  `);
-  Logger.info(`API base URL: http://localhost:${ENV.PORT}/api/v1`);
-  Logger.info(`Health check: http://localhost:${ENV.PORT}/api/v1/health`);
-});
+// Start server only when not in test mode. In test mode the server is started by the test harness.
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(ENV.PORT, () => {
+    Logger.info(`
+    ╔══════════════════════════════════════════════════╗
+    ║   CAM LABS Manufacturing API Server              ║
+    ║   Port:    ${String(ENV.PORT).padEnd(38)}║
+    ║   Env:     ${ENV.NODE_ENV.padEnd(38)}║
+    ║   Engine:   CAM LABS Internal Manufacturing       ║
+    ╚══════════════════════════════════════════════════╝
+    `);
+    Logger.info(`API base URL: http://localhost:${ENV.PORT}/api/v1`);
+    Logger.info(`Health check: http://localhost:${ENV.PORT}/api/v1/health`);
+  });
+}

@@ -7,7 +7,9 @@ export const AdminPricingView: React.FC = () => {
   const { t } = useTranslation();
   return (
     <AdminLayout title={t('admin.pricing.title')} subtitle={t('admin.pricing.subtitle')}>
-      <EquationBuilderView />
+      <div className="admin-section">
+        <EquationBuilderView />
+      </div>
     </AdminLayout>
   );
 };

@@ -40,6 +40,10 @@ interface StoreContextType {
   openOrderTimeline: (order: Order) => void;
   closeOrderTimeline: () => void;
 
+  selectedOrderIds: string[];
+  toggleOrderSelection: (id: string) => void;
+  clearOrderSelection: () => void;
+
   selectedAdminOrderId: string | null;
   selectedAdminCustomerId: string | null;
   selectedAdminManufacturerId: string | null;
@@ -121,6 +125,15 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isOrderTimelineOpen, setIsOrderTimelineOpen] = useState(false);
+  const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
+
+  const toggleOrderSelection = (id: string) => {
+    setSelectedOrderIds((prev) =>
+      prev.includes(id) ? prev.filter((oid) => oid !== id) : [...prev, id],
+    );
+  };
+
+  const clearOrderSelection = () => setSelectedOrderIds([]);
 
   const [selectedAdminOrderId, setSelectedAdminOrderId] = useState<string | null>(null);
   const [selectedAdminCustomerId, setSelectedAdminCustomerId] = useState<string | null>(null);
@@ -158,11 +171,17 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Modals controls
   const startManufacturingRequest = () => {
+    if (window.location.pathname !== '/') {
+      window.history.pushState({}, '', '/');
+    }
     setActiveView('manufacturing-request');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const openComingSoon = () => {
+    if (window.location.pathname !== '/') {
+      window.history.pushState({}, '', '/');
+    }
     setActiveView('coming-soon');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -342,6 +361,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         isOrderTimelineOpen,
         openOrderTimeline,
         closeOrderTimeline,
+        selectedOrderIds,
+        toggleOrderSelection,
+        clearOrderSelection,
         selectedAdminOrderId,
         selectedAdminCustomerId,
         selectedAdminManufacturerId,

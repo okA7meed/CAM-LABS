@@ -91,11 +91,17 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav }) => {
     };
   }, [isLandingView, setActiveView]);
 
+  const isAdmin = isAuthenticated && Boolean(currentUser?.role?.includes('ADMIN'));
+
   const handleNavClick = (view: ViewType, sectionId?: string) => {
-    // Admin users land on the admin dashboard when they click "Dashboard".
-    if (view === 'dashboard' && currentUser?.role?.includes('ADMIN')) {
-      window.location.href = '/admin';
+    if (view === 'admin-dashboard' || (view === 'dashboard' && isAdmin)) {
+      window.history.pushState({}, '', '/admin');
+      setActiveView('admin-dashboard');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
+    }
+    if (window.location.pathname !== '/') {
+      window.history.pushState({}, '', '/');
     }
     setActiveView(view);
     if (view === 'dashboard' || view === 'profile') {
@@ -122,7 +128,10 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav }) => {
     { label: t('nav.manufacturing'), view: 'materials', sectionId: 'materials-section' },
     { label: t('nav.about'), view: 'about', sectionId: 'about' },
     { label: t('nav.marketplace'), view: 'marketplace' },
-    { label: t('nav.dashboard'), view: 'dashboard' },
+    {
+      label: isAdmin ? t('nav.adminPanel') : t('nav.dashboard'),
+      view: isAdmin ? 'admin-dashboard' : 'dashboard',
+    },
   ];
 
   return (
@@ -172,7 +181,12 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav }) => {
 
           {isAuthenticated ? (
             <>
-              <button className="header-sign-in" onClick={() => handleNavClick('dashboard')}>{t('nav.dashboard')}</button>
+              <button
+                className="header-sign-in"
+                onClick={() => handleNavClick(isAdmin ? 'admin-dashboard' : 'dashboard')}
+              >
+                {isAdmin ? t('nav.adminPanel') : t('nav.dashboard')}
+              </button>
               <button className="header-sign-in" onClick={() => void logout()}>{t('nav.signOut')}</button>
             </>
           ) : (

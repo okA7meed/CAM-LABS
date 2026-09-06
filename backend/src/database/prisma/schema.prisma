@@ -498,22 +498,25 @@ model AuditLog {
 }
 
 model AdminNotification {
-  id                  String   @id @default(uuid())
-  userId              String?
-  user                User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type                String   // NEW_ORDER, NEW_CUSTOMER, FAILED_UPLOAD, PAYMENT_FAILED, MANUFACTURING_REQUEST, etc.
-  title               String
-  message             String
-  metadata            Json?
-  isRead              Boolean  @default(false)
-  priority            String   @default("INFO") // INFO, WARNING, ERROR, SUCCESS
-  createdAt           DateTime @default(now())
-  readAt              DateTime?
+  id          String   @id @default(uuid())
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        String   // QUOTE, ORDER, USER_REGISTERED, USER_LOGIN, MANUFACTURING_REQUEST, PAYMENT, SYSTEM, ...
+  title       String
+  message     String
+  metadata    Json?
+  entityType  String?  // QUOTE, ORDER, USER, PAYMENT, MANUFACTURING_REQUEST, ...
+  entityId    String?  // navigation target id of entityType
+  isRead      Boolean  @default(false)
+  priority    String   @default("INFO") // INFO, WARNING, ERROR, SUCCESS
+  createdAt   DateTime @default(now())
+  readAt      DateTime?
 
   @@index([userId])
   @@index([isRead])
   @@index([type])
   @@index([createdAt])
+  @@index([entityType, entityId])
   @@map("admin_notifications")
 }
 

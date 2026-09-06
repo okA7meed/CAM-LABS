@@ -2,6 +2,19 @@ import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../../context/StoreContext';
 import { AdminLayout } from './AdminLayout';
+import { AdminCard, AdminCardHeader, AdminCardBody } from './ui/Card';
+import { Button } from './ui/Button';
+import { DetailsGrid, DetailItem } from './ui/DetailItem';
+import { EmptyState } from './ui/States';
+import { StatusBadge, StatusTone, statusToneOf } from './ui/StatusBadge';
+
+const FILE_TONES: Record<string, StatusTone> = {
+  'Verified CAD': 'delivered',
+  'Analyzing': 'review',
+  'DFM Flagged': 'inspection',
+  'Quarantined': 'cancelled',
+  'Processing Failed': 'cancelled',
+};
 
 export const AdminCadFileDetailView: React.FC = () => {
   const { t } = useTranslation();
@@ -27,77 +40,144 @@ export const AdminCadFileDetailView: React.FC = () => {
   useEffect(() => { void load(); }, [selectedAdminCadFileId]);
 
   if (!selectedAdminCadFileId) {
-    return <AdminLayout title={t('admin.cadFileDetail.title')}><div style={{ color: 'var(--cam-text-muted)' }}>{t('admin.cadFileDetail.noSelected')}</div></AdminLayout>;
+    return (
+      <AdminLayout title={t('admin.cadFileDetail.title')}>
+        <div className="admin-section">
+          <EmptyState icon="file" text={t('admin.cadFileDetail.noSelected')} />
+        </div>
+      </AdminLayout>
+    );
   }
+
+  const latestVersion = cadFile?.versions?.[0];
 
   return (
     <AdminLayout title={`${t('admin.cadFileDetail.title')} · ${selectedAdminCadFileId}`} subtitle={t('admin.cadFileDetail.subtitle')}>
-      {loading ? (
-        <div style={{ textAlign: 'center', padding: '60px', color: 'var(--cam-text-faint)' }}>{t('admin.cadFileDetail.loading')}</div>
-      ) : !cadFile ? (
-        <div style={{ color: 'var(--cam-text-muted)' }}>{t('admin.cadFileDetail.notFound')}</div>
-      ) : (
-        <div style={{ display: 'grid', gap: '20px' }}>
-          <button className="btn btn-sm btn-outline" onClick={() => { closeAdminDetail(); setActiveView('admin-cad-files'); }}>
-            {t('admin.cadFileDetail.backToCadFiles')}
-          </button>
+      <div className="admin-section">
+        {loading ? (
+          <div className="admin-muted" style={{ textAlign: 'center', padding: '60px 0' }}>{t('admin.cadFileDetail.loading')}</div>
+        ) : !cadFile ? (
+          <EmptyState icon="file" text={t('admin.cadFileDetail.notFound')} />
+        ) : (
+          <>
+            <AdminCard>
+              <AdminCardHeader
+                title={cadFile.name}
+                description={cadFile.user?.name}
+                actions={
+                  <Button variant="outline" size="sm" icon="arrowLeft" onClick={() => { closeAdminDetail(); setActiveView('admin-cad-files'); }}>
+                    {t('admin.cadFileDetail.backToCadFiles')}
+                  </Button>
+                }
+              />
+              <AdminCardBody>
+                <DetailsGrid>
+                  <DetailItem label={t('admin.cadFileDetail.fileName')} value={cadFile.name} />
+                  <DetailItem label={t('admin.cadFileDetail.fileType')} value={cadFile.format} />
+                  <DetailItem label={t('admin.cadFileDetail.fileSize')} value={cadFile.size} />
+                  <DetailItem label={t('admin.cadFileDetail.customer')} value={cadFile.user?.name || '—'} />
+                  <DetailItem label={t('admin.cadFileDetail.uploadDate')} value={new Date(cadFile.createdAt).toLocaleString()} />
+                  <DetailItem
+                    label={t('admin.cadFileDetail.status')}
+                    value={<StatusBadge status={cadFile.status} tone={FILE_TONES[cadFile.status] ?? 'unknown'} />}
+                  />
+                </DetailsGrid>
+              </AdminCardBody>
+            </AdminCard>
 
-          <Section title={t('admin.cadFileDetail.fileInformation')}>
-            <Grid>
-              <DetailItem label={t('admin.cadFileDetail.fileName')} value={cadFile.name} />
-              <DetailItem label={t('admin.cadFileDetail.fileType')} value={cadFile.format} />
-              <DetailItem label={t('admin.cadFileDetail.fileSize')} value={cadFile.size} />
-              <DetailItem label={t('admin.cadFileDetail.customer')} value={cadFile.user?.name || '—'} />
-              <DetailItem label={t('admin.cadFileDetail.uploadDate')} value={new Date(cadFile.createdAt).toLocaleString()} />
-              <DetailItem label={t('admin.cadFileDetail.status')} value={cadFile.status} />
-            </Grid>
-          </Section>
+            <AdminCard>
+              <AdminCardHeader title={t('admin.cadFileDetail.geometryAndProcessing')} />
+              <AdminCardBody>
+                <DetailsGrid>
+                  <DetailItem label={t('admin.cadFileDetail.dimensions')} value={cadFile.dimensions || '—'} />
+                  <DetailItem label={t('admin.cadFileDetail.volume')} value={cadFile.volume || '—'} />
+                  <DetailItem label={t('admin.cadFileDetail.meshTriangles')} value={cadFile.meshTriangles || '—'} />
+                  <DetailItem
+                    label={t('admin.cadFileDetail.latestScan')}
+                    value={latestVersion?.scanStatus
+                      ? <StatusBadge status={latestVersion.scanStatus} tone={FILE_TONES[latestVersion.scanStatus] ?? 'unknown'} />
+                      : '—'}
+                  />
+                  <DetailItem
+                    label={t('admin.cadFileDetail.processingStatus')}
+                    value={latestVersion?.processingStatus
+                      ? <StatusBadge status={latestVersion.processingStatus} tone={FILE_TONES[latestVersion.processingStatus] ?? 'unknown'} />
+                      : '—'}
+                  />
+                  <DetailItem
+                    label={t('admin.cadFileDetail.validationStatus')}
+                    value={latestVersion?.uploadStatus
+                      ? <StatusBadge status={latestVersion.uploadStatus} tone={FILE_TONES[latestVersion.uploadStatus] ?? 'unknown'} />
+                      : '—'}
+                  />
+                </DetailsGrid>
+              </AdminCardBody>
+            </AdminCard>
 
-          <Section title={t('admin.cadFileDetail.geometryAndProcessing')}>
-            <Grid>
-              <DetailItem label={t('admin.cadFileDetail.dimensions')} value={cadFile.dimensions || '—'} />
-              <DetailItem label={t('admin.cadFileDetail.volume')} value={cadFile.volume || '—'} />
-              <DetailItem label={t('admin.cadFileDetail.meshTriangles')} value={cadFile.meshTriangles || '—'} />
-              <DetailItem label={t('admin.cadFileDetail.latestScan')} value={cadFile.versions?.[0]?.scanStatus || '—'} />
-              <DetailItem label={t('admin.cadFileDetail.processingStatus')} value={cadFile.versions?.[0]?.processingStatus || '—'} />
-              <DetailItem label={t('admin.cadFileDetail.validationStatus')} value={cadFile.versions?.[0]?.uploadStatus || '—'} />
-            </Grid>
-          </Section>
+            <AdminCard>
+              <AdminCardHeader title={t('admin.cadFileDetail.associatedOrders')} />
+              <AdminCardBody flush>
+                {cadFile.orders?.length ? (
+                  <div className="admin-table-wrap">
+                    <table className="admin-table">
+                      <thead>
+                        <tr>
+                          <th>{t('admin.orders.col.id')}</th>
+                          <th>{t('admin.orders.col.status')}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {cadFile.orders.map((entry: any) => (
+                          <tr key={entry.order?.id || entry.cadFileId}>
+                            <td className="mono-primary">{entry.order?.id || '—'}</td>
+                            <td>
+                              <StatusBadge status={entry.order?.status || '—'} tone={statusToneOf(entry.order?.status ?? '')} />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <EmptyState icon="cube" text={t('admin.lists.empty')} />
+                )}
+              </AdminCardBody>
+            </AdminCard>
 
-          <Section title={t('admin.cadFileDetail.associatedOrders')}>
-            <List items={cadFile.orders || []} renderItem={(entry) => <div><strong>{entry.order?.id}</strong> · {entry.order?.status || '—'}</div>} />
-          </Section>
-
-          <Section title={t('admin.cadFileDetail.versions')}>
-            <List items={cadFile.versions || []} renderItem={(version) => <div><strong>v{version.version}</strong> · {version.originalName} · {version.processingStatus}</div>} />
-          </Section>
-        </div>
-      )}
+            <AdminCard>
+              <AdminCardHeader title={t('admin.cadFileDetail.versions')} />
+              <AdminCardBody flush>
+                {cadFile.versions?.length ? (
+                  <div className="admin-table-wrap">
+                    <table className="admin-table">
+                      <thead>
+                        <tr>
+                          <th>{t('geometry.version')}</th>
+                          <th>{t('admin.cadFileDetail.fileName')}</th>
+                          <th>{t('admin.cadFileDetail.processingStatus')}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {cadFile.versions.map((version: any) => (
+                          <tr key={version.id}>
+                            <td className="mono-primary">v{version.version}</td>
+                            <td>{version.originalName}</td>
+                            <td>
+                              <StatusBadge status={version.processingStatus} tone={FILE_TONES[version.processingStatus] ?? 'unknown'} />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <EmptyState icon="file" text={t('admin.lists.empty')} />
+                )}
+              </AdminCardBody>
+            </AdminCard>
+          </>
+        )}
+      </div>
     </AdminLayout>
   );
 };
-
-const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
-  <div className="dashboard-section-panel" style={{ padding: '20px' }}>
-    <h3 style={{ marginBottom: '12px', color: 'var(--cam-text-primary)' }}>{title}</h3>
-    {children}
-  </div>
-);
-
-const Grid: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>{children}</div>
-);
-
-const DetailItem: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value }) => (
-  <div>
-    <div style={{ fontSize: '11px', color: 'var(--cam-text-faint)', marginBottom: '6px' }}>{label}</div>
-    <div style={{ color: 'var(--cam-text-primary)' }}>{value || '—'}</div>
-  </div>
-);
-
-const List: React.FC<{ items: any[]; renderItem: (item: any) => React.ReactNode }> = ({ items, renderItem }) => (
-  <div style={{ display: 'grid', gap: '10px' }}>
-    {items.map((item) => <div key={item.id || item.cadFileId} style={{ padding: '12px', background: 'var(--cam-surface-1)', borderRadius: '8px' }}>{renderItem(item)}</div>)}
-    {items.length === 0 && <div style={{ color: 'var(--cam-text-muted)' }}>No records found.</div>}
-  </div>
-);

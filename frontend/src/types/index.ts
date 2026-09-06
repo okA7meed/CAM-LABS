@@ -159,7 +159,7 @@ export interface ToastMessage {
 }
 
 export type ViewType = 'home' | 'services' | 'materials' | 'workflow' | 'about' | 'dashboard' | 'profile' | 'marketplace' | 'manufacturing-request' | 'coming-soon' | 'equation-builder'
-  | 'admin-login' | 'admin-dashboard'
+  | 'not-found' | 'admin-dashboard'
   | 'admin-orders' | 'admin-order-detail'
   | 'admin-customers' | 'admin-customer-detail'
   | 'admin-manufacturers' | 'admin-manufacturer-detail'
@@ -176,3 +176,30 @@ export type ViewType = 'home' | 'services' | 'materials' | 'workflow' | 'about' 
   | 'admin-users'
   | 'admin-audit-logs'
   | 'admin-settings';
+
+export type AdminNotificationType = 'QUOTE' | 'ORDER' | 'USER_REGISTERED' | 'USER_LOGIN';
+export type AdminNotificationPriority = 'INFO' | 'SUCCESS' | 'WARNING' | 'ERROR';
+
+export interface AdminNotification {
+  id: string;
+  userId: string | null;
+  type: string;
+  title: string;
+  message: string;
+  metadata?: Record<string, unknown> | null;
+  priority: AdminNotificationPriority;
+  entityType?: string | null;
+  entityId?: string | null;
+  isRead: boolean;
+  createdAt: string;
+  readAt: string | null;
+}
+
+export interface AdminNotificationList {
+  notifications: AdminNotification[];
+  total: number;
+}
+
+export interface AdminUnreadCount {
+  count: number;
+}

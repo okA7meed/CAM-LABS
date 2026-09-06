@@ -1,5 +1,6 @@
 import React from 'react';
 import { useStore } from '../../context/StoreContext';
+import { useAuth } from '../../context/AuthContext';
 import { ViewType } from '../../types';
 import { useTranslation } from 'react-i18next';
 import { isRequestFlowView } from '../../constants/navigation';
@@ -11,10 +12,22 @@ interface MobileNavProps {
 
 export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose }) => {
   const { setActiveView, activeView, startManufacturingRequest, openAuthModal } = useStore();
+  const { currentUser, isAuthenticated } = useAuth();
   const { t } = useTranslation();
   const isInsideRequestFlow = isRequestFlowView(activeView);
+  const isAdmin = isAuthenticated && Boolean(currentUser?.role?.includes('ADMIN'));
 
   const handleLinkClick = (view: ViewType, sectionId?: string) => {
+    if (view === 'admin-dashboard' || (view === 'dashboard' && isAdmin)) {
+      window.history.pushState({}, '', '/admin');
+      setActiveView('admin-dashboard');
+      onClose();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    if (window.location.pathname !== '/') {
+      window.history.pushState({}, '', '/');
+    }
     setActiveView(view);
     onClose();
     if (view === 'dashboard' || view === 'profile') {
@@ -92,14 +105,14 @@ export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose }) => {
         {t('nav.marketplace')}
       </a>
       <a
-        href="#dashboard"
+        href={isAdmin ? "/admin" : "#dashboard"}
         className="mobile-nav-link"
         onClick={(e) => {
           e.preventDefault();
-          handleLinkClick('dashboard');
+          handleLinkClick(isAdmin ? 'admin-dashboard' : 'dashboard');
         }}
       >
-        {t('nav.dashboard')}
+        {isAdmin ? t('nav.adminPanel') : t('nav.dashboard')}
       </a>
       <a
         href="#profile"

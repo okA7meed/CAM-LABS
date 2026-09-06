@@ -59,11 +59,8 @@ router.put('/', requireSuperAdmin, async (req: Request, res: Response) => {
 // ============================================================================
 // ADMIN ROUTE CONFIGURATION
 // ============================================================================
-// Public by design: the login screen resolves the admin URL before any session
-// exists. On failure we fall back to the default path instead of leaking
-// internals — and the handler must catch, because Express 4 does not route
-// async rejections to the error middleware (the request would hang).
-router.get('/admin-url', async (_req: Request, res: Response) => {
+// Protected: Only authenticated administrators can inspect the configured admin route.
+router.get('/admin-url', requireAnyAdmin, async (_req: Request, res: Response) => {
   try {
     const adminUrl = await AdminService.getSystemSetting<string>('adminUrl');
     ApiResponseHelper.success(res, { adminUrl: adminUrl || '/admin' }, 'Admin URL retrieved');

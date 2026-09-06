@@ -1,257 +1,202 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../../context/StoreContext';
+import { useAuth } from '../../context/AuthContext';
 import { Icon } from '../ui/Icon';
 import { AdminLayout } from './AdminLayout';
+import { DashboardStats, DashboardRange } from './dashboard/types';
+import { StatCard } from './dashboard/StatCard';
+import { QuickActions } from './dashboard/QuickActions';
+import { SystemStatus } from './dashboard/SystemStatus';
+import { OrderChart } from './dashboard/OrderChart';
+import { RecentActivityList } from './dashboard/RecentActivityList';
 
-interface DashboardStats {
-  orders: {
-    total: number;
-    pending: number;
-    inProduction: number;
-    completed: number;
-  };
-  users: {
-    total: number;
-  };
-  quotes: {
-    total: number;
-  };
-  cadFiles: {
-    total: number;
-  };
-  manufacturers: {
-    total: number;
-    active: number;
-  };
-  manufacturingRequests: {
-    pending: number;
-  };
-  revenue: {
-    total: number;
-    currency: string;
-  };
-}
+const RANGES: Array<{ key: DashboardRange; labelKey: string }> = [
+  { key: '7', labelKey: 'admin.dashboard.range7' },
+  { key: '30', labelKey: 'admin.dashboard.range30' },
+  { key: '90', labelKey: 'admin.dashboard.range90' },
+  { key: 'year', labelKey: 'admin.dashboard.rangeYear' },
+];
+
+const KpiSkeleton: React.FC = () => (
+  <div className="kpi-grid" aria-hidden="true">
+    {Array.from({ length: 6 }).map((_, i) => (
+      <div key={i} className="kpi-card skeleton-block" />
+    ))}
+  </div>
+);
 
 export const AdminDashboardView: React.FC = () => {
-  const { showToast, setActiveView } = useStore();
   const { t } = useTranslation();
+  const { showToast, setActiveView } = useStore();
+  const { currentUser } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(false);
+  const [range, setRange] = useState<DashboardRange>('30');
 
-  const loadDashboardStats = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch('/api/v1/admin/dashboard', {
-        credentials: 'same-origin',
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to load dashboard statistics');
+  const load = useCallback(
+    async (nextRange: DashboardRange, initial: boolean) => {
+      if (initial) {
+        setLoading(true);
+      } else {
+        setRefreshing(true);
       }
-
-      const data = await response.json();
-      setStats(data.data);
-    } catch (err: any) {
-      showToast('Error', err.message || 'Failed to load dashboard data', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadDashboardStats();
-  }, []);
-
-  const StatCard = ({ title, value, subtitle, icon, color }: { title: string; value: string | number; subtitle?: string; icon: any; color: string }) => (
-    <div style={{
-      background: 'var(--cam-surface-1)',
-      border: '1px solid var(--cam-border-subtle)',
-      borderRadius: '12px',
-      padding: '24px',
-      display: 'flex',
-      alignItems: 'flex-start',
-      gap: '16px',
-    }}>
-      <div style={{
-        width: '48px',
-        height: '48px',
-        borderRadius: '10px',
-        background: color,
-        color: '#fff',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexShrink: 0,
-      }}>
-        <Icon name={icon} size={24} />
-      </div>
-      <div style={{ flex: 1 }}>
-        <div style={{ fontSize: '0.875rem', color: 'var(--cam-text-muted)', marginBottom: '4px' }}>{title}</div>
-        <div style={{ fontSize: '1.75rem', fontWeight: '700', color: 'var(--cam-text-primary)', marginBottom: '4px' }}>{value}</div>
-        {subtitle && <div style={{ fontSize: '0.75rem', color: 'var(--cam-text-muted)' }}>{subtitle}</div>}
-      </div>
-    </div>
+      setError(false);
+      try {
+        const response = await fetch(`/api/v1/admin/dashboard?range=${nextRange}`, { credentials: 'same-origin' });
+        if (!response.ok) throw new Error('Failed to load dashboard statistics');
+        const data = await response.json();
+        setStats(data.data);
+      } catch (err: any) {
+        setError(true);
+        if (!stats) showToast('Error', err.message || 'Failed to load dashboard data', 'error');
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [showToast, stats],
   );
 
-  if (loading) {
+  useEffect(() => {
+    void load(range, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const changeRange = (nextRange: DashboardRange) => {
+    if (nextRange === range) return;
+    setRange(nextRange);
+    void load(nextRange, false);
+  };
+
+  const renderStats = () => {
+    const s = stats;
     return (
-      <AdminLayout title={t('admin.dashboard.title')} subtitle={t('admin.dashboard.subtitle')}>
-        <div style={{ textAlign: 'center', padding: '60px 0' }}>
-          <div className="skeleton" style={{ width: '80px', height: '80px', margin: '0 auto 20px', borderRadius: '50%' }} />
-          <p>{t('admin.dashboard.loading')}</p>
-        </div>
-      </AdminLayout>
-    );
-  }
-
-  return (
-    <AdminLayout title={t('admin.dashboard.title')} subtitle={t('admin.dashboard.subtitle')}>
-      <div className="dashboard-header-bar" style={{ marginBottom: '32px' }}>
-          <div>
-            <div className="user-welcome-title">
-              <span>{t('admin.dashboard.heading')}</span>
-            </div>
-            <div className="dashboard-user-meta">
-              {t('admin.dashboard.subheading')}
-            </div>
-          </div>
-          <div className="dashboard-actions-cluster">
-            <button className="btn btn-sm btn-outline" onClick={() => window.location.href = '/'}>
-              <Icon name="arrowRight" size={14} /> {t('admin.dashboard.backToWebsite')}
-            </button>
-            <button className="btn btn-sm btn-primary" onClick={loadDashboardStats}>
-              <Icon name="reset" size={14} /> {t('admin.dashboard.refresh')}
-            </button>
-          </div>
-        </div>
-
-        {/* Stats Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', marginBottom: '32px' }}>
+      <>
+        <section className="kpi-grid" aria-label={t('admin.dashboard.title')}>
           <StatCard
             title={t('admin.dashboard.totalOrders')}
-            value={stats?.orders.total || 0}
-            subtitle={t('admin.dashboard.ordersSub', { pending: stats?.orders.pending || 0, production: stats?.orders.inProduction || 0 })}
-            icon="layers"
-            color="rgba(0, 102, 255, 0.2)"
+            value={s!.orders.total.toLocaleString()}
+            subtitle={t('admin.dashboard.ordersSub', { pending: s!.orders.pending, production: s!.orders.inProduction })}
+            icon="layers3"
+            tone="blue"
+            spark={s!.trends.orders}
           />
           <StatCard
             title={t('admin.dashboard.revenue')}
-            value={`${stats?.revenue.total.toLocaleString()} ${stats?.revenue.currency}`}
-            subtitle={t('admin.dashboard.revenueSub')}
-            icon="clipboard"
-            color="rgba(16, 185, 129, 0.2)"
+            value={`${s!.revenue.total.toLocaleString()} ${s!.revenue.currency}`}
+            subtitle={t('admin.dashboard.revenueSub', { count: s!.revenue.orderCount })}
+            icon="wallet"
+            tone="green"
+            spark={s!.trends.revenue}
           />
           <StatCard
             title={t('admin.dashboard.customers')}
-            value={stats?.users.total || 0}
+            value={s!.customers.total.toLocaleString()}
             subtitle={t('admin.dashboard.usersSub')}
-            icon="check"
-            color="rgba(245, 158, 11, 0.2)"
+            icon="users"
+            tone="amber"
+            spark={s!.trends.customers}
           />
           <StatCard
             title={t('admin.dashboard.quotes')}
-            value={stats?.quotes.total || 0}
-            subtitle={t('admin.dashboard.quotesSub')}
+            value={s!.quotes.active.toLocaleString()}
+            subtitle={t('admin.dashboard.quotesSub', { total: s!.quotes.total })}
             icon="file"
-            color="rgba(6, 182, 212, 0.2)"
+            tone="cyan"
+            spark={s!.trends.quotes}
           />
           <StatCard
             title={t('admin.dashboard.cadFiles')}
-            value={stats?.cadFiles.total || 0}
+            value={s!.cadFiles.total.toLocaleString()}
             subtitle={t('admin.dashboard.cadSub')}
             icon="cube"
-            color="rgba(139, 92, 246, 0.2)"
+            tone="purple"
+            spark={s!.trends.cadFiles}
           />
           <StatCard
             title={t('admin.dashboard.manufacturers')}
-            value={stats?.manufacturers.active || 0}
-            subtitle={t('admin.dashboard.manufacturersSub', { total: stats?.manufacturers.total || 0, pending: stats?.manufacturingRequests.pending || 0 })}
-            icon="technology"
-            color="rgba(236, 72, 153, 0.2)"
+            value={s!.manufacturers.total.toLocaleString()}
+            subtitle={t('admin.dashboard.manufacturersSub', {
+              total: s!.manufacturers.total,
+              pending: s!.manufacturingRequests.pending,
+            })}
+            icon="target"
+            tone="magenta"
+            spark={s!.trends.manufacturers}
           />
+        </section>
+
+        <div className="dashboard-lower">
+          <QuickActions role={currentUser?.role} onNavigate={setActiveView} />
+          <SystemStatus stats={s} />
         </div>
 
-        {/* Quick Actions */}
-        <div style={{ marginBottom: '32px' }}>
-          <h3 style={{ fontSize: '1.25rem', color: 'var(--cam-text-primary)', marginBottom: '16px' }}>{t('admin.dashboard.quickActions')}</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
-            <button
-              className="btn btn-outline"
-              onClick={() => setActiveView('admin-orders')}
-              style={{ justifyContent: 'flex-start', gap: '12px' }}
-            >
-              <Icon name="layers" size={16} /> {t('admin.dashboard.manageOrders')}
-            </button>
-            <button
-              className="btn btn-outline"
-              onClick={() => setActiveView('admin-manufacturers')}
-              style={{ justifyContent: 'flex-start', gap: '12px' }}
-            >
-              <Icon name="technology" size={16} /> {t('admin.dashboard.manageManufacturers')}
-            </button>
-            <button
-              className="btn btn-outline"
-              onClick={() => setActiveView('admin-pricing')}
-              style={{ justifyContent: 'flex-start', gap: '12px' }}
-            >
-              <Icon name="configure" size={16} /> {t('admin.dashboard.managePricing')}
-            </button>
-            <button
-              className="btn btn-outline"
-              onClick={() => setActiveView('admin-customers')}
-              style={{ justifyContent: 'flex-start', gap: '12px' }}
-            >
-              <Icon name="review" size={16} /> {t('admin.dashboard.manageCustomers')}
-            </button>
-            <button
-              className="btn btn-outline"
-              onClick={() => setActiveView('admin-materials')}
-              style={{ justifyContent: 'flex-start', gap: '12px' }}
-            >
-              <Icon name="cube" size={16} /> {t('admin.dashboard.manageMaterials')}
-            </button>
-            <button
-              className="btn btn-outline"
-              onClick={() => setActiveView('admin-users')}
-              style={{ justifyContent: 'flex-start', gap: '12px' }}
-            >
-              <Icon name="configure" size={16} /> {t('admin.dashboard.manageAdminUsers')}
-            </button>
+        <section className="analytics-grid">
+          <div className="widget">
+            <div className="widget-header">
+              <h2 className="widget-title">{t('admin.dashboard.orderOverview')}</h2>
+              <span className="widget-caption">{t('admin.dashboard.orderOverviewSub')}</span>
+              <div className="range-tabs" role="group" aria-label={t('admin.dashboard.orderOverview')}>
+                {RANGES.map((item) => (
+                  <button
+                    key={item.key}
+                    type="button"
+                    className={`range-tab ${item.key === range ? 'active' : ''}`}
+                    aria-pressed={item.key === range}
+                    onClick={() => changeRange(item.key)}
+                  >
+                    {t(item.labelKey)}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {refreshing ? (
+              <div className="chart-skeleton" aria-hidden="true" />
+            ) : (
+              <OrderChart data={s!.orderTimeline} emptyLabel={t('admin.dashboard.noOrderActivity')} />
+            )}
           </div>
-        </div>
 
-        {/* Recent Activity */}
-        <div className="dashboard-section-panel">
-          <div className="panel-header-row">
-            <div className="panel-title-group">
-              <h3 className="panel-title">{t('admin.dashboard.systemStatus')}</h3>
-            </div>
+          <RecentActivityList items={s!.activity} onViewAll={() => setActiveView('admin-audit-logs')} />
+        </section>
+      </>
+    );
+  };
+
+  const renderBody = () => {
+    if (loading) {
+      return (
+        <>
+          <KpiSkeleton />
+          <div className="dashboard-lower">
+            <div className="widget skeleton-block" />
+            <div className="widget skeleton-block" />
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px' }}>
-            <div style={{ padding: '16px', background: 'var(--cam-success-subtle)', borderRadius: '8px', border: '1px solid ' +
-              'rgba(16, 185, 129, 0.25)' }}>
-              <div style={{ fontSize: '0.875rem', color: 'var(--cam-success)', marginBottom: '8px', fontWeight: '600' }}>
-                <Icon name="check" size={14} /> {t('admin.dashboard.platformOperational')}
-              </div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--cam-text-muted)' }}>{t('admin.dashboard.platformOperationalSub')}</div>
-            </div>
-            <div style={{ padding: '16px', background: 'var(--cam-blue-subtle)', borderRadius: '8px', border: '1px solid ' +
-              'rgba(0, 102, 255, 0.25)' }}>
-              <div style={{ fontSize: '0.875rem', color: 'var(--cam-blue-primary)', marginBottom: '8px', fontWeight: '600' }}>
-                <Icon name="cpu" size={14} /> {t('admin.dashboard.manufacturingEngine')}
-              </div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--cam-text-muted)' }}>{t('admin.dashboard.activeManufacturers', { count: stats?.manufacturers.active || 0 })}</div>
-            </div>
-            <div style={{ padding: '16px', background: 'var(--cam-warning-subtle)', borderRadius: '8px', border: '1px solid ' +
-              'rgba(245, 158, 11, 0.25)' }}>
-              <div style={{ fontSize: '0.875rem', color: 'var(--cam-warning)', marginBottom: '8px', fontWeight: '600' }}>
-                <Icon name="alert" size={14} /> {t('admin.dashboard.pendingActions')}
-              </div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--cam-text-muted)' }}>{t('admin.dashboard.pendingRequests', { count: stats?.manufacturingRequests.pending || 0 })}</div>
-            </div>
-          </div>
+        </>
+      );
+    }
+    if (error && !stats) {
+      return (
+        <div className="error-state" role="alert">
+          <span className="error-state-icon" aria-hidden="true">
+            <Icon name="alert" size={20} />
+          </span>
+          <span className="error-state-title">{t('admin.dashboard.loadError')}</span>
+          <button type="button" className="cam-btn cam-btn-outline error-state-retry" onClick={() => void load(range, true)}>
+            {t('admin.dashboard.retry')}
+          </button>
         </div>
+      );
+    }
+    return stats ? renderStats() : null;
+  };
+
+  return (
+    <AdminLayout title={t('admin.dashboard.subtitle')} subtitle={t('admin.dashboard.title')}>
+      {renderBody()}
     </AdminLayout>
   );
 };

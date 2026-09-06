@@ -20,7 +20,7 @@ vi.mock('../src/middleware/auth.middleware', () => ({
 
 vi.mock('../src/config/database', () => ({
   getPrismaClient: () => ({
-    quote: { findUnique: vi.fn(async () => state.quote), update: vi.fn(async () => state.quote) },
+    quote: { findUnique: vi.fn(async () => state.quote), update: vi.fn(async () => state.quote), updateMany: vi.fn(async () => ({ count: 1 })) },
     user: { findUnique: vi.fn(async () => ({ address: null })) },
     cadFile: { findMany: state.cadFindMany, updateMany: vi.fn() },
     order: { create: state.orderCreate, update: vi.fn(async () => ({ id: 'order-1' })) },

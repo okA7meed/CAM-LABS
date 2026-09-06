@@ -144,6 +144,21 @@ describe('authentication foundation', () => {
     expect(invalid.body.error.code).toBe('INVALID_CREDENTIALS');
   });
 
+  it('lets admin accounts log in through the SAME single login endpoint and keeps their admin role', async () => {
+    state.user.role = 'ADMIN';
+    state.user.isAdmin = true;
+    state.user.accountStatus = 'ACTIVE';
+
+    const response = await request(createTestApp()).post('/api/v1/auth/login').send({ email: state.user.email, password: 'ValidPass1' });
+
+    expect(response.status).toBe(200);
+    expect(response.headers['set-cookie'][0]).toContain('HttpOnly');
+    expect(response.body.data.user.role).toBe('ADMIN');
+    expect(response.body.data.user.passwordHash).toBeUndefined();
+    expect(response.body.data.token).toBeUndefined();
+    expect(state.prisma.session.create).toHaveBeenCalled();
+  });
+
   it('verifies password hashes independently of plaintext values', async () => {
     const hash = await hashPassword('ValidPass1');
     expect(hash).not.toBe('ValidPass1');
@@ -177,23 +192,12 @@ describe('authentication foundation', () => {
     expect(state.prisma.session.deleteMany).not.toHaveBeenCalled();
   });
 
-  it('admin login issues HttpOnly cookie and never exposes the token in the body', async () => {
-    state.user.role = 'SUPER_ADMIN';
-    state.user.isAdmin = true;
-    state.user.accountStatus = 'ACTIVE';
-    state.user.passwordHash = await hashPassword('ValidAdminPass1!');
-
+  it('exposes exactly one login system: there is no separate admin login endpoint', async () => {
     const response = await request(createTestApp())
       .post('/api/v1/auth/admin/login')
       .send({ email: state.user.email, password: 'ValidAdminPass1!' });
 
-    expect(response.status).toBe(200);
-    expect(response.headers['set-cookie'][0]).toContain('HttpOnly');
-    expect(response.body.data.user.role).toBe('SUPER_ADMIN');
-    expect(response.body.data.user.passwordHash).toBeUndefined();
-    expect(response.body.data.token).toBeUndefined();
-    expect(response.body.data.expiresAt).toBeUndefined();
-    expect(JSON.stringify(response.body)).not.toContain('token');
+    expect(response.status).toBe(404);
   });
 
   it('centralizes role and ownership decisions', async () => {

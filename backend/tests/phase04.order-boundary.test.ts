@@ -15,6 +15,7 @@ vi.mock('../src/config/database', () => ({
     quote: {
       findUnique: vi.fn(async () => state.quote),
       update: vi.fn(async () => state.quote),
+      updateMany: vi.fn(async () => ({ count: 1 })),
     },
     user: {
       findUnique: vi.fn(async () => ({ address: state.profileAddress })),

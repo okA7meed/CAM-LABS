@@ -4,6 +4,7 @@ import { App } from './App';
 import { AuthProvider } from './context/AuthContext';
 import { StoreProvider } from './context/StoreContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { NotificationsProvider } from './context/NotificationsContext';
 import './i18n';
 
 // Import CSS Design System Cascade
@@ -16,13 +17,16 @@ import './styles/order-center.css';
 import './styles/marketplace.css';
 import './styles/manufacturing-request.css';
 import './styles/motion.css';
+import './styles/admin.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ThemeProvider>
       <AuthProvider>
         <StoreProvider>
-          <App />
+          <NotificationsProvider>
+            <App />
+          </NotificationsProvider>
         </StoreProvider>
       </AuthProvider>
     </ThemeProvider>
