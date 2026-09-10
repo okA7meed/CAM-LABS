@@ -40,6 +40,27 @@ describe('CAM LABS FDM engineering pricing engine', () => {
     expect(dense.pricingBreakdown!.machine.printTimeMinutes).toBeGreaterThan(standard.pricingBreakdown!.machine.printTimeMinutes);
   });
 
+  it('drives the price from an isolated custom integer infill at a fixed layer height', async () => {
+    const engine = new CAMLabsManufacturingEngine();
+    const at = (infillPercent: number) => engine.calculateQuote({
+      materialId: 'pla', technology: 'FDM', surfaceFinish: 'standard', toleranceGrade: 'standard', quantity: 1,
+      modelData, fileName: 'tetrahedron.stl', ...geometry,
+      manufacturingParameters: { infillPercent, layerHeightMm: 0.2, wallCount: 3 },
+    });
+
+    const sparse = await at(1);
+    const mid = await at(55);
+    const dense = await at(99);
+
+    expect(sparse.pricingBreakdown!.manufacturing.infillPercent).toBe(1);
+    expect(mid.pricingBreakdown!.manufacturing.infillPercent).toBe(55);
+    expect(dense.pricingBreakdown!.manufacturing.infillPercent).toBe(99);
+    expect(mid.pricingBreakdown!.material.materialVolumeCm3).toBeGreaterThan(sparse.pricingBreakdown!.material.materialVolumeCm3);
+    expect(dense.pricingBreakdown!.material.materialVolumeCm3).toBeGreaterThan(mid.pricingBreakdown!.material.materialVolumeCm3);
+    expect(mid.manufacturingTotalCost).toBeGreaterThan(sparse.manufacturingTotalCost);
+    expect(dense.manufacturingTotalCost).toBeGreaterThan(mid.manufacturingTotalCost);
+  });
+
   it('uses the geometry-derived estimate when slicer output is flat for tiny parts', async () => {
     const engine = new CAMLabsManufacturingEngine();
     const light = await engine.calculateQuote({

@@ -2,10 +2,10 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../context/AuthContext';
 import { useStore } from '../../context/StoreContext';
-import { useTheme, ThemePreference } from '../../context/ThemeContext';
 import { useNotifications } from '../../context/NotificationsContext';
 import { ADMIN_NAV_ITEMS } from '../../constants/adminNav';
 import { Icon } from '../ui/Icon';
+import { ThemeMenu } from '../shared/ThemeMenu';
 import { ViewType, AdminNotification } from '../../types';
 import { notificationIcon, notificationPriorityColor, notificationTypeLabel, openNotificationTarget } from '../../utils/notificationUi';
 import { formatRelativeTime } from '../../utils/relativeTime';
@@ -16,34 +16,22 @@ interface AdminHeaderProps {
   onToggleSidebar: () => void;
 }
 
-const SunIcon = () => (
-  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" /></svg>
-);
-const MoonIcon = () => (
-  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M20.4 14.8A8.5 8.5 0 0 1 9.2 3.6 8.5 8.5 0 1 0 20.4 14.8Z" /></svg>
-);
-
 const LANGUAGES = [
   { code: 'en', label: 'English' },
   { code: 'ar', label: 'العربية' },
 ];
 
-const THEME_OPTIONS: ThemePreference[] = ['light', 'dark', 'system'];
-
 export const AdminHeader: React.FC<AdminHeaderProps> = ({ title, subtitle, onToggleSidebar }) => {
   const { t, i18n } = useTranslation();
   const { logout } = useAuth();
   const { setActiveView, showToast, openAdminOrderDetail, openAdminQuoteDetail, openAdminCustomerDetail } = useStore();
-  const { preference, resolvedTheme, setPreference } = useTheme();
-  const { notifications, unread, loading, streamConnected, error, refresh, markRead, markAllRead } = useNotifications();
+  const { notifications, unread, loading, error, refresh, markRead, markAllRead } = useNotifications();
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
-  const [themeOpen, setThemeOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
   const langRef = useRef<HTMLDivElement>(null);
-  const themeRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
 
   const results = useMemo(() => {
@@ -90,24 +78,6 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({ title, subtitle, onTog
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, [langOpen]);
-
-  useEffect(() => {
-    if (!themeOpen) return undefined;
-    const handlePointerDown = (event: MouseEvent | TouchEvent) => {
-      if (!themeRef.current?.contains(event.target as Node)) setThemeOpen(false);
-    };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setThemeOpen(false);
-    };
-    document.addEventListener('mousedown', handlePointerDown);
-    document.addEventListener('touchstart', handlePointerDown);
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('mousedown', handlePointerDown);
-      document.removeEventListener('touchstart', handlePointerDown);
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [themeOpen]);
 
   useEffect(() => {
     if (!notifOpen) return undefined;
@@ -249,46 +219,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({ title, subtitle, onTog
           )}
         </div>
 
-        <div className="cam-theme" ref={themeRef}>
-          <button
-            type="button"
-            className="cam-icon-btn"
-            aria-label={t('theme.color')}
-            title={t('theme.color')}
-            aria-haspopup="listbox"
-            aria-expanded={themeOpen}
-            onClick={() => setThemeOpen((value) => !value)}
-          >
-            {preference === 'dark' ? <MoonIcon /> : preference === 'light' ? <SunIcon /> : resolvedTheme === 'light' ? <SunIcon /> : <MoonIcon />}
-          </button>
-          {themeOpen && (
-            <div className="cam-theme-pop" role="listbox" aria-label={t('theme.color')}>
-              {THEME_OPTIONS.map((option) => (
-                <button
-                  key={option}
-                  type="button"
-                  role="option"
-                  aria-selected={preference === option}
-                  className={`cam-theme-option ${preference === option ? 'active' : ''}`}
-                  onClick={() => {
-                    setPreference(option);
-                    setThemeOpen(false);
-                  }}
-                >
-                  <span className="cam-theme-ic">
-                    {option === 'light' ? <SunIcon /> : option === 'dark' ? <MoonIcon /> : resolvedTheme === 'light' ? <SunIcon /> : <MoonIcon />}
-                  </span>
-                  <span className="cam-theme-label">{t(`theme.${option}`)}</span>
-                  {preference === option && (
-                    <span className="cam-theme-check" aria-hidden="true">
-                      <Icon name="check" size={13} />
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        <ThemeMenu />
 
         <div className="cam-lang" ref={langRef}>
           <button
@@ -340,7 +271,6 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({ title, subtitle, onTog
             aria-expanded={notifOpen}
           >
             <Icon name="bell" size={17} />
-            <span className={`notif-live ${streamConnected ? 'on' : ''}`} aria-hidden="true" title={streamConnected ? t('admin.notifications.streamConnected') : t('admin.notifications.streamDisabled')} />
             {unread > 0 && <span className="notif-badge" aria-hidden="true">{unread > 99 ? '99+' : unread}</span>}
           </button>
           {notifOpen && (

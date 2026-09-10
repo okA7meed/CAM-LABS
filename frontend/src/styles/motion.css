@@ -296,7 +296,56 @@
 }
 
 /* --------------------------------------------------------------------------
-   8. Reduced Motion
+   8. Price Estimate Notice (amber warning with "!" icon)
+   Amber/orange-yellow per the design token --cam-warning. The pulse rhythm is:
+   exactly 5 normal-speed pulses → 5s pause → repeat forever. Only the small
+   warning icon animates (subtle scale + opacity + glow), so the text stays
+   fully readable. The 9s timeline places the 5 pulse peaks in its first 4s
+   and holds the remaining 5s quiet before restarting.
+   -------------------------------------------------------------------------- */
+.price-estimate-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  color: var(--cam-warning);
+  font: 500 0.72rem / 1.5 var(--font-sans);
+}
+
+.price-estimate-notice-icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  margin-top: 2px;
+  transform-origin: center;
+  animation: price-warning-pulse 9s ease-in-out infinite;
+}
+
+@keyframes price-warning-pulse {
+  0%,
+  8.9%,
+  17.8%,
+  26.7%,
+  35.6%,
+  44.4%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+    filter: none;
+  }
+
+  4.44%,
+  13.33%,
+  22.22%,
+  31.11%,
+  40% {
+    transform: scale(1.15);
+    opacity: 0.62;
+    filter: drop-shadow(0 0 5px rgba(245, 158, 11, 0.55));
+  }
+}
+
+/* --------------------------------------------------------------------------
+   9. Reduced Motion
    -------------------------------------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
   .cam-reveal,
@@ -306,7 +355,8 @@
 
   .price-transition-face,
   .price-transition.is-ready .price-transition-value,
-  .price-transition-pulse i {
+  .price-transition-pulse i,
+  .price-estimate-notice-icon {
     animation: none !important;
   }
 

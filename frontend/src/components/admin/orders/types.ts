@@ -10,6 +10,13 @@ export interface OrderManufacturer {
   companyName: string;
 }
 
+export interface OrderCadFileRef {
+  cadFile: {
+    id: string;
+    name: string;
+  };
+}
+
 export interface OrderRow {
   id: string;
   partName: string;
@@ -25,6 +32,7 @@ export interface OrderRow {
   date?: string | null;
   user?: OrderUser;
   manufacturer?: OrderManufacturer | null;
+  cadFiles?: OrderCadFileRef[];
 }
 
 export interface TrendDay {

@@ -135,7 +135,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav }) => {
   ];
 
   return (
-    <header className={`cam-header ${scrolled ? 'scrolled' : ''}`}>
+    <header className={`cam-header ${scrolled ? 'scrolled' : ''}${isInsideRequestFlow ? ' cam-header--compact' : ''}`}>
       <div className="container header-container">
         <a
           href="#home"

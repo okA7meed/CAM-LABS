@@ -15,9 +15,10 @@ import './styles/explorer.css';
 import './styles/dashboard.css';
 import './styles/order-center.css';
 import './styles/marketplace.css';
-import './styles/manufacturing-request.css';
+import './styles/cad-geometry-viewer.css';
 import './styles/motion.css';
 import './styles/admin.css';
+import './styles/pricing-engine.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

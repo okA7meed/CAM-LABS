@@ -28,6 +28,26 @@
   box-shadow: 0 5px 16px rgba(0, 0, 0, 0.12);
 }
 
+/* Compact header — used inside the manufacturing request flow workspace */
+.cam-header.cam-header--compact {
+  --header-height: 56px;
+  height: var(--header-height);
+}
+
+.cam-header.cam-header--compact .brand-wrapper {
+  transform: scale(0.88);
+  transform-origin: center left;
+}
+
+.cam-header.cam-header--compact .desktop-nav {
+  transform: scale(0.95);
+  transform-origin: center;
+}
+
+@media (max-width: 920px) {
+  .cam-header.cam-header--compact { height: 52px; }
+}
+
 .header-container {
   display: flex;
   align-items: center;

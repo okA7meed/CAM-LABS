@@ -26,6 +26,7 @@ export type IconName =
   | 'layers'
   | 'layers3'
   | 'loader'
+  | 'lock'
   | 'mapPin'
   | 'menu'
   | 'network'
@@ -69,6 +70,7 @@ const paths: Record<IconName, React.ReactNode> = {
   layers: <path d="m12 3 9 5-9 5-9-5 9-5Zm-9 9 9 5 9-5m-18 6 9 5 9-5" />,
   layers3: <path d="m12 4 8 4.5-8 4.5-8-4.5L12 4Zm-8 8.5 8 4.5 8-4.5M4 17l8 4.5 8-4.5" />,
   loader: <path d="M12 3v3m6.4-.4-2.1 2.1M21 12h-3m.4 6.4-2.1-2.1M12 21v-3m-6.4.4 2.1-2.1M3 12h3m-.4-6.4 2.1 2.1" />,
+  lock: <><rect x="4.5" y="10.5" width="15" height="9.5" rx="2" /><path d="M8 10.5V7a4 4 0 1 1 8 0v3.5" /></>,
   mapPin: <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 1 1 16 0Z M12 10a2 2 0 1 0 0-.01" />,
   review: <path d="M5 4h14v16H5V4Zm3 4h8M8 12h5m-5 4h3" />,
   search: <><circle cx="11" cy="11" r="7" /><path d="m20.5 20.5-4.2-4.2" /></>,

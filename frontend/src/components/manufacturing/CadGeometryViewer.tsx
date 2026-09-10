@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
@@ -108,7 +109,7 @@ export const CadGeometryViewer: React.FC<{ file: CadFile; onGeometry: (geometry:
     orientationRoot.updateMatrixWorld(true);
   };
 
-  const fitModel = () => {
+  const fitModel = useCallback(() => {
     const root = viewerRootRef.current; const camera = cameraRef.current; const controls = controlsRef.current;
     if (!root || !camera || !controls) return;
     root.position.set(0, 0, 0);
@@ -138,7 +139,7 @@ export const CadGeometryViewer: React.FC<{ file: CadFile; onGeometry: (geometry:
     controls.maxDistance = distance * 8;
     controls.minDistance = Math.min(radius / 50, distance / 12);
     controls.update();
-  };
+  }, [is2D]);
 
   useEffect(() => {
     let active = true; let timer: number | undefined; let viewerUrl: string | undefined;
@@ -230,27 +231,93 @@ export const CadGeometryViewer: React.FC<{ file: CadFile; onGeometry: (geometry:
     return () => window.removeEventListener('keydown', exitFullscreen);
   }, []);
 
+  const panelRef = useRef<HTMLElement | null>(null);
+  const panelHomeRef = useRef<Element | null>(null);
+
+  useLayoutEffect(() => {
+    const panel = panelRef.current;
+    if (!panel) return;
+    const host = document.getElementById('root') ?? document.body;
+    if (isFullscreen) {
+      if (!panelHomeRef.current) panelHomeRef.current = panel.parentElement;
+      host.appendChild(panel);
+      return () => { const home = panelHomeRef.current; if (home && !home.contains(panel)) home.appendChild(panel); };
+    }
+    const home = panelHomeRef.current;
+    if (home && !home.contains(panel)) home.appendChild(panel);
+    return undefined;
+  }, [isFullscreen]);
+
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const prevOverflow = document.body.style.overflow;
+    const prevBehavior = document.body.style.overscrollBehavior;
+    document.body.style.overflow = 'hidden';
+    document.body.style.overscrollBehavior = 'none';
+    return () => { document.body.style.overflow = prevOverflow; document.body.style.overscrollBehavior = prevBehavior; };
+  }, [isFullscreen]);
+
+  useEffect(() => {
+    if (thumbnail || state !== 'ready') return;
+    const frames: number[] = [];
+    for (let i = 0; i < 3; i += 1) frames.push(window.requestAnimationFrame(() => { fitModel(); }));
+    return () => { frames.forEach((id) => window.cancelAnimationFrame(id)); };
+  }, [isFullscreen, state, thumbnail, fitModel]);
+
   const retry = async () => { setState('processing'); setMessage(''); await ApiService.retryCadProcessing(file.id); };
 
   const value = (property: keyof NonNullable<CadGeometryData['metadata']>) => metadata?.[property] as number | undefined;
 
-  return <div className={`geometry-viewer-layout${isFullscreen ? ' is-fullscreen' : ''}${thumbnail ? ' is-thumbnail' : ''}`}>
-    {!thumbnail && <section className="geometry-properties-panel">
-      <div className="geometry-properties-heading"><h3><Icon name="configure" size={16} /> {t('geometry.modelProperties')}</h3><fieldset className="geometry-unit-selector"><legend>{t('geometry.unit')}</legend>{(['mm', 'cm', 'in', 'm'] as ModelUnit[]).map((option) => <button type="button" key={option} className={unit === option ? 'is-active' : ''} onClick={() => onSetupChange?.({ unit: option })}>{option}</button>)}</fieldset></div>
-      <div className="geometry-dimensions"><span>{t('geometry.boundingBox', { unit })}</span><div>{(['x', 'y', 'z'] as const).map((axis) => <label className="geometry-dimension" key={axis}><b>{axis.toUpperCase()}</b><input aria-label={`${axis.toUpperCase()} dimension in ${unit}`} type="number" min="0.000001" step="any" value={displayDimensions ? Number(displayDimensions[axis].toFixed(6)) : ''} onChange={(event) => { const next = Number(event.target.value); if (!Number.isFinite(next) || next <= 0 || !dimensions) return; const nextMm = convertLength(next, unit, 'mm'); const scaled = scaleDimensions(dimensions, axis, nextMm); const scale = dimensions[axis] ? scaled[axis] / dimensions[axis] : 1; onSetupChange?.({ dimensions: scaled, volume: baseVolume === null ? null : baseVolume * scale ** 3, surfaceArea: baseSurfaceArea === null ? null : baseSurfaceArea * scale ** 2 }); }} /></label>)}</div><p className="geometry-uniform-hint"><Icon name="configure" size={13} /> {t('geometry.uniformScaling')}</p></div>
-      <div className="geometry-metrics"><div className="geometry-metric geometry-volume"><span>{t('geometry.volume')}</span><strong>{displayVolume === null ? t('geometry.notAvailable') : formatModelValue(displayVolume, unit === 'm' ? 8 : unit === 'in' ? 5 : 2)}<small> {unit}³</small></strong></div><div className="geometry-metric geometry-area"><span>{t('geometry.surfaceArea')}</span><strong>{displaySurfaceArea === null ? t('geometry.notAvailable') : formatModelValue(displaySurfaceArea, unit === 'm' ? 8 : unit === 'in' ? 5 : 2)}<small> {unit}²</small></strong></div></div>
-      <div className="geometry-mesh-info"><span>{t('geometry.meshInformation')}</span><div><b>{t('geometry.triangleCount')}</b><strong>{(setup?.triangleCount ?? value('triangleCount')) === undefined || (setup?.triangleCount ?? value('triangleCount')) === null ? t('geometry.notAvailable') : formatModelValue(setup?.triangleCount ?? value('triangleCount'), 0)}</strong></div></div>
-    </section>}
-    <section className="geometry-viewer-section">
-      <h3><Icon name="cube" size={16} /> {t('geometry.viewer3d')}</h3>
-    <section className="geometry-canvas-panel" aria-label={is2D ? t('geometry.viewer2dLabel') : t('geometry.viewerLabel')}>
-      {state === 'ready' && documentUrl && geometry?.format === 'SVG' && <img className="geometry-document-canvas" src={documentUrl} alt={t('geometry.viewer2dLabel')} />}
-      {state === 'ready' && documentUrl && geometry?.format === 'PDF' && <iframe className="geometry-document-canvas" src={documentUrl} title={t('geometry.documentLabel')} />}
-      {state === 'ready' && !documentUrl && <><div ref={mountRef} className="geometry-canvas" /><div className="geometry-toolbar"><button title={t('geometry.resetView')} aria-label={t('geometry.resetView')} onClick={fitModel}><Icon name="reset" size={16} /></button><button title={t('geometry.fullscreen')} aria-label={t('geometry.fullscreen')} onClick={() => setIsFullscreen(true)}><Icon name="expand" size={16} /></button></div><div className="geometry-controls-hint">{t('geometry.rotateHint')} <span>{t('geometry.zoomHint')}</span><span>{t('geometry.panHint')}</span></div>{isFullscreen && <button className="geometry-fullscreen-close" title={t('geometry.exitFullscreen')} aria-label={t('geometry.exitFullscreen')} onClick={() => setIsFullscreen(false)}><Icon name="close" size={20} /></button>}</>}
-      {(state === 'loading' || state === 'processing') && <div className="geometry-state"><span className="geometry-spinner" /><strong>{t('geometry.processing')}</strong><p>{t('geometry.processingDescription')}</p></div>}
-      {state === 'unavailable' && <div className="geometry-state"><strong>{t('geometry.unavailable')}</strong><p>{t('geometry.unavailableDescription', { format: geometry?.format || file.format })}</p></div>}
-      {state === 'error' && <div className="geometry-state geometry-error"><strong>{t('geometry.error')}</strong><p>{message}</p><button className="btn btn-outline" onClick={() => void retry()}>{t('geometry.retry')}</button></div>}
-    </section>
-    </section>
+  const triangleCount = setup?.triangleCount ?? value('triangleCount');
+  const meshStats = [
+    { label: t('geometry.triangleCount'), value: triangleCount },
+    ...(value('vertexCount') != null ? [{ label: t('geometry.vertexCount'), value: value('vertexCount') }] : []),
+    ...(value('faceCount') != null ? [{ label: t('geometry.faceCount'), value: value('faceCount') }] : []),
+  ];
+
+  return <div className={`geometry-viewer-layout${thumbnail ? ' is-thumbnail' : ''}`}>
+    {!thumbnail && (
+      <header className="geometry-module-header">
+        <span className="geometry-module-header-icon" aria-hidden="true"><Icon name="cube" size={16} /></span>
+        <div className="geometry-module-header-text">
+          <h2 className="geometry-module-header-title">{t('geometry.viewer3d')}</h2>
+          <p className="geometry-module-header-subtitle">{t('geometry.viewerSubtitle')}</p>
+        </div>
+      </header>
+    )}
+    <div className="geometry-module-body">
+      {!thumbnail && (
+        <section className="geometry-properties-panel" aria-label={t('geometry.modelProperties')}>
+          <div className="geometry-properties-heading"><h3><Icon name="configure" size={15} /> {t('geometry.modelProperties')}</h3><div className="geometry-unit-selector" role="group" aria-label={t('geometry.unit')}><span className="geometry-unit-label">{t('geometry.unit')}</span>{(['mm', 'cm', 'in', 'm'] as ModelUnit[]).map((option) => <button type="button" key={option} className={unit === option ? 'is-active' : ''} onClick={() => onSetupChange?.({ unit: option })}>{option}</button>)}</div></div>
+          <section className="geometry-bounding-card">
+            <h4 className="geometry-section-label">{t('geometry.boundingBox', { unit })}</h4>
+            <div className="geometry-dimensions">{(['x', 'y', 'z'] as const).map((axis) => <label className="geometry-dimension" key={axis}><b>{axis.toUpperCase()}</b><input aria-label={`${axis.toUpperCase()} dimension in ${unit}`} type="number" min="0.000001" step="any" value={displayDimensions ? Math.round(displayDimensions[axis]) : ''} onChange={(event) => { const next = Number(event.target.value); if (!Number.isFinite(next) || next <= 0 || !dimensions) return; const nextMm = convertLength(next, unit, 'mm'); const scaled = scaleDimensions(dimensions, axis, nextMm); const scale = dimensions[axis] ? scaled[axis] / dimensions[axis] : 1; onSetupChange?.({ dimensions: scaled, volume: baseVolume === null ? null : baseVolume * scale ** 3, surfaceArea: baseSurfaceArea === null ? null : baseSurfaceArea * scale ** 2 }); }} /></label>)}</div>
+          </section>
+          <p className="geometry-uniform-hint"><Icon name="configure" size={13} /> {t('geometry.uniformScaling')}</p>
+          <div className="geometry-metrics"><div className="geometry-metric geometry-volume"><span>{t('geometry.volume')}</span><strong>{displayVolume === null ? t('geometry.notAvailable') : formatModelValue(displayVolume, unit === 'm' ? 8 : unit === 'in' ? 5 : 2)}<small> {unit}³</small></strong></div><div className="geometry-metric geometry-area"><span>{t('geometry.surfaceArea')}</span><strong>{displaySurfaceArea === null ? t('geometry.notAvailable') : formatModelValue(displaySurfaceArea, unit === 'm' ? 8 : unit === 'in' ? 5 : 2)}<small> {unit}²</small></strong></div></div>
+          <section className="geometry-mesh-info">
+            <h4 className="geometry-section-label">{t('geometry.meshInformation')}</h4>
+            <div className="geometry-mesh-stats">{meshStats.map((stat, index) => (
+              <Fragment key={stat.label}>
+                {index > 0 && <span className="geometry-mesh-sep" aria-hidden="true" />}
+                <span className="geometry-mesh-stat"><b>{stat.label}</b><strong>{stat.value === undefined || stat.value === null ? t('geometry.notAvailable') : formatModelValue(stat.value, 0)}</strong></span>
+              </Fragment>
+            ))}</div>
+          </section>
+        </section>
+      )}
+      <section className="geometry-viewer-section">
+        <section ref={panelRef} className={`geometry-canvas-panel${isFullscreen ? ' is-fullscreen' : ''}`} aria-label={is2D ? t('geometry.viewer2dLabel') : t('geometry.viewerLabel')}>
+          {state === 'ready' && documentUrl && geometry?.format === 'SVG' && <img className="geometry-document-canvas" src={documentUrl} alt={t('geometry.viewer2dLabel')} />}
+          {state === 'ready' && documentUrl && geometry?.format === 'PDF' && <iframe className="geometry-document-canvas" src={documentUrl} title={t('geometry.documentLabel')} />}
+          {state === 'ready' && !documentUrl && <><div ref={mountRef} className="geometry-canvas" /><div className="geometry-toolbar"><button title={t('geometry.resetView')} aria-label={t('geometry.resetView')} onClick={fitModel}><Icon name="reset" size={16} /></button><button title={isFullscreen ? t('geometry.exitFullscreen') : t('geometry.fullscreen')} aria-label={isFullscreen ? t('geometry.exitFullscreen') : t('geometry.fullscreen')} onClick={() => setIsFullscreen((v) => !v)}><Icon name="expand" size={16} /></button></div><div className="geometry-controls-hint">{t('geometry.rotateHint')} <span>{t('geometry.zoomHint')}</span><span>{t('geometry.panHint')}</span></div></>}
+          {state === 'ready' && isFullscreen && <button className="geometry-fullscreen-close" title={t('geometry.exitFullscreen')} aria-label={t('geometry.exitFullscreen')} onClick={() => setIsFullscreen(false)}><Icon name="close" size={20} /></button>}
+          {isFullscreen && !thumbnail && createPortal(<div className="geometry-fullscreen-overlay" aria-hidden="true" onClick={() => setIsFullscreen(false)} />, document.getElementById('root') ?? document.body)}
+          {(state === 'loading' || state === 'processing') && <div className="geometry-state"><span className="geometry-spinner" /><strong>{t('geometry.processing')}</strong><p>{t('geometry.processingDescription')}</p></div>}
+          {state === 'unavailable' && <div className="geometry-state"><strong>{t('geometry.unavailable')}</strong><p>{t('geometry.unavailableDescription', { format: geometry?.format || file.format })}</p></div>}
+          {state === 'error' && <div className="geometry-state geometry-error"><strong>{t('geometry.error')}</strong><p>{message}</p><button className="btn btn-outline" onClick={() => void retry()}>{t('geometry.retry')}</button></div>}
+        </section>
+      </section>
+    </div>
   </div>;
 };

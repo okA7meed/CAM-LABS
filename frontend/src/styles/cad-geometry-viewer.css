@@ -1,0 +1,411 @@
+@keyframes geometry-spin { to { transform: rotate(360deg); } }
+
+/* ── Outer module ─────────────────────────────────────────────────────────── *
+ * The 3D Model Viewer is one self-contained module: a full-width header on
+ * top, and a two-panel inspection body (Model Properties | 3D Viewport)
+ * below it. */
+
+.geometry-viewer-layout {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.geometry-module-header {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 16px;
+  border: 1px solid var(--cam-border-medium);
+  border-radius: var(--radius-sm);
+  background: var(--cam-surface-1);
+}
+
+.geometry-module-header-icon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--cam-blue-subtle);
+  color: var(--cam-cyan-tech);
+}
+
+.geometry-module-header-text { min-width: 0; }
+.geometry-module-header-title { margin: 0; color: var(--cam-text-primary); font-size: .95rem; font-weight: 700; }
+.geometry-module-header-subtitle { margin: 2px 0 0; color: var(--cam-text-muted); font-size: .7rem; }
+
+.geometry-module-body {
+  display: grid;
+  grid-template-columns: minmax(0, 320px) minmax(0, 1fr);
+  gap: var(--space-4);
+  min-width: 0;
+  min-height: 0;
+}
+
+/* ── The two panels ───────────────────────────────────────────────────────── */
+
+.geometry-properties-panel,
+.geometry-viewer-section { display: grid; gap: var(--space-3); min-width: 0; min-height: 0; }
+
+.geometry-properties-panel { align-content: start; }
+.geometry-viewer-section { }
+
+/* ── Model Properties ─────────────────────────────────────────────────────── */
+
+.geometry-properties-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+.geometry-properties-heading h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--cam-text-primary);
+  font-size: .95rem;
+}
+.geometry-properties-heading h3 svg { color: var(--cam-cyan-tech); }
+
+.geometry-unit-selector {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.geometry-unit-label { margin-inline-end: 2px; color: var(--cam-text-muted); font-size: .7rem; white-space: nowrap; }
+.geometry-unit-selector button {
+  min-width: 34px;
+  min-height: 28px;
+  padding: 4px 7px;
+  border: 1px solid var(--cam-border-medium);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--cam-text-muted);
+  cursor: pointer;
+  font: 700 .7rem var(--font-mono);
+}
+.geometry-unit-selector button.is-active,
+.geometry-unit-selector button:hover {
+  border-color: var(--cam-blue-primary);
+  background: var(--cam-blue-subtle);
+  color: var(--cam-blue-hover);
+}
+
+/* Bounding Box card */
+
+.geometry-bounding-card,
+.geometry-mesh-info {
+  display: grid;
+  gap: 8px;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--cam-border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--cam-surface-2);
+}
+
+.geometry-section-label {
+  margin: 0;
+  color: var(--cam-text-muted);
+  font: 600 .7rem var(--font-mono);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.geometry-dimensions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+.geometry-dimension { display: grid; gap: 3px; min-width: 0; }
+.geometry-dimension b { color: var(--cam-text-muted); font: 600 .66rem var(--font-mono); letter-spacing: .05em; }
+.geometry-dimension input {
+  width: 100%;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--cam-border-subtle);
+  border-radius: 6px;
+  background: var(--cam-surface-1);
+  color: var(--cam-text-primary);
+  font: 700 .92rem var(--font-mono);
+}
+.geometry-dimension input:focus-visible { border-color: var(--cam-blue-primary); outline: none; }
+
+.geometry-uniform-hint {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--cam-cyan-tech);
+  font-size: .7rem;
+}
+.geometry-uniform-hint svg { flex: none; }
+
+/* Volume | Surface Area */
+
+.geometry-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+.geometry-metric {
+  display: grid;
+  gap: 5px;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--cam-border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--cam-surface-2);
+}
+.geometry-metric > span {
+  color: var(--cam-text-muted);
+  font: 600 .7rem var(--font-mono);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.geometry-metric strong { color: var(--cam-blue-hover); font: 700 1.15rem var(--font-mono); }
+.geometry-metric small { color: var(--cam-text-muted); font-size: .7rem; font-weight: 600; }
+
+.geometry-area { border-color: color-mix(in srgb, #9d76ff 38%, var(--cam-border-subtle)); }
+.geometry-area strong { color: #b197fc; }
+
+/* Mesh Information */
+
+.geometry-mesh-stats {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+}
+.geometry-mesh-stat {
+  display: grid;
+  flex: 1;
+  gap: 3px;
+  min-width: 0;
+  padding-inline: var(--space-3);
+}
+.geometry-mesh-stat:first-child { padding-inline-start: 0; }
+.geometry-mesh-stat:last-child { padding-inline-end: 0; }
+.geometry-mesh-sep { flex: none; width: 1px; margin: 2px 0; background: var(--cam-border-subtle); }
+.geometry-mesh-stat b {
+  color: var(--cam-text-muted);
+  font: 600 .62rem var(--font-mono);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.geometry-mesh-stat strong {
+  overflow: hidden;
+  color: var(--cam-text-primary);
+  font: 700 .95rem var(--font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── 3D Viewport panel ────────────────────────────────────────────────────── */
+
+.geometry-canvas-panel {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 460px;
+  overflow: hidden;
+  border: 1px solid var(--cam-border-medium);
+  border-radius: var(--radius-sm);
+  background: var(--cam-bg);
+}
+
+.geometry-canvas {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  cursor: grab;
+  touch-action: none;
+}
+
+.geometry-canvas:active { cursor: grabbing; }
+.geometry-canvas canvas { display: block; max-width: 100%; }
+
+.geometry-document-canvas {
+  width: 100%;
+  height: 100%;
+  min-height: 430px;
+  display: block;
+  border: 0;
+  background: #fff;
+  object-fit: contain;
+}
+
+.geometry-toolbar {
+  position: absolute;
+  z-index: 2;
+  top: auto;
+  bottom: var(--space-3);
+  left: var(--space-3);
+  display: flex;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.geometry-toolbar button {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 1px solid var(--cam-border-medium);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--cam-surface-1) 92%, transparent);
+  color: var(--cam-text-secondary);
+  cursor: pointer;
+  font: 700 1rem var(--font-mono);
+}
+
+.geometry-toolbar button.is-active { outline: none; background: var(--cam-blue-subtle); color: var(--cam-blue-hover); }
+.geometry-toolbar button:hover,
+.geometry-toolbar button:focus-visible,
+.geometry-fullscreen-close:hover,
+.geometry-fullscreen-close:focus-visible { outline: none; background: var(--cam-surface-hover); color: var(--cam-text-primary); }
+
+.geometry-state {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--space-3);
+  padding: var(--space-8);
+  text-align: center;
+}
+
+.geometry-state p { max-width: 400px; color: var(--cam-text-muted); }
+.geometry-error strong { color: var(--cam-danger); }
+
+.geometry-spinner {
+  width: 34px;
+  height: 34px;
+  border: 3px solid var(--cam-border-medium);
+  border-top-color: var(--cam-blue-primary);
+  border-radius: 50%;
+  animation: geometry-spin .8s linear infinite;
+}
+
+.geometry-controls-hint {
+  position: absolute;
+  right: var(--space-4);
+  bottom: var(--space-4);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 12px;
+  color: var(--cam-text-faint);
+  font-size: .68rem;
+  pointer-events: none;
+}
+
+.geometry-fullscreen-close {
+  position: absolute;
+  z-index: 3;
+  top: var(--space-4);
+  right: var(--space-4);
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 1px solid var(--cam-border-medium);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--cam-surface-1) 92%, transparent);
+  color: var(--cam-text-secondary);
+  cursor: pointer;
+}
+
+/* ── Fullscreen MODEL view ─────────────────────────────────────────────────── *
+ * Clicking fullscreen ONLY enlarges the 3D model viewport. The Model
+ * Properties panel, the viewer card and the rest of the page stay in place
+ * behind a dark, blurred overlay. The component re-hosts the live canvas panel
+ * in the app root container, where `position: fixed` escapes every containing
+ * block (in particular the workspace .mw-panel backdrop-filter), producing a
+ * large, focused model viewing area without recreating the renderer. */
+
+.geometry-fullscreen-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1060;
+  overflow: hidden;
+  overscroll-behavior: contain;
+  background: rgba(2, 7, 13, 0.55);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  animation: geometry-fs-backdrop 0.22s ease-out;
+}
+
+@keyframes geometry-fs-backdrop {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.geometry-canvas-panel.is-fullscreen {
+  position: fixed;
+  z-index: 1061;
+  inset: max(10px, 3vh) max(10px, 3vw);
+  width: auto;
+  height: auto;
+  min-width: 0;
+  min-height: 0;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+  animation: geometry-fs-panel 0.26s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+@keyframes geometry-fs-panel {
+  from { opacity: 0.15; transform: scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ── Thumbnail (order cards) ──────────────────────────────────────────────── */
+
+.geometry-viewer-layout.is-thumbnail { display: block; width: 100%; height: 100%; }
+.geometry-viewer-layout.is-thumbnail .geometry-module-body,
+.geometry-viewer-layout.is-thumbnail .geometry-viewer-section,
+.geometry-viewer-layout.is-thumbnail .geometry-canvas-panel,
+.geometry-viewer-layout.is-thumbnail .geometry-canvas {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  border: 0;
+}
+.geometry-viewer-layout.is-thumbnail .geometry-module-header,
+.geometry-viewer-layout.is-thumbnail .geometry-toolbar,
+.geometry-viewer-layout.is-thumbnail .geometry-controls-hint,
+.geometry-viewer-layout.is-thumbnail .geometry-state p,
+.geometry-viewer-layout.is-thumbnail .geometry-state strong { display: none; }
+.geometry-viewer-layout.is-thumbnail .geometry-state { padding: 0; }
+.geometry-viewer-layout.is-thumbnail .geometry-spinner { width: 14px; height: 14px; border-width: 2px; }
+
+/* ── Responsive (non-workspace contexts) ──────────────────────────────────── */
+
+@media (max-width: 1024px) {
+  .geometry-module-body { grid-template-columns: minmax(0, 1fr); }
+  .geometry-canvas-panel { min-height: 390px; }
+}
+
+@media (max-width: 640px) {
+  .geometry-module-body { grid-template-columns: minmax(0, 1fr); gap: var(--space-4); min-width: 0; }
+  .geometry-dimensions, .geometry-metrics { grid-template-columns: 1fr; }
+  .geometry-canvas-panel { min-height: min(62vh, 430px); }
+  .geometry-toolbar button,
+  .geometry-fullscreen-close { width: 44px; height: 44px; min-width: 44px; }
+  .geometry-unit-selector button { min-height: 44px; }
+  .geometry-controls-hint {
+    right: var(--space-3);
+    left: var(--space-3);
+    bottom: 56px;
+    justify-content: center;
+    text-align: center;
+  }
+  .geometry-fullscreen-overlay { background: rgba(2, 7, 13, 0.6); }
+  .geometry-canvas-panel.is-fullscreen { inset: 6px; }
+  .geometry-canvas-panel { min-height: 300px; }
+  .geometry-controls-hint { font-size: .62rem; }
+}
+
+@media (max-width: 560px) {
+  .geometry-properties-heading { align-items: flex-start; flex-direction: column; }
+}

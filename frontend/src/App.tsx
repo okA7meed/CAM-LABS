@@ -23,7 +23,7 @@ import { ForgotPasswordModal } from './components/auth/ForgotPasswordModal';
 import { OrderCenter } from './components/orders/OrderCenter';
 import { ProfileView } from './components/profile/ProfileView';
 import { MarketplaceView } from './components/marketplace/MarketplaceView';
-import { ManufacturingRequestView } from './components/manufacturing/ManufacturingRequestView';
+import { ManufacturingRequestView } from './components/manufacturing/ManufacturingWorkspaceView';
 import { ComingSoonView } from './components/coming-soon/ComingSoonView';
 import { EquationBuilderView } from './components/admin/EquationBuilderView';
 import { NotFoundView } from './components/common/NotFoundView';
@@ -136,8 +136,12 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('keydown', handleEscape);
   }, [closeAuthModal, closeComparisonModal, closeForgotPassword, closeOrderTimeline, closePersonaModal]);
 
+  useEffect(() => {
+    document.body.style.overflow = activeView === 'manufacturing-request' ? 'hidden' : '';
+  }, [activeView]);
+
   return (
-    <div className={`${isAdminView ? '' : 'tech-grid-bg'} page-enter`} style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div className={`${isAdminView ? '' : 'tech-grid-bg'} page-enter${activeView === 'manufacturing-request' ? ' app-viewport' : ''}`} style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       {!isAdminView && <Header onToggleMobileNav={() => setMobileNavOpen(!mobileNavOpen)} />}
       {!isAdminView && <MobileNav isOpen={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />}
 
@@ -187,7 +191,7 @@ export const App: React.FC = () => {
         </main>
       )}
 
-      {!isLoading && !isAdminView && <Footer />}
+      {!isLoading && !isAdminView && activeView !== 'manufacturing-request' && <Footer />}
 
       {/* Interactive Global Overlays & Modals */}
       <AuthModal />

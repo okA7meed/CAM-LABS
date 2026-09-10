@@ -3001,44 +3001,8 @@
    Admin notifications — real-time
    -------------------------------------------------------------------------- */
 
-.cam-theme, .cam-notif { position: relative; }
+.cam-notif { position: relative; }
 
-.cam-theme-pop {
-  position: absolute;
-  top: calc(100% + 8px);
-  inset-inline-end: 0;
-  width: 172px;
-  background: var(--admin-surface);
-  border: 1px solid var(--admin-border);
-  border-radius: 12px;
-  box-shadow: 0 18px 44px rgba(2, 6, 18, 0.55);
-  z-index: 70;
-  padding: 6px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-[data-theme='light'] .cam-theme-pop { box-shadow: 0 18px 44px rgba(15, 23, 42, 0.14); }
-
-.cam-theme-option {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  width: 100%;
-  padding: 7px 9px;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--admin-text-secondary);
-  font-size: 12.5px;
-  cursor: pointer;
-  text-align: start;
-}
-
-.cam-theme-option:hover { background: var(--admin-blue-soft); color: var(--admin-text); }
-.cam-theme-option.active { color: var(--admin-text); }
-.cam-theme-option:focus-visible,
 .cam-notif-item:focus-visible,
 .cam-notif-viewall:focus-visible,
 .cam-notif-markall:focus-visible,
@@ -3046,40 +3010,6 @@
   outline: 2px solid var(--admin-blue);
   outline-offset: 1px;
 }
-
-.cam-theme-ic {
-  width: 30px;
-  height: 22px;
-  border-radius: 6px;
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  background: var(--admin-hover);
-  color: var(--admin-text-muted);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  border: 1px solid var(--admin-border-soft);
-}
-.cam-theme-ic svg { width: 13px; height: 13px; }
-
-.cam-theme-label { flex: 1; min-width: 0; }
-.cam-theme-check { color: var(--admin-blue); display: grid; place-items: center; flex-shrink: 0; }
-
-/* Live indicator dot on the bell button */
-.notif-live {
-  position: absolute;
-  inset-inline-end: 1px;
-  bottom: 2px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--admin-hover);
-  border: 2px solid var(--admin-surface);
-  box-sizing: content-box;
-  transition: background var(--transition-fast);
-}
-.notif-live.on { background: #10b981; }
 
 .cam-notif-pop {
   position: absolute;
@@ -3364,7 +3294,6 @@
 
 @media (max-width: 860px) {
   .cam-notif-pop { width: min(360px, calc(100vw - 24px)); }
-  .cam-theme-pop { width: min(180px, calc(100vw - 24px)); }
   .admin-notif-toolbar { align-items: stretch; }
   .admin-filter-tabs { flex-wrap: wrap; }
 }

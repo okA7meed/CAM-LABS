@@ -1,19 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import i18n from '../../i18n';
-import { ThemePreference, useTheme } from '../../context/ThemeContext';
+import { ThemeMenu } from '../shared/ThemeMenu';
 
 type MenuId = 'theme' | 'language';
 
-const SunIcon = () => (
-  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" /></svg>
-);
-const MoonIcon = () => (
-  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M20.4 14.8A8.5 8.5 0 0 1 9.2 3.6 8.5 8.5 0 1 0 20.4 14.8Z" /></svg>
-);
-const SystemIcon = () => (
-  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="4" width="18" height="13" rx="2" /><path d="M8 21h8M12 17v4" /></svg>
-);
 const TranslateIcon = () => (
   <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 5h11M9 3v2M11.5 5c-.5 5-3.6 9-8 11M6 9c1.2 3 3.8 5.3 7 6.4" /><path d="M13 21l4.2-10 4.2 10M14.7 17.4h5" /></svg>
 );
@@ -23,17 +14,14 @@ const CheckIcon = () => (
 
 export const HeaderPreferences: React.FC = () => {
   const { t } = useTranslation();
-  const { preference, resolvedTheme, setPreference } = useTheme();
   const [openMenu, setOpenMenu] = useState<MenuId | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
-  const themeButtonRef = useRef<HTMLButtonElement>(null);
   const languageButtonRef = useRef<HTMLButtonElement>(null);
 
   const locale = i18n.language.startsWith('ar') ? 'ar' : 'en';
 
   const closeMenu = useCallback((refocus?: MenuId) => {
     setOpenMenu(null);
-    if (refocus === 'theme') themeButtonRef.current?.focus();
     if (refocus === 'language') languageButtonRef.current?.focus();
   }, []);
 
@@ -89,12 +77,6 @@ export const HeaderPreferences: React.FC = () => {
     }
   };
 
-  const themeOptions: Array<{ value: ThemePreference; label: string; icon: React.ReactNode }> = [
-    { value: 'light', label: t('theme.light'), icon: <SunIcon /> },
-    { value: 'dark', label: t('theme.dark'), icon: <MoonIcon /> },
-    { value: 'system', label: t('theme.system'), icon: <SystemIcon /> },
-  ];
-
   const languageOptions: Array<{ value: 'en' | 'ar'; label: string; flag: string }> = [
     { value: 'en', label: 'English', flag: '🇺🇸' },
     { value: 'ar', label: 'العربية', flag: '🇸🇦' },
@@ -102,49 +84,10 @@ export const HeaderPreferences: React.FC = () => {
 
   return (
     <div className="nav-preferences" ref={rootRef}>
-      <div className="nav-menu-wrapper">
-        <button
-          type="button"
-          ref={themeButtonRef}
-          className={`nav-icon-button ${openMenu === 'theme' ? 'open' : ''}`}
-          onClick={() => toggleMenu('theme')}
-          onKeyDown={(event) => handleTriggerKeyDown(event, 'theme')}
-          aria-haspopup="menu"
-          aria-expanded={openMenu === 'theme'}
-          aria-controls="nav-menu-theme"
-          aria-label={t('theme.color')}
-          title={t('theme.color')}
-        >
-          {resolvedTheme === 'light' ? <SunIcon /> : <MoonIcon />}
-        </button>
-        {openMenu === 'theme' && (
-          <div
-            id="nav-menu-theme"
-            className="nav-menu"
-            role="menu"
-            aria-label={t('theme.color')}
-            onKeyDown={handleMenuKeyDown}
-          >
-            {themeOptions.map(({ value, label, icon }) => (
-              <button
-                key={value}
-                type="button"
-                role="menuitemradio"
-                aria-checked={preference === value}
-                className={`nav-menu-item ${preference === value ? 'selected' : ''}`}
-                onClick={() => {
-                  setPreference(value);
-                  closeMenu('theme');
-                }}
-              >
-                <span className="nav-menu-icon">{icon}</span>
-                <span className="nav-menu-label">{label}</span>
-                {preference === value && <CheckIcon />}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+      <ThemeMenu
+        open={openMenu === 'theme'}
+        onOpenChange={(next) => setOpenMenu(next ? 'theme' : null)}
+      />
 
       <div className="nav-menu-wrapper">
         <button
