@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import i18n from '../../i18n';
 import { Icon, IconName } from '../ui/Icon';
 import { CadGeometryViewer } from '../manufacturing/CadGeometryViewer';
+import { AnimatedModal } from '../ui/AnimatedModal';
 
 // Canonical CAM LABS order lifecycle — the backend is the source of truth for
 // the valid statuses (ORDER_LIFECYCLE_STATUSES in the admin API). This only
@@ -392,28 +393,24 @@ export const OrderCenter: React.FC = () => {
       </div>
 
       {/* Detail modal */}
-      {detailOrderId && (
-        <div className="modal-overlay active" role="dialog" aria-modal="true" aria-label={t('orderCenter.detailTitle')}>
-          <div className="modal-card modal-lg">
-            <div className="modal-header">
-              <div className="modal-title">{t('orderCenter.detailTitle')}</div>
-              <button className="modal-close" onClick={closeDetail} aria-label={t('common.close')}>
-                <Icon name="close" size={20} />
-              </button>
-            </div>
-            <div className="modal-body">
-              {detailLoading && <div className="oc-state"><strong className="oc-state__title">{t('orderCenter.loading')}</strong></div>}
-              {detailError && (
-                <div className="oc-state is-error" role="alert">
-                  <strong className="oc-state__title">{t('orderCenter.errorTitle')}</strong>
-                  <button className="btn btn-sm btn-outline" onClick={() => void openDetail(detailOrderId)}>{t('orderCenter.retry')}</button>
-                </div>
-              )}
-              {!detailLoading && !detailError && detail && <OrderDetail order={detail} t={t} />}
-            </div>
-          </div>
+      <AnimatedModal open={!!detailOrderId} cardClassName="modal-lg" role="dialog" ariaLabel={t('orderCenter.detailTitle')}>
+        <div className="modal-header">
+          <div className="modal-title">{t('orderCenter.detailTitle')}</div>
+          <button className="modal-close" onClick={closeDetail} aria-label={t('common.close')}>
+            <Icon name="close" size={20} />
+          </button>
         </div>
-      )}
+        <div className="modal-body">
+          {detailLoading && <div className="oc-state"><strong className="oc-state__title">{t('orderCenter.loading')}</strong></div>}
+          {detailError && (
+            <div className="oc-state is-error" role="alert">
+              <strong className="oc-state__title">{t('orderCenter.errorTitle')}</strong>
+              <button className="btn btn-sm btn-outline" onClick={() => detailOrderId && void openDetail(detailOrderId)}>{t('orderCenter.retry')}</button>
+            </div>
+          )}
+          {!detailLoading && !detailError && detail && <OrderDetail order={detail} t={t} />}
+        </div>
+      </AnimatedModal>
     </main>
   );
 };

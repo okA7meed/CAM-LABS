@@ -1,5 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { MotionConfig } from 'motion/react';
 import { App } from './App';
 import { AuthProvider } from './context/AuthContext';
 import { StoreProvider } from './context/StoreContext';
@@ -22,14 +23,16 @@ import './styles/pricing-engine.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <ThemeProvider>
-      <AuthProvider>
-        <StoreProvider>
-          <NotificationsProvider>
-            <App />
-          </NotificationsProvider>
-        </StoreProvider>
-      </AuthProvider>
-    </ThemeProvider>
+    <MotionConfig reducedMotion="user">
+      <ThemeProvider>
+        <AuthProvider>
+          <StoreProvider>
+            <NotificationsProvider>
+              <App />
+            </NotificationsProvider>
+          </StoreProvider>
+        </AuthProvider>
+      </ThemeProvider>
+    </MotionConfig>
   </React.StrictMode>
 );

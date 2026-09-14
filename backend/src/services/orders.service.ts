@@ -6,11 +6,29 @@ import { Order, Prisma } from '@prisma/client';
 import { ManufacturingDispatchResult } from '../providers/manufacturing/IManufacturingProvider';
 import { AppError } from '../utils/errors';
 import { randomInt } from 'crypto';
+import { TechnicalDocumentsService } from './technicalDocuments.service';
 
 interface CreateOrderInternalOptions {
   /** Server-issued order id reserved atomically against the source quote. */
   reservedOrderId?: string;
 }
+
+/** Surcharge applied by the server when priority shipping is requested. */
+export const PRIORITY_SHIPPING_FEE_EGP = 100;
+
+const EGP_FORMAT_REGEX = /-?\d[\d,]*\.?\d*/;
+
+/** Parses a formatted EGP string like "1,480.00 EGP" into its numeric value. */
+const parseEgp = (formatted: string): number => {
+  const match = String(formatted).match(EGP_FORMAT_REGEX);
+  if (!match) return 0;
+  const value = parseFloat(match[0].replace(/,/g, ''));
+  return Number.isFinite(value) ? value : 0;
+};
+
+/** Formats a numeric EGP amount exactly like the pricing engine backend. */
+const formatEgp = (amount: number): string =>
+  `${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} EGP`;
 
 /**
  * Orders Service
@@ -64,14 +82,14 @@ export class OrdersService {
    * Create and dispatch a new manufacturing order
    */
   static async createOrder(
-    orderData: Partial<Order> & { surfaceFinish?: string; cadFileIds?: string[]; cadFileConfigs?: Array<{ cadFileId: string; configuration?: Record<string, unknown>; totalCost?: string }>; guestCadId?: string },
+    orderData: Partial<Order> & { surfaceFinish?: string; cadFileIds?: string[]; cadFileConfigs?: Array<{ cadFileId: string; configuration?: Record<string, unknown>; totalCost?: string }>; guestCadId?: string; technicalNotes?: string; technicalDocumentIds?: string[]; priorityShipping?: boolean },
     internal: CreateOrderInternalOptions = {}
   ): Promise<Order> {
     const prisma = getPrismaClient();
 
     // NEW (Phase 04): Validate quote is not expired
     if (!orderData.quoteId) throw new AppError('A valid quote is required before an order can be submitted.', 400, 'QUOTE_REQUIRED');
-    const quote = await prisma.quote.findUnique({ where: { id: orderData.quoteId } });
+    const quote = await prisma.quote.findUnique({ where: { id: orderData.quoteId }, include: { technicalDocuments: true } });
     if (!quote || quote.userId !== orderData.userId) throw new AppError('Quote is invalid or does not belong to this customer.', 403, 'QUOTE_NOT_OWNED');
     if (quote.convertedOrderId && quote.convertedOrderId !== internal.reservedOrderId) {
       throw new AppError('This quote has already been converted to an order.', 409, 'QUOTE_ALREADY_CONVERTED');
@@ -82,6 +100,16 @@ export class OrdersService {
     if (quote.technology !== (orderData.technology || '') || quote.material !== (orderData.material || '') || quote.quantity !== (orderData.quantity || 1)) {
       throw new AppError('The submitted manufacturing configuration does not match the quoted configuration.', 400, 'CONFIG_MISMATCH');
     }
+
+    // Priority shipping is a server-side, derived surcharge. The quoted base
+    // price is never mutated — the fee is added only when the customer opted
+    // in, and only the server decides it (clients never supply an amount).
+    const shippingFee = orderData.priorityShipping ? PRIORITY_SHIPPING_FEE_EGP : 0;
+    const shippingCost = shippingFee > 0 ? formatEgp(shippingFee) : null;
+    const shippingMethod = orderData.priorityShipping ? 'Priority Express Courier' : 'Express Courier';
+    // When shipping is off the stored total is the quote verbatim (no drift);
+    // when enabled it is base + the fixed server fee.
+    const orderTotalCost = shippingFee > 0 ? formatEgp(parseEgp(quote.totalPrice) + shippingFee) : quote.totalPrice;
 
     const cadFileIds = [...new Set(orderData.cadFileIds || [])];
     const quotedCadFileIds = Array.isArray(quote.cadFileIds) ? quote.cadFileIds.map(String).sort() : [];
@@ -111,6 +139,20 @@ export class OrdersService {
       if (hasUnreadyFile) throw new AppError('All CAD files must complete valid engineering analysis before an order can be submitted.', 400, 'CAD_NOT_READY');
       if (orderData.guestCadId) await prisma.cadFile.updateMany({ where: { id: { in: cadFileIds }, userId: null, guestId: orderData.guestCadId }, data: { userId: orderData.userId, guestId: null } });
     }
+
+    // Technical documentation: the order must carry exactly the documents that
+    // were quoted (never fewer, never more), and they must belong to the
+    // customer. Guest-owned documents are claimed by the user just like CAD.
+    const technicalDocumentIds = await TechnicalDocumentsService.resolveForOrder({
+      userId: orderData.userId || undefined,
+      guestId: orderData.guestCadId || undefined,
+      quoteId: orderData.quoteId,
+      quoteDocumentIds: (quote.technicalDocuments || []).map((document) => document.id),
+      technicalDocumentIds: orderData.technicalDocumentIds,
+    });
+    const technicalNotes = (orderData.technicalNotes !== undefined && orderData.technicalNotes.trim() !== '')
+      ? orderData.technicalNotes.trim()
+      : (quote.technicalNotes || '').trim();
 
     // Shipping address resolution: prefer the submitted value, otherwise fall
     // back to the customer profile address. No hardcoded placeholder addresses.
@@ -192,34 +234,49 @@ export class OrdersService {
       },
     ];
 
-    newOrder = await prisma.order.create({
-      data: {
-        id: orderId,
-        userId: orderData.userId,
-        quoteId: orderData.quoteId,
-        partName: orderData.partName || 'Custom_Component.step',
-        technology: orderData.technology || 'Industrial 3D Printing',
-        material: orderData.material || 'PA 12 (Nylon 12)',
-        quantity: orderData.quantity || 1,
-        date: new Date().toISOString().split('T')[0],
-        estDelivery: dispatchResult.estimatedCompletion,
-        status: 'In Review',
-        statusBadge: 'badge-blue',
-        progressStep: 1,
-        manufacturingCost: quote.manufacturingCost,
-        totalCost: quote.totalPrice,
-        serviceFee: null, // No platform service fee is charged
-        shippingAddress,
-        shippingMethod: 'Express Courier',
-        carrier: 'CAM LABS Express',
-        tolerance: orderData.tolerance || '±0.15 mm (ISO 2768-m)',
-        provider: dispatchResult.engineName,
-        providerOrderRef: dispatchResult.internalOrderRef,
-        trackingNum: dispatchResult.trackingId,
-        history,
-        cadFiles: cadFileIds.length > 0 ? { create: cadFileIds.map((cadFileId) => { const config = orderData.cadFileConfigs?.find((candidate) => candidate.cadFileId === cadFileId); return { cadFileId, configuration: config?.configuration as Prisma.InputJsonValue | undefined }; }) } : undefined,
-      },
-      include: { cadFiles: { include: { cadFile: true } } },
+    newOrder = await prisma.$transaction(async (tx) => {
+      const created = await tx.order.create({
+        data: {
+          id: orderId,
+          userId: orderData.userId,
+          quoteId: orderData.quoteId,
+          partName: orderData.partName || 'Custom_Component.step',
+          technology: orderData.technology || 'Industrial 3D Printing',
+          material: orderData.material || 'PA 12 (Nylon 12)',
+          quantity: orderData.quantity || 1,
+          date: new Date().toISOString().split('T')[0],
+          estDelivery: dispatchResult.estimatedCompletion,
+          status: 'In Review',
+          statusBadge: 'badge-blue',
+          progressStep: 1,
+          manufacturingCost: quote.manufacturingCost,
+          totalCost: orderTotalCost,
+          serviceFee: null, // No platform service fee is charged
+          shippingAddress,
+          shippingCost,
+          shippingMethod,
+          carrier: 'CAM LABS Express',
+          tolerance: orderData.tolerance || '±0.15 mm (ISO 2768-m)',
+          provider: dispatchResult.engineName,
+          providerOrderRef: dispatchResult.internalOrderRef,
+          trackingNum: dispatchResult.trackingId,
+          technicalNotes,
+          history,
+          cadFiles: cadFileIds.length > 0 ? { create: cadFileIds.map((cadFileId) => { const config = orderData.cadFileConfigs?.find((candidate) => candidate.cadFileId === cadFileId); return { cadFileId, configuration: config?.configuration as Prisma.InputJsonValue | undefined }; }) } : undefined,
+        },
+        include: { cadFiles: { include: { cadFile: true } } },
+      });
+      if (technicalDocumentIds.length > 0) {
+        await tx.technicalDocument.updateMany({
+          where: { id: { in: technicalDocumentIds } },
+          data: {
+            orderId: created.id,
+            quoteId: orderData.quoteId,
+            ...(orderData.userId ? { userId: orderData.userId, guestId: null } : {}),
+          },
+        });
+      }
+      return created;
     });
     } catch (err) {
       if (claimedHere) {
@@ -361,10 +418,10 @@ export class OrdersService {
       return prisma.order.findMany({
         where: { userId },
         orderBy: { createdAt: 'desc' },
-        include: { cadFiles: { include: { cadFile: true } } },
+        include: { cadFiles: { include: { cadFile: true } }, technicalDocuments: true },
       });
     }
-    return prisma.order.findMany({ orderBy: { createdAt: 'desc' }, include: { cadFiles: { include: { cadFile: true } } } });
+    return prisma.order.findMany({ orderBy: { createdAt: 'desc' }, include: { cadFiles: { include: { cadFile: true } }, technicalDocuments: true } });
   }
 
   /**
@@ -376,6 +433,7 @@ export class OrdersService {
       where: { id },
       include: {
         cadFiles: { include: { cadFile: true } },
+        technicalDocuments: true,
         events: { orderBy: { createdAt: 'desc' } },
         user: { select: { id: true, name: true, email: true } },
       },

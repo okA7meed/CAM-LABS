@@ -3,117 +3,160 @@
    Precision Digital Manufacturing Platform
    ========================================================================== */
 
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@700;800;900&family=DM+Sans:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;600;700&family=Google+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@700;800;900&family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
 :root {
-  /* Brand Colors */
+  /* ── Brand Colors ─────────────────────────────────────────────────────── */
   --cam-bg: #0A0A0A;
   --cam-surface-1: #111317;
   --cam-surface-2: #191d24;
   --cam-surface-3: #252b34;
+  --cam-surface-4: #2d3440;
   --cam-surface-hover: #202630;
-  
+  --cam-surface-elevated: #161a22;
+
   --cam-blue-primary: #0066FF;
   --cam-blue-hover: #1A75FF;
   --cam-blue-active: #0052CC;
   --cam-blue-subtle: rgba(0, 102, 255, 0.12);
   --cam-blue-glow: rgba(0, 102, 255, 0.35);
-  
+  --cam-blue-dim: rgba(0, 102, 255, 0.06);
+
+  /* ── Text Hierarchy ───────────────────────────────────────────────────── */
   --cam-text-primary: #F9FAFB;
   --cam-text-secondary: #E5E7EB;
   --cam-text-muted: #9CA3AF;
   --cam-text-faint: #6B7280;
-  
-  /* Precision & Status Colors */
+  --cam-text-inverse: #0A0A0A;
+
+  /* ── Precision & Status Colors ────────────────────────────────────────── */
   --cam-success: #10B981;
   --cam-success-subtle: rgba(16, 185, 129, 0.12);
+  --cam-success-dim: rgba(16, 185, 129, 0.06);
   --cam-warning: #F59E0B;
   --cam-warning-subtle: rgba(245, 158, 11, 0.12);
+  --cam-warning-dim: rgba(245, 158, 11, 0.06);
   --cam-danger: #EF4444;
   --cam-danger-subtle: rgba(239, 68, 68, 0.12);
+  --cam-danger-dim: rgba(239, 68, 68, 0.06);
   --cam-cyan-tech: #06B6D4;
+  --cam-cyan-subtle: rgba(6, 182, 212, 0.12);
+  --cam-purple: #8B5CF6;
+  --cam-purple-subtle: rgba(139, 92, 246, 0.12);
 
-  /* Borders & Dividers */
+  /* ── Borders & Dividers ───────────────────────────────────────────────── */
   --cam-border-subtle: rgba(255, 255, 255, 0.08);
   --cam-border-medium: rgba(255, 255, 255, 0.14);
   --cam-border-strong: rgba(255, 255, 255, 0.22);
   --cam-border-blue: rgba(0, 102, 255, 0.5);
+  --cam-divider: rgba(255, 255, 255, 0.06);
 
-  /* Typography */
+  /* ── Typography ───────────────────────────────────────────────────────── */
   --font-sans: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-display: 'Space Grotesk', var(--font-sans);
   --font-arabic: 'IBM Plex Sans Arabic', 'Segoe UI', sans-serif;
-  /* Google Sans is the project's new technical/data typeface. It replaces the
-     former JetBrains Mono everywhere that previously used var(--font-mono). */
-  --font-google-sans: 'Google Sans', var(--font-sans);
-  --font-mono: var(--font-google-sans);
-  /* Space Grotesk / IBM Plex Sans Arabic stop at 700; these ship real 900 faces for the hero headline. */
+  --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
   --font-hero-display: 'DM Sans', var(--font-sans);
   --font-hero-arabic: 'Noto Sans Arabic', var(--font-arabic);
+  /* Google Sans is the project's technical/data typeface (see layout.css hero DB). */
+  --font-google-sans: 'Google Sans', var(--font-sans);
 
-  /* Spacing Scale */
-  --space-1: 0.25rem;  /* 4px */
-  --space-2: 0.5rem;   /* 8px */
-  --space-3: 0.75rem;  /* 12px */
-  --space-4: 1rem;     /* 16px */
-  --space-5: 1.25rem;  /* 20px */
-  --space-6: 1.5rem;   /* 24px */
-  --space-8: 2rem;     /* 32px */
-  --space-10: 2.5rem;  /* 40px */
-  --space-12: 3rem;    /* 48px */
-  --space-16: 4rem;    /* 64px */
-  --space-20: 5rem;    /* 80px */
-  --space-24: 6rem;    /* 96px */
+  /* ── Spacing Scale ────────────────────────────────────────────────────── */
+  --space-0: 0;
+  --space-px: 1px;
+  --space-0-5: 0.125rem; /* 2px */
+  --space-1: 0.25rem;    /* 4px */
+  --space-1-5: 0.375rem; /* 6px */
+  --space-2: 0.5rem;     /* 8px */
+  --space-2-5: 0.625rem; /* 10px */
+  --space-3: 0.75rem;    /* 12px */
+  --space-3-5: 0.875rem; /* 14px */
+  --space-4: 1rem;       /* 16px */
+  --space-5: 1.25rem;    /* 20px */
+  --space-6: 1.5rem;     /* 24px */
+  --space-7: 1.75rem;    /* 28px */
+  --space-8: 2rem;       /* 32px */
+  --space-9: 2.25rem;    /* 36px */
+  --space-10: 2.5rem;    /* 40px */
+  --space-12: 3rem;      /* 48px */
+  --space-14: 3.5rem;    /* 56px */
+  --space-16: 4rem;      /* 64px */
+  --space-20: 5rem;      /* 80px */
+  --space-24: 6rem;      /* 96px */
 
-  /* Radii (Engineered & Crisp) */
+  /* ── Radii ────────────────────────────────────────────────────────────── */
+  --radius-xs: 3px;
   --radius-sm: 4px;
   --radius-md: 8px;
   --radius-lg: 12px;
   --radius-xl: 16px;
+  --radius-2xl: 20px;
+  --radius-3xl: 24px;
   --radius-full: 9999px;
 
-  /* Button corner curvature — derived from the navbar "Start Manufacturing"
-     button (8px radius on a 36px control = 0.2222 of the control height).
-     Set --btn-block-size per button, then use var(--btn-radius). */
+  /* Button curvature ratio */
   --btn-radius-ratio: 0.2222;
   --btn-block-size: 36px;
 
-  /* Elevation Shadows */
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.4);
+  /* ── Elevation Shadows ────────────────────────────────────────────────── */
+  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.4), 0 1px 2px -1px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -2px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.6), 0 4px 6px -4px rgba(0, 0, 0, 0.6);
   --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.7), 0 8px 10px -6px rgba(0, 0, 0, 0.7);
+  --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
   --shadow-glow: 0 0 24px var(--cam-blue-glow);
+  --shadow-glow-sm: 0 0 12px var(--cam-blue-glow);
+  --shadow-inset: inset 0 2px 4px 0 rgba(0, 0, 0, 0.3);
 
-  /* Transitions */
+  /* ── Transitions ──────────────────────────────────────────────────────── */
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-smooth: 350ms cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-spring: 500ms cubic-bezier(0.34, 1.56, 0.64, 1);
 
-  /* Layout */
+  /* ── Z-Index Scale ────────────────────────────────────────────────────── */
+  --z-base: 0;
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-overlay: 300;
+  --z-modal: 400;
+  --z-toast: 500;
+  --z-tooltip: 600;
+
+  /* ── Layout ───────────────────────────────────────────────────────────── */
   --container-max-w: 1280px;
   --header-height: 72px;
   --navbar-control-height: 36px;
+  --sidebar-width: 280px;
+  --sidebar-collapsed-width: 76px;
 }
 
 [data-theme='light'] {
   --cam-bg: #f7f9fc;
-  --cam-bg: #f7f9fc;
   --cam-surface-1: #ffffff;
   --cam-surface-2: #f1f5f9;
   --cam-surface-3: #e5e7eb;
+  --cam-surface-4: #d1d5db;
   --cam-surface-hover: #eaf1ff;
+  --cam-surface-elevated: #ffffff;
   --cam-text-primary: #111827;
   --cam-text-secondary: #374151;
   --cam-text-muted: #64748b;
   --cam-text-faint: #94a3b8;
+  --cam-text-inverse: #f9fafb;
   --cam-border-subtle: rgba(15, 23, 42, 0.10);
   --cam-border-medium: rgba(15, 23, 42, 0.16);
   --cam-border-strong: rgba(15, 23, 42, 0.28);
   --cam-border-blue: rgba(0, 102, 255, 0.46);
-  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.08);
-  --shadow-md: 0 6px 14px rgba(15, 23, 42, 0.08);
+  --cam-divider: rgba(15, 23, 42, 0.08);
+  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.08), 0 2px 4px -2px rgba(15, 23, 42, 0.04);
   --shadow-lg: 0 16px 30px rgba(15, 23, 42, 0.12);
   --shadow-xl: 0 22px 44px rgba(15, 23, 42, 0.15);
+  --shadow-2xl: 0 25px 50px rgba(15, 23, 42, 0.20);
+  --shadow-inset: inset 0 2px 4px 0 rgba(15, 23, 42, 0.06);
 }
 
 /* Base Reset & Box Sizing */
@@ -302,16 +345,23 @@ code, pre, .font-mono {
   align-items: center;
   gap: var(--space-2);
   padding: 4px 12px;
-  background: var(--cam-surface-2);
+  background: linear-gradient(180deg, var(--cam-surface-3), var(--cam-surface-2));
   border: 1px solid var(--cam-border-medium);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-full);
   font-family: var(--font-mono);
   font-size: 0.75rem;
   font-weight: 600;
-  color: var(--cam-text-secondary);
+  color: var(--cam-text-primary);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   margin-bottom: var(--space-4);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.section-badge:hover {
+  border-color: var(--cam-border-blue);
+  box-shadow: var(--shadow-glow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .section-badge-dot {
@@ -319,16 +369,24 @@ code, pre, .font-mono {
   height: 6px;
   border-radius: 50%;
   background-color: var(--cam-blue-primary);
+  box-shadow: 0 0 8px var(--cam-blue-glow);
 }
 
 .section-title {
   margin-bottom: var(--space-4);
+  font-family: var(--font-display);
+  font-size: clamp(1.625rem, 2.5vw, 2.125rem);
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: var(--cam-text-primary);
 }
 
 .section-subtitle {
-  font-size: 1.125rem;
+  font-size: 1.0625rem;
   color: var(--cam-text-muted);
-  line-height: 1.6;
+  line-height: 1.65;
+  max-width: 560px;
 }
 
 /* Custom Scrollbars */
@@ -358,24 +416,276 @@ code, pre, .font-mono {
 }
 
 .page-enter > main {
-  animation: content-enter var(--transition-smooth) both;
+  animation: content-enter 0.24s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 @keyframes content-enter {
-  from { opacity: 0; transform: translateY(12px); }
+  from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* ── Skeleton Loader ────────────────────────────────────────────────────── */
 .skeleton {
   background: linear-gradient(90deg, var(--cam-surface-2) 25%, var(--cam-surface-3) 50%, var(--cam-surface-2) 75%);
   background-size: 200% 100%;
   animation: skeleton-shimmer 1.4s ease infinite;
+  border-radius: var(--radius-sm);
 }
 
 @keyframes skeleton-shimmer {
   to { background-position: -200% 0; }
 }
 
+/* ── Separator / Divider ────────────────────────────────────────────────── */
+.cam-separator {
+  height: 1px;
+  background: var(--cam-divider);
+  border: none;
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.cam-separator-vertical {
+  width: 1px;
+  height: auto;
+  align-self: stretch;
+}
+
+/* ── Industrial Badge System ────────────────────────────────────────────── */
+.cam-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.4;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-family: var(--font-mono);
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.cam-badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+.cam-badge-blue {
+  background: var(--cam-blue-subtle);
+  color: #60A5FA;
+  border-color: rgba(0, 102, 255, 0.25);
+}
+
+.cam-badge-green {
+  background: var(--cam-success-subtle);
+  color: #34D399;
+  border-color: rgba(16, 185, 129, 0.25);
+}
+
+.cam-badge-amber {
+  background: var(--cam-warning-subtle);
+  color: #FBBF24;
+  border-color: rgba(245, 158, 11, 0.25);
+}
+
+.cam-badge-red {
+  background: var(--cam-danger-subtle);
+  color: #F87171;
+  border-color: rgba(239, 68, 68, 0.25);
+}
+
+.cam-badge-neutral {
+  background: var(--cam-surface-2);
+  color: var(--cam-text-muted);
+  border-color: var(--cam-border-subtle);
+}
+
+/* ── Industrial Tooltip ─────────────────────────────────────────────────── */
+.cam-tooltip-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.cam-tooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  padding: 6px 10px;
+  background: var(--cam-surface-3);
+  border: 1px solid var(--cam-border-medium);
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--cam-text-primary);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+  z-index: var(--z-tooltip);
+  box-shadow: var(--shadow-lg);
+}
+
+.cam-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: var(--cam-surface-3);
+}
+
+.cam-tooltip-wrap:hover .cam-tooltip,
+.cam-tooltip-wrap:focus-within .cam-tooltip {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ── Progress Bar ───────────────────────────────────────────────────────── */
+.cam-progress {
+  height: 4px;
+  border-radius: var(--radius-full);
+  background: var(--cam-surface-3);
+  overflow: hidden;
+}
+
+.cam-progress-bar {
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: var(--cam-blue-primary);
+  transition: width 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.cam-progress-bar.success {
+  background: var(--cam-success);
+}
+
+.cam-progress-bar.warning {
+  background: var(--cam-warning);
+}
+
+.cam-progress-bar.danger {
+  background: var(--cam-danger);
+}
+
+/* ── Industrial Breadcrumb ──────────────────────────────────────────────── */
+.cam-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.8125rem;
+  color: var(--cam-text-muted);
+}
+
+.cam-breadcrumb-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--cam-text-muted);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+.cam-breadcrumb-item:hover {
+  color: var(--cam-text-primary);
+}
+
+.cam-breadcrumb-item.current {
+  color: var(--cam-text-primary);
+  font-weight: 600;
+}
+
+.cam-breadcrumb-sep {
+  color: var(--cam-text-faint);
+  font-size: 0.75rem;
+}
+
+/* ── Industrial Empty State ─────────────────────────────────────────────── */
+.cam-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-12) var(--space-6);
+  text-align: center;
+}
+
+.cam-empty-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-xl);
+  display: grid;
+  place-items: center;
+  background: var(--cam-surface-2);
+  border: 1px solid var(--cam-border-medium);
+  color: var(--cam-text-muted);
+  margin-bottom: var(--space-5);
+}
+
+.cam-empty-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--cam-text-primary);
+  margin-bottom: var(--space-2);
+}
+
+.cam-empty-desc {
+  font-size: 0.875rem;
+  color: var(--cam-text-muted);
+  max-width: 320px;
+  line-height: 1.5;
+  margin-bottom: var(--space-6);
+}
+
+/* ── Industrial Loading Spinner ─────────────────────────────────────────── */
+.cam-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--cam-border-medium);
+  border-top-color: var(--cam-blue-primary);
+  border-radius: 50%;
+  animation: cam-spin 0.6s linear infinite;
+}
+
+@keyframes cam-spin {
+  to { transform: rotate(360deg); }
+}
+
+.cam-spinner-sm { width: 14px; height: 14px; border-width: 2px; }
+.cam-spinner-lg { width: 32px; height: 32px; border-width: 3px; }
+
+/* ── Focus Ring Utility ─────────────────────────────────────────────────── */
+.cam-focus-ring:focus-visible {
+  outline: 2px solid var(--cam-blue-primary);
+  outline-offset: 2px;
+}
+
+/* ── Truncate Utility ───────────────────────────────────────────────────── */
+.cam-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cam-line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: 0.01ms !important; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }

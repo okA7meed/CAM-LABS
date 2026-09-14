@@ -2,20 +2,18 @@ import React from 'react';
 import { useStore } from '../../context/StoreContext';
 import { useMaterials } from '../../hooks/useMaterials';
 import { useTranslation } from 'react-i18next';
+import { AnimatedModal } from '../ui/AnimatedModal';
 
 export const ComparisonModal: React.FC = () => {
   const { isComparisonModalOpen, closeComparisonModal, comparisonList } = useStore();
   const { t } = useTranslation();
   const { materials } = useMaterials();
 
-  if (!isComparisonModalOpen) return null;
-
   const comparedMaterials = materials.filter((m) => comparisonList.includes(m.id));
 
   return (
-    <div className="modal-overlay active">
-      <div className="modal-card modal-lg">
-        <div className="modal-header">
+    <AnimatedModal open={isComparisonModalOpen} cardClassName="modal-lg">
+      <div className="modal-header">
           <div className="modal-title">{t('comparison.title')}</div>
           <button className="modal-close" onClick={closeComparisonModal}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -126,7 +124,6 @@ export const ComparisonModal: React.FC = () => {
             </div>
           )}
         </div>
-      </div>
-    </div>
+    </AnimatedModal>
   );
 };

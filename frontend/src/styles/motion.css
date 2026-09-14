@@ -219,7 +219,7 @@
 }
 
 .price-transition.is-ready .price-transition-value {
-  animation: price-value-settle 420ms var(--cam-ease-out) both;
+  animation: price-value-settle 340ms var(--cam-ease-out) both;
 }
 
 @keyframes price-value-settle {
@@ -229,7 +229,7 @@
   }
   55% {
     opacity: 1;
-    transform: translateY(-1px) scale(1.015);
+    transform: translateY(-1px) scale(1.012);
   }
   100% {
     opacity: 1;
@@ -345,7 +345,172 @@
 }
 
 /* --------------------------------------------------------------------------
-   9. Reduced Motion
+   9. Motion-driven Modals, Toasts & Reveals
+   `.cam-motion` elements are animated by motion/react (opacity/transform are
+   set inline), so the legacy CSS-only transitions must not also interpolate
+   the same properties and cause double animation.
+   -------------------------------------------------------------------------- */
+.modal-overlay.active.cam-motion {
+  transition: none;
+}
+
+.modal-overlay.active.cam-motion .modal-card {
+  transition: none;
+  transform: none;
+}
+
+.toast.cam-motion {
+  transition: none;
+}
+
+/* Toasts without a motion/react wrapper still animate in cleanly */
+.toast {
+  animation: toast-in 320ms var(--cam-ease-out) both;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(min(18px, 3vw)) scale(0.97);
+  }
+}
+
+[dir='rtl'] .toast {
+  animation-name: toast-in-rtl;
+}
+
+@keyframes toast-in-rtl {
+  from {
+    opacity: 0;
+    transform: translateX(max(-18px, -3vw)) scale(0.97);
+  }
+}
+
+/* Surfaces driven by motion/react: their CSS keyframe entrance is disabled so
+   only motion animates opacity/transform (enter AND exit). */
+.cam-motion {
+  animation: none !important;
+}
+
+/* Comparison floating bar — kept mounted so the legacy CSS transform
+   transition can run BOTH directions (slide down/up). Hidden states are taken
+   out of focus order via visibility, preserving original a11y behaviour. */
+.comparison-floating-bar {
+  visibility: hidden;
+  pointer-events: none;
+  transition: transform var(--transition-base), visibility 0s linear var(--transition-base);
+}
+
+.comparison-floating-bar.active {
+  visibility: visible;
+  pointer-events: auto;
+  transition: transform var(--transition-base), visibility 0s;
+}
+
+/* Lightweight block reveal used where a surface appears after async work
+   (quote results, saved confirmations, dynamic lists). Purely decorative. */
+.cam-fade-up {
+  animation: cam-fade-up-in 240ms var(--cam-ease-out) both;
+}
+
+@keyframes cam-fade-up-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   10. Workspace Motion Suite
+   Micro-interactions for the manufacturing workspace, panels & viewport.
+   -------------------------------------------------------------------------- */
+
+/* Analytical scanning sweep across a panel when it becomes active */
+.mw-panel.is-active::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(105deg, transparent 40%, rgba(22, 119, 255, 0.045) 50%, transparent 60%);
+  animation: mw-scan-sweep 2.2s var(--cam-ease-out) 400ms both;
+}
+
+@keyframes mw-scan-sweep {
+  from { transform: translateX(-120%); }
+  to { transform: translateX(120%); }
+}
+
+[dir='rtl'] .mw-panel.is-active::after {
+  animation-name: mw-scan-sweep-rtl;
+}
+
+@keyframes mw-scan-sweep-rtl {
+  from { transform: translateX(120%); }
+  to { transform: translateX(-120%); }
+}
+
+/* State mark pop — when a step flips to completed */
+.mw-panel.is-completed .mw-panel-state-mark {
+  animation: mw-state-pop 380ms var(--cam-ease-out) both;
+}
+
+@keyframes mw-state-pop {
+  0% { transform: scale(0.5); opacity: 0; }
+  70% { transform: scale(1.18); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* Viewport loading bar — indeterminate progress across the viewport top */
+.mw-viewport-loading {
+  position: absolute;
+  top: 0;
+  inset-inline: 0;
+  height: 2px;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: var(--z-sticky);
+  border-radius: 0;
+}
+
+.mw-viewport-loading::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 34%;
+  border-radius: var(--radius-full);
+  background: linear-gradient(90deg, var(--mw-blue), var(--mw-cyan));
+  animation: mw-loading-slide 1.3s cubic-bezier(0.65, 0.05, 0.35, 0.95) infinite;
+  box-shadow: 0 0 8px var(--mw-blue);
+}
+
+@keyframes mw-loading-slide {
+  from { transform: translateX(-110%); }
+  to { transform: translateX(320%); }
+}
+
+[dir='rtl'] .mw-viewport-loading::before {
+  animation-name: mw-loading-slide-rtl;
+}
+
+@keyframes mw-loading-slide-rtl {
+  from { transform: translateX(110%); }
+  to { transform: translateX(-320%); }
+}
+
+/* Upload dropzone — subtle pulse ring while dragging a file */
+.dropzone.dragover .dropzone-icon {
+  animation: mw-dropzone-pulse 900ms var(--cam-ease-out) infinite;
+}
+
+@keyframes mw-dropzone-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(22, 119, 255, 0.45); }
+  50% { box-shadow: 0 0 0 10px rgba(22, 119, 255, 0); }
+}
+
+/* --------------------------------------------------------------------------
+   11. Reduced Motion
    -------------------------------------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
   .cam-reveal,
@@ -358,6 +523,11 @@
   .price-transition-pulse i,
   .price-estimate-notice-icon {
     animation: none !important;
+  }
+
+  .cam-fade-up {
+    animation: none;
+    opacity: 1;
   }
 
   .cam-headline-phrase,
@@ -392,5 +562,20 @@
 
   .nav-active-indicator {
     transition: opacity 120ms ease;
+  }
+
+  .mw-panel.is-active::after,
+  .mw-viewport-loading::before,
+  .dropzone.dragover .dropzone-icon,
+  .mw-panel.is-completed .mw-panel-state-mark {
+    animation: none !important;
+  }
+
+  .mw-viewport-loading::before {
+    opacity: 0.6;
+  }
+
+  .toast {
+    animation: none;
   }
 }

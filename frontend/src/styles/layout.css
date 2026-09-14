@@ -517,6 +517,37 @@
   overflow: hidden;
 }
 
+/* Engineering grid background — subtle industrial blueprint texture */
+.hero-section::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(var(--cam-border-subtle) 1px, transparent 1px),
+    linear-gradient(90deg, var(--cam-border-subtle) 1px, transparent 1px);
+  background-size: 56px 56px;
+  background-position: center;
+  -webkit-mask-image: radial-gradient(ellipse 90% 70% at 50% 20%, black 20%, transparent 70%);
+  mask-image: radial-gradient(ellipse 90% 70% at 50% 20%, black 20%, transparent 70%);
+  opacity: 0.6;
+}
+
+/* Ambient brand glow behind the hero */
+.hero-section::after {
+  content: '';
+  position: absolute;
+  top: -12%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(920px, 90vw);
+  height: 520px;
+  background: radial-gradient(ellipse 50% 60% at center, var(--cam-blue-glow), transparent 70%);
+  filter: blur(30px);
+  opacity: 0.28;
+  pointer-events: none;
+}
+
 .hero-grid {
   display: grid;
   grid-template-columns: 1.15fr 0.85fr;
@@ -540,7 +571,7 @@
   font-family: var(--font-hero-display);
   font-size: clamp(2.5rem, 5vw, 3.875rem);
   font-weight: 900;
-  line-height: 1.1;
+  line-height: 1.08;
   letter-spacing: -0.03em;
   margin-top: var(--space-5);
   margin-bottom: var(--space-6);
@@ -555,6 +586,24 @@
   color: var(--cam-blue-primary);
   position: relative;
   display: inline-block;
+  background: linear-gradient(120deg, var(--cam-blue-primary), var(--cam-cyan-tech));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 2px 14px var(--cam-blue-glow));
+}
+
+/* Underline accent on the highlighted title words */
+.hero-title-highlight::after {
+  content: '';
+  position: absolute;
+  left: 2%;
+  right: 2%;
+  bottom: 0.04em;
+  height: 0.09em;
+  border-radius: var(--radius-full);
+  background: linear-gradient(90deg, var(--cam-blue-primary), var(--cam-cyan-tech));
+  opacity: 0.55;
 }
 
 @media (max-width: 640px) {
@@ -571,8 +620,8 @@
 
 .hero-description {
   font-size: 1.1875rem;
-  color: var(--cam-text-secondary);
-  line-height: 1.6;
+  color: var(--cam-text-muted);
+  line-height: 1.65;
   max-width: 580px;
   margin-bottom: var(--space-8);
 }
@@ -1074,19 +1123,41 @@
   display: flex;
   flex-direction: column;
   height: 100%;
+  background: linear-gradient(180deg, var(--cam-surface-elevated), var(--cam-surface-1));
+  box-shadow: var(--shadow-md);
+  transition: all var(--transition-smooth);
+}
+
+.service-card:hover {
+  box-shadow: var(--shadow-xl), 0 0 0 1px var(--cam-border-blue);
+  transform: translateY(-3px);
 }
 
 .service-icon-wrapper {
-  width: 48px;
-  height: 48px;
-  border-radius: var(--radius-sm);
-  background-color: var(--cam-blue-subtle);
-  border: 1px solid var(--cam-border-blue);
+  width: 52px;
+  height: 52px;
+  border-radius: var(--radius-md);
+  background-color: var(--cam-surface-3);
+  border: 1px solid var(--cam-border-medium);
   color: var(--cam-blue-primary);
   display: flex;
   align-items: center;
   justify-content: center;
   margin-bottom: var(--space-4);
+  transform: rotate(0deg);
+  transition: transform var(--transition-smooth), color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.service-card:hover .service-icon-wrapper {
+  transform: rotate(-4deg) scale(1.06);
+  background-color: var(--cam-blue-subtle);
+  border-color: var(--cam-border-blue);
+  box-shadow: var(--shadow-glow-sm);
+  color: var(--cam-blue-hover);
+}
+
+[dir='rtl'] .service-card:hover .service-icon-wrapper {
+  transform: rotate(4deg) scale(1.06);
 }
 
 .service-tech-tags {
@@ -1099,7 +1170,7 @@
 .service-spec-matrix {
   margin-top: auto;
   padding-top: var(--space-4);
-  border-top: 1px solid var(--cam-border-subtle);
+  border-top: 1px solid var(--cam-divider);
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--space-2);
@@ -1109,19 +1180,32 @@
 .spec-entry {
   display: flex;
   flex-direction: column;
+  padding: var(--space-2) var(--space-2-5);
+  background: var(--cam-surface-2);
+  border: 1px solid var(--cam-border-subtle);
+  border-radius: var(--radius-sm);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.service-card:hover .spec-entry {
+  background: var(--cam-surface-3);
+  border-color: var(--cam-border-medium);
 }
 
 .spec-key {
   color: var(--cam-text-muted);
   font-family: var(--font-mono);
-  font-size: 0.6875rem;
+  font-size: 0.625rem;
   text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .spec-val {
   color: var(--cam-text-primary);
   font-weight: 600;
   font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  margin-top: 2px;
 }
 
 /* --------------------------------------------------------------------------
@@ -1148,17 +1232,25 @@
 }
 
 .step-card {
-  background-color: var(--cam-surface-1);
+  background: linear-gradient(180deg, var(--cam-surface-elevated), var(--cam-surface-1));
   border: 1px solid var(--cam-border-subtle);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   padding: var(--space-6);
   position: relative;
-  transition: all var(--transition-fast);
+  transition: all var(--transition-smooth);
+  z-index: 1;
 }
 
 .step-card:hover {
   border-color: var(--cam-border-blue);
-  transform: translateY(-2px);
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lg), 0 0 0 1px var(--cam-border-blue);
+  background: linear-gradient(180deg, var(--cam-surface-3), var(--cam-surface-1));
+}
+
+.step-card:hover .step-icon {
+  color: var(--cam-blue-primary);
+  transform: scale(1.12);
 }
 
 .step-number {
@@ -1173,10 +1265,27 @@
   justify-content: space-between;
 }
 
+.step-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--cam-border-blue), transparent);
+  opacity: 0;
+  transition: opacity var(--transition-base);
+}
+
+.step-card:hover::after {
+  opacity: 0.4;
+}
+
 .step-icon {
   width: 28px;
   height: 28px;
   color: var(--cam-text-muted);
+  transition: color var(--transition-fast), transform var(--transition-smooth);
 }
 
 .step-title {
@@ -1200,8 +1309,6 @@
 
 .hero-title { letter-spacing: 0; }
 .hero-title-highlight { text-shadow: 0 0 24px rgba(0, 102, 255, 0.24); }
-.service-card, .step-card { box-shadow: 0 18px 48px rgba(0, 0, 0, 0.18); }
-.service-card:hover, .step-card:hover { box-shadow: 0 22px 54px rgba(0, 0, 0, 0.28), 0 0 0 1px var(--cam-border-blue); }
 .workflow-stepper-grid::before { content: ''; position: absolute; top: 32px; right: 10%; left: 10%; height: 1px; background: var(--cam-border-subtle); pointer-events: none; }
 .step-card { z-index: 1; }
 
@@ -1284,14 +1391,18 @@
    6. Call to Action Banner
    -------------------------------------------------------------------------- */
 .cta-banner {
-  background: linear-gradient(135deg, var(--cam-surface-1) 0%, var(--cam-surface-2) 50%, var(--cam-bg) 100%);
+  background:
+    radial-gradient(ellipse 60% 80% at 50% 0%, rgba(0, 102, 255, 0.14), transparent 70%),
+    repeating-linear-gradient(0deg, var(--cam-border-subtle) 0 1px, transparent 1px 44px),
+    repeating-linear-gradient(90deg, var(--cam-border-subtle) 0 1px, transparent 1px 44px),
+    linear-gradient(180deg, var(--cam-surface-elevated) 0%, var(--cam-surface-1) 100%);
   border: 1px solid var(--cam-border-blue);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-xl);
   padding: var(--space-12) var(--space-8);
   text-align: center;
   position: relative;
   overflow: hidden;
-  box-shadow: var(--shadow-glow);
+  box-shadow: var(--shadow-glow), var(--shadow-xl);
 }
 
 .cta-banner-content {
@@ -1309,6 +1420,21 @@
   border-top: 1px solid var(--cam-border-subtle);
   padding: var(--space-16) 0 var(--space-8) 0;
   margin-top: auto;
+  position: relative;
+}
+
+/* Ambient footer top glow */
+.cam-footer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(700px, 85vw);
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--cam-border-blue), transparent);
+  opacity: 0.3;
+  pointer-events: none;
 }
 
 .footer-grid {
@@ -1364,10 +1490,25 @@
   font-size: 0.875rem;
   color: var(--cam-text-muted);
   transition: color var(--transition-fast);
+  display: inline-flex;
+  align-items: center;
+}
+
+.footer-links a::after {
+  content: '';
+  display: block;
+  width: 0;
+  height: 1px;
+  background: var(--cam-blue-primary);
+  transition: width var(--transition-smooth);
 }
 
 .footer-links a:hover {
   color: var(--cam-blue-primary);
+}
+
+.footer-links a:hover::after {
+  width: 100%;
 }
 
 .footer-bottom {

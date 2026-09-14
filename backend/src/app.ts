@@ -13,6 +13,7 @@ import materialsRoutes from './routes/materials.routes';
 import ordersRoutes from './routes/orders.routes';
 import quotesRoutes from './routes/quotes.routes';
 import cadRoutes from './routes/cad.routes';
+import technicalDocumentsRoutes from './routes/technicalDocuments.routes';
 import manufacturingRoutes from './routes/manufacturing.routes';
 import pricingAdminRoutes from './routes/pricing-admin.routes';
 import adminRoutes from './routes/admin.routes';
@@ -62,7 +63,7 @@ if (process.env.NODE_ENV === 'production') {
     max: 100,
     standardHeaders: true,
     legacyHeaders: false,
-    skip: (req) => req.path.startsWith('/v1/cad-files'),
+    skip: (req) => req.path.startsWith('/v1/cad-files') || req.path.startsWith('/v1/technical-documents'),
     message: { success: false, error: { code: 'RATE_LIMIT', message: 'Too many requests. Please try again later.' } },
   });
   app.use('/api/', limiter);
@@ -100,6 +101,7 @@ if (process.env.NODE_ENV === 'production') {
   app.use('/api/v1/orders', ordersRoutes);
   app.use('/api/v1/quotes', quotesRoutes);
   app.use('/api/v1/cad-files', cadRoutes);
+  app.use('/api/v1/technical-documents', technicalDocumentsRoutes);
   app.use('/api/v1/manufacturing', manufacturingRoutes);
   app.use('/api/v1/admin/pricing', pricingAdminRoutes);
   app.use('/api/v1/admin', adminRoutes);

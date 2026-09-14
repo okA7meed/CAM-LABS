@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { motion } from 'motion/react';
 import { useStore } from '../../../context/StoreContext';
 import { Icon } from '../../ui/Icon';
+import { CAM_EASE } from '../../ui/AnimatedModal';
 
 interface EligibleQuote {
   id: string;
@@ -76,12 +78,23 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ onClose, onC
   const selectedQuote = quotes.find((quote) => quote.id === selectedId) || null;
 
   return (
-    <div className="admin-modal-backdrop" onMouseDown={onClose}>
-      <div
+    <motion.div
+      className="admin-modal-backdrop cam-motion"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.16, ease: CAM_EASE }}
+      onMouseDown={onClose}
+    >
+      <motion.div
         className="admin-modal"
         role="dialog"
         aria-modal="true"
         aria-label={t('admin.orders.newOrder')}
+        initial={{ opacity: 0, y: 14, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 8, scale: 0.985 }}
+        transition={{ duration: 0.22, ease: CAM_EASE }}
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="admin-modal-header">
@@ -152,7 +165,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ onClose, onC
             {converting ? t('admin.orders.converting') : t('admin.orders.confirmConvert')}
           </button>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 };

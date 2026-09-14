@@ -18,10 +18,16 @@ export type IconName =
   | 'cpu'
   | 'cube'
   | 'database'
+  | 'dimensionX'
+  | 'dimensionY'
+  | 'dimensionZ'
+  | 'dotsVertical'
+  | 'download'
   | 'eye'
   | 'expand'
   | 'file'
   | 'filter'
+  | 'folder'
   | 'gear'
   | 'layers'
   | 'layers3'
@@ -36,7 +42,9 @@ export type IconName =
   | 'review'
   | 'search'
   | 'send'
+  | 'scaling'
   | 'shieldCheck'
+  | 'surface'
   | 'target'
   | 'technology'
   | 'trash'
@@ -53,6 +61,11 @@ const paths: Record<IconName, React.ReactNode> = {
   calendar: <><path d="M8 3v4m8-4v4M3.5 9h17M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z" /><path d="M8 13.5h.01M12 13.5h.01M16 13.5h.01" /></>,
   copy: <><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></>,
   database: <><ellipse cx="12" cy="5.5" rx="8" ry="2.8" /><path d="M4 5.5V12c0 1.55 3.58 2.8 8 2.8s8-1.25 8-2.8V5.5" /><path d="M4 12v6.5c0 1.55 3.58 2.8 8 2.8s8-1.25 8-2.8V12" /></>,
+  dimensionX: <path d="M4 12h16m-7-5 5 5-5 5M13 7l-5 5 5 5" />,
+  dimensionY: <path d="M12 4v16m-5-7 5 5 5-5M7 13l5-5 5 5" />,
+  dimensionZ: <path d="M6 18 18 6M13 6h5v5M11 18H6v-5" />,
+  dotsVertical: <path d="M12 5.5h.01M12 12h.01M12 18.5h.01" />,
+  download: <path d="M12 4v9m0 0 4-4m-4 4L8 9M5 15v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4" />,
   check: <path d="m5 12 4.2 4.2L19 6.5" />,
   chevronDown: <path d="m6 9 6 6 6-6" />,
   chevronRight: <path d="m9 6 6 6-6 6" />,
@@ -66,6 +79,7 @@ const paths: Record<IconName, React.ReactNode> = {
   expand: <path d="M8 3H3v5m0-5 6 6m7-6h5v5m0-5-6 6M8 21H3v-5m0 5 6-6m7 6h5v-5m0 5-6-6" />,
   file: <path d="M6 3h8l4 4v14H6V3Zm8 0v5h4M9 12h6m-6 4h6" />,
   filter: <path d="M4 5h16l-6.2 7.2V18l-3.6 2v-7.8L4 5Z" />,
+  folder: <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />,
   gear: <><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.01a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" /></>,
   layers: <path d="m12 3 9 5-9 5-9-5 9-5Zm-9 9 9 5 9-5m-18 6 9 5 9-5" />,
   layers3: <path d="m12 4 8 4.5-8 4.5-8-4.5L12 4Zm-8 8.5 8 4.5 8-4.5M4 17l8 4.5 8-4.5" />,
@@ -76,6 +90,8 @@ const paths: Record<IconName, React.ReactNode> = {
   search: <><circle cx="11" cy="11" r="7" /><path d="m20.5 20.5-4.2-4.2" /></>,
   reset: <path d="M4 12a8 8 0 1 0 2.35-5.65L4 8.7M4 4v4.7h4.7" />,
   send: <path d="m22 2-7 20-4-9-9-4 20-7ZM22 2 11 13" />,
+  scaling: <><rect x="4.5" y="4.5" width="15" height="15" rx="2" /><path d="M12 3v2.5m0 13V21M3 12h2.5m13 0H21" /></>,
+  surface: <><rect x="3.5" y="3.5" width="17" height="17" rx="2" /><path d="m8 16 8-8M16 13v3h-3" /></>,
   technology: <path d="M12 3 3 8l9 5 9-5-9-5Zm-6 8v5l6 3 6-3v-5M3 16l9 5 9-5" />,
   target: <><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1.2" /></>,
   users: <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87M15.5 3.13a4 4 0 0 1 0 7.75" /></>,

@@ -29,8 +29,8 @@ const state = vi.hoisted(() => ({
   engineQuote: vi.fn(),
 }));
 
-vi.mock('../src/config/database', () => ({
-  getPrismaClient: () => ({
+vi.mock('../src/config/database', () => {
+  const prisma = {
     quote: {
       findUnique: vi.fn(async () => state.quote),
       update: state.quoteUpdate,
@@ -44,11 +44,18 @@ vi.mock('../src/config/database', () => ({
       findUnique: state.orderFindUnique,
       findFirst: state.orderFindFirst,
     },
+    technicalDocument: { findMany: vi.fn(async () => []), updateMany: vi.fn(async () => ({ count: 0 })) },
     manufacturingRequest: { create: vi.fn(async () => ({ id: 'mfg-1' })) },
     orderEvent: { create: vi.fn(async () => ({ id: 'evt-1' })) },
     manufacturer: { findUnique: vi.fn(async () => ({ id: 'cell-1', companyName: 'CAM LABS Internal Manufacturing Cell' })) },
-  }),
-}));
+  };
+  return {
+    getPrismaClient: () => ({
+      ...prisma,
+      $transaction: async (fn: (tx: any) => unknown) => fn(prisma),
+    }),
+  };
+});
 
 vi.mock('../src/middleware/auth.middleware', () => ({
   requireAuth: (req: any, _res: any, next: any) => { req.auth = state.authUser; next(); },

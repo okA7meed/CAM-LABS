@@ -2,49 +2,16 @@ import React, { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useSt
 import { createPortal } from 'react-dom';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
-import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
-import { PLYLoader } from 'three/examples/jsm/loaders/PLYLoader.js';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import DxfParser, { IEntity, IPoint } from 'dxf-parser';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { CadFile } from '../../types';
 import { ApiError, ApiService, CadGeometryData } from '../../services/api';
 import { useTranslation } from 'react-i18next';
 import { Icon } from '../ui/Icon';
 import { ModelDimensions, ModelUnit, convertArea, convertLength, convertVolume, formatModelValue, scaleDimensions } from '../../utils/modelUnits';
-
-type DxfEntityGeometry = IEntity & { vertices?: IPoint[]; center?: IPoint; radius?: number; startAngle?: number; endAngle?: number };
-
-const dxfLinePoints = (entity: IEntity): THREE.Vector3[] => {
-  const geometry = entity as DxfEntityGeometry;
-  if (geometry.vertices?.length) return geometry.vertices.map((point) => new THREE.Vector3(point.x, point.y, point.z || 0));
-  if (geometry.center && Number.isFinite(geometry.radius)) {
-    const start = Number.isFinite(geometry.startAngle) ? geometry.startAngle! : 0;
-    const end = Number.isFinite(geometry.endAngle) ? geometry.endAngle! : Math.PI * 2;
-    const sweep = end >= start ? end - start : end + Math.PI * 2 - start;
-    return Array.from({ length: 65 }, (_, index) => {
-      const angle = start + sweep * index / 64;
-      return new THREE.Vector3(geometry.center!.x + geometry.radius! * Math.cos(angle), geometry.center!.y + geometry.radius! * Math.sin(angle), geometry.center!.z || 0);
-    });
-  }
-  return [];
-};
-
-const createDxfModel = (text: string): THREE.Group => {
-  const drawing = new DxfParser().parseSync(text);
-  if (!drawing) throw new Error('DXF parsing failed.');
-  const positions: number[] = [];
-  drawing.entities.forEach((entity) => {
-    const points = dxfLinePoints(entity);
-    for (let index = 1; index < points.length; index += 1) positions.push(...points[index - 1].toArray(), ...points[index].toArray());
-  });
-  if (positions.length === 0) throw new Error('DXF has no supported line entities.');
-  const lineGeometry = new THREE.BufferGeometry();
-  lineGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  const group = new THREE.Group();
-  group.add(new THREE.LineSegments(lineGeometry, new THREE.LineBasicMaterial({ color: 0x2f80ff })));
-  return group;
-};
+import { isPreviewMaterial, buildPreviewMaterial, materialColor } from './materialPreview';
+import { AnimatePresence, motion } from 'motion/react';
+import { CAM_EASE } from '../ui/AnimatedModal';
+import { SUPPORTED_GEOMETRY_FORMATS, parseCadBuffer } from './cadGeometryLoaders';
 
 export interface CadViewerSetup {
   unit: ModelUnit;
@@ -55,15 +22,19 @@ export interface CadViewerSetup {
   triangleCount: number | null;
 }
 
-export const CadGeometryViewer: React.FC<{ file: CadFile; onGeometry: (geometry: CadGeometryData) => void; setup?: CadViewerSetup; onSetupChange?: (update: Partial<CadViewerSetup>) => void; thumbnail?: boolean }> = ({ file, onGeometry, setup, onSetupChange, thumbnail = false }) => {
+export const CadGeometryViewer: React.FC<{ file: CadFile; onGeometry: (geometry: CadGeometryData) => void; setup?: CadViewerSetup; onSetupChange?: (update: Partial<CadViewerSetup>) => void; thumbnail?: boolean; materialId?: string | null; colorId?: string | null }> = ({ file, onGeometry, setup, onSetupChange, thumbnail = false, materialId = null, colorId = null }) => {
   const { t } = useTranslation();
   const mountRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
+  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const modelRef = useRef<THREE.Object3D | null>(null);
   const viewerRootRef = useRef<THREE.Group | null>(null);
   const orientationRootRef = useRef<THREE.Group | null>(null);
+  const livePreviewMaterialsRef = useRef<THREE.MeshPhysicalMaterial[]>([]);
+  const lastColorRef = useRef(new THREE.Color());
+  const colorInitRef = useRef(false);
   const [geometry, setGeometry] = useState<CadGeometryData | null>(null);
   const [state, setState] = useState<'loading' | 'processing' | 'ready' | 'unavailable' | 'error'>('loading');
   const [message, setMessage] = useState('');
@@ -154,29 +125,14 @@ export const CadGeometryViewer: React.FC<{ file: CadFile; onGeometry: (geometry:
         if (!active || !result) return;
         setGeometry(result); onGeometry(result);
         if (result.status !== 'COMPLETE') { setState('processing'); timer = window.setTimeout(load, 1100); return; }
-        if (result.metadata?.geometryStatus !== 'READY' || !result.metadata.viewerAsset?.available || !['STL', 'OBJ', 'PLY', 'DXF', 'SVG', 'PDF', 'STEP', 'STP', 'IGES', 'IGS'].includes(result.format)) { setState('unavailable'); return; }
+        if (result.metadata?.geometryStatus !== 'READY' || !result.metadata.viewerAsset?.available || !SUPPORTED_GEOMETRY_FORMATS.includes(result.format)) { setState('unavailable'); return; }
         const blob = await ApiService.getCadViewerAsset(file.id, versionId); const buffer = await blob.arrayBuffer();
         if (result.format === 'SVG' || result.format === 'PDF') {
           viewerUrl = URL.createObjectURL(blob);
           if (!active) { URL.revokeObjectURL(viewerUrl); return; }
           setDocumentUrl(viewerUrl); setState('ready'); return;
         }
-        let model: THREE.Object3D;
-        if (result.format === 'STL') {
-          const bufferGeometry = new STLLoader().parse(buffer); bufferGeometry.computeVertexNormals();
-          model = new THREE.Mesh(bufferGeometry, new THREE.MeshStandardMaterial({ color: 0x72e6d2, metalness: .18, roughness: .5, side: THREE.DoubleSide }));
-        } else if (result.format === 'OBJ') {
-          model = new OBJLoader().parse(new TextDecoder().decode(buffer));
-          model.traverse((child) => { if (child instanceof THREE.Mesh) child.material = new THREE.MeshStandardMaterial({ color: 0x72e6d2, metalness: .18, roughness: .5, side: THREE.DoubleSide }); });
-        } else if (result.format === 'PLY') {
-          const bufferGeometry = new PLYLoader().parse(buffer); bufferGeometry.computeVertexNormals();
-          model = new THREE.Mesh(bufferGeometry, new THREE.MeshStandardMaterial({ color: 0x72e6d2, metalness: .18, roughness: .5, side: THREE.DoubleSide, vertexColors: bufferGeometry.hasAttribute('color') }));
-        } else if (['STEP', 'STP', 'IGES', 'IGS'].includes(result.format)) {
-          const gltf = await new GLTFLoader().parseAsync(buffer, '');
-          model = gltf.scene;
-        } else {
-          model = createDxfModel(new TextDecoder().decode(buffer));
-        }
+        const model = await parseCadBuffer(result.format, buffer);
         if (!active) return;
         modelRef.current = model; setState('ready');
       } catch (error) {
@@ -189,6 +145,62 @@ export const CadGeometryViewer: React.FC<{ file: CadFile; onGeometry: (geometry:
   }, [file.id, t]);
 
   useEffect(() => {
+    const model = modelRef.current;
+    if (state !== 'ready' || !model) return;
+    const activeMaterialId = isPreviewMaterial(materialId) ? materialId : null;
+    const hasVertexColors = (() => { let found = false; model.traverse((object) => { if (object instanceof THREE.Mesh && object.geometry.getAttribute('color')) found = true; }); return found; })();
+    const shared = buildPreviewMaterial(activeMaterialId, colorId, { doubleSide: true });
+    const vertexColored = hasVertexColors && shared !== null ? shared.clone() : null;
+    if (vertexColored) vertexColored.vertexColors = true;
+    const replaced: (THREE.Material | THREE.Material[])[] = [];
+    model.traverse((object) => {
+      if (!(object instanceof THREE.Mesh)) return;
+      replaced.push(object.material);
+      object.material = (vertexColored && object.geometry.getAttribute('color')) ? vertexColored : shared;
+    });
+    livePreviewMaterialsRef.current = vertexColored ? [shared, vertexColored] : [shared];
+    return () => {
+      livePreviewMaterialsRef.current = [];
+      replaced.forEach((m) => { const list = Array.isArray(m) ? m : [m]; list.forEach((item) => item.dispose()); });
+      shared.dispose();
+      vertexColored?.dispose();
+    };
+  }, [state, materialId, colorId]);
+
+  /* Lightweight material colour transition: when the selected material / colour
+     changes, glide the live material's base colour from the last committed hue
+     to the new one (~320ms, ease-out). This is a plain three.js mutation picked
+     up by the existing render loop — it never recreates the renderer, never
+     animates the camera or geometry, and does not drive React state. */
+  useEffect(() => {
+    if (state !== 'ready') return;
+    const materials = livePreviewMaterialsRef.current;
+    const target = new THREE.Color(materialColor(colorId || 'any'));
+    if (materials.length === 0) { lastColorRef.current.copy(target); return; }
+    if (!colorInitRef.current) {
+      colorInitRef.current = true;
+      lastColorRef.current.copy(target);
+      return;
+    }
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || lastColorRef.current.equals(target)) {
+      lastColorRef.current.copy(target);
+      return;
+    }
+    const from = lastColorRef.current.clone();
+    const duration = 320;
+    const start = performance.now();
+    let raf = 0;
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - start) / duration);
+      const eased = 1 - Math.pow(1 - t, 3);
+      materials.forEach((material) => { material.color.copy(from).lerp(target, eased); });
+      if (t < 1) { raf = requestAnimationFrame(tick); } else { lastColorRef.current.copy(target); }
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [state, materialId, colorId]);
+
+  useEffect(() => {
     const mount = mountRef.current; const model = modelRef.current;
     if (state !== 'ready' || !mount || !model) return;
     const scene = new THREE.Scene(); sceneRef.current = scene;
@@ -196,9 +208,21 @@ export const CadGeometryViewer: React.FC<{ file: CadFile; onGeometry: (geometry:
     const theme = getComputedStyle(document.documentElement); scene.background = new THREE.Color(theme.getPropertyValue('--cam-bg').trim() || '#0a0a0a');
     const camera = new THREE.PerspectiveCamera(45, 1, .01, 100000); cameraRef.current = camera;
     camera.up.set(0, 0, 1);
-    const renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); renderer.outputColorSpace = THREE.SRGBColorSpace; mount.appendChild(renderer.domElement);
+    const renderer = new THREE.WebGLRenderer({ antialias: true }); rendererRef.current = renderer; renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); renderer.outputColorSpace = THREE.SRGBColorSpace; mount.appendChild(renderer.domElement);
+    // Physically-based presentation: ACES tonemapping (Mr. r185 also default-encodes sRGB output via
+    // outputColorSpace) plus a shared PMREM environment so every material reads from the same IBL.
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.05;
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    pmrem.dispose();
     const controls = new OrbitControls(camera, renderer.domElement); controls.enableDamping = true; controls.screenSpacePanning = true; controls.enableRotate = !is2D; controlsRef.current = controls;
-    scene.add(new THREE.HemisphereLight(0xffffff, 0x26364d, 2.2)); const directional = new THREE.DirectionalLight(0xffffff, 2.4); directional.position.set(4, 7, 5); scene.add(directional);
+    // Controlled studio-style rig: soft ambient fill + key/fill/rim so curvature,
+    // roughness and reflections stay readable without flooding the model.
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x2c3b4f, 1.0));
+    const key = new THREE.DirectionalLight(0xffffff, 2.0); key.position.set(6, 8, 5); scene.add(key);
+    const fillLight = new THREE.DirectionalLight(0xcdd8e6, 0.6); fillLight.position.set(-5, 3, -4); scene.add(fillLight);
+    const rimLight = new THREE.DirectionalLight(0x93a7c4, 0.65); rimLight.position.set(-4, 5, -7); scene.add(rimLight);
     const viewerRoot = new THREE.Group(); viewerRootRef.current = viewerRoot;
     const orientationRoot = new THREE.Group(); orientationRootRef.current = orientationRoot; orientationRoot.add(model); viewerRoot.add(orientationRoot);
     scene.add(viewerRoot);
@@ -206,7 +230,7 @@ export const CadGeometryViewer: React.FC<{ file: CadFile; onGeometry: (geometry:
     fitModel();
     let frame = 0; let previous = performance.now();
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    controls.autoRotate = !is2D && !reducedMotion;
+    controls.autoRotate = thumbnail ? false : !is2D && !reducedMotion;
     controls.autoRotateSpeed = 0.6;
     const resize = () => { const rect = mount.getBoundingClientRect(); renderer.setSize(rect.width, rect.height, false); camera.aspect = rect.width / Math.max(rect.height, 1); camera.updateProjectionMatrix(); };
     const render = (now: number) => {
@@ -214,7 +238,7 @@ export const CadGeometryViewer: React.FC<{ file: CadFile; onGeometry: (geometry:
       controls.update(delta); renderer.render(scene, camera); frame = requestAnimationFrame(render);
     };
     resize(); render(performance.now()); const observer = new ResizeObserver(resize); observer.observe(mount);
-    return () => { observer.disconnect(); cancelAnimationFrame(frame); controls.dispose(); renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove(); scene.traverse((object) => { if (object instanceof THREE.Mesh) { object.geometry.dispose(); const materials = Array.isArray(object.material) ? object.material : [object.material]; materials.forEach((material) => material.dispose()); } }); sceneRef.current = null; controlsRef.current = null; cameraRef.current = null; viewerRootRef.current = null; orientationRootRef.current = null; };
+    return () => { observer.disconnect(); cancelAnimationFrame(frame); controls.dispose(); renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove(); scene.environment?.dispose(); scene.traverse((object) => { if (object instanceof THREE.Mesh) { object.geometry.dispose(); const materials = Array.isArray(object.material) ? object.material : [object.material]; materials.forEach((material) => material.dispose()); } }); sceneRef.current = null; controlsRef.current = null; rendererRef.current = null; cameraRef.current = null; viewerRootRef.current = null; orientationRootRef.current = null; };
   }, [state]);
 
   useEffect(() => {
@@ -288,15 +312,42 @@ export const CadGeometryViewer: React.FC<{ file: CadFile; onGeometry: (geometry:
     <div className="geometry-module-body">
       {!thumbnail && (
         <section className="geometry-properties-panel" aria-label={t('geometry.modelProperties')}>
-          <div className="geometry-properties-heading"><h3><Icon name="configure" size={15} /> {t('geometry.modelProperties')}</h3><div className="geometry-unit-selector" role="group" aria-label={t('geometry.unit')}><span className="geometry-unit-label">{t('geometry.unit')}</span>{(['mm', 'cm', 'in', 'm'] as ModelUnit[]).map((option) => <button type="button" key={option} className={unit === option ? 'is-active' : ''} onClick={() => onSetupChange?.({ unit: option })}>{option}</button>)}</div></div>
+          <div className="geometry-properties-header">
+            <div className="geometry-properties-heading">
+              <span className="geometry-properties-icon" aria-hidden="true"><Icon name="configure" size={15} /></span>
+              <div className="geometry-properties-heading-text">
+                <h3>{t('geometry.modelProperties')}</h3>
+                <p className="geometry-properties-subtitle">{t('geometry.modelPropertiesSubtitle')}</p>
+              </div>
+            </div>
+            <div className="geometry-unit-selector" role="group" aria-label={t('geometry.unit')}><span className="geometry-unit-label">{t('geometry.unit')}</span>{(['mm', 'cm', 'in', 'm'] as ModelUnit[]).map((option) => <button type="button" key={option} className={unit === option ? 'is-active' : ''} aria-pressed={unit === option} onClick={() => onSetupChange?.({ unit: option })}>{option}</button>)}</div>
+          </div>
+          <div className="geometry-properties-divider" role="separator" aria-hidden="true" />
           <section className="geometry-bounding-card">
-            <h4 className="geometry-section-label">{t('geometry.boundingBox', { unit })}</h4>
-            <div className="geometry-dimensions">{(['x', 'y', 'z'] as const).map((axis) => <label className="geometry-dimension" key={axis}><b>{axis.toUpperCase()}</b><input aria-label={`${axis.toUpperCase()} dimension in ${unit}`} type="number" min="0.000001" step="any" value={displayDimensions ? Math.round(displayDimensions[axis]) : ''} onChange={(event) => { const next = Number(event.target.value); if (!Number.isFinite(next) || next <= 0 || !dimensions) return; const nextMm = convertLength(next, unit, 'mm'); const scaled = scaleDimensions(dimensions, axis, nextMm); const scale = dimensions[axis] ? scaled[axis] / dimensions[axis] : 1; onSetupChange?.({ dimensions: scaled, volume: baseVolume === null ? null : baseVolume * scale ** 3, surfaceArea: baseSurfaceArea === null ? null : baseSurfaceArea * scale ** 2 }); }} /></label>)}</div>
+            <h4 className="geometry-section-label">{t('geometry.boundingBox', { unit: unit.toUpperCase() })}</h4>
+            <div className="geometry-dimensions">{(['x', 'y', 'z'] as const).map((axis, index) => (
+              <Fragment key={axis}>
+                {index > 0 && <span className="geometry-dimension-sep" aria-hidden="true" />}
+                <label className="geometry-dimension">
+                  <span className="geometry-dimension-axis"><Icon name={axis === 'x' ? 'dimensionX' : axis === 'y' ? 'dimensionY' : 'dimensionZ'} size={13} /><b>{axis.toUpperCase()}</b></span>
+                  <input aria-label={`${axis.toUpperCase()} dimension in ${unit}`} type="number" min="0.000001" step="any" value={displayDimensions ? Math.round(displayDimensions[axis]) : ''} onChange={(event) => { const next = Number(event.target.value); if (!Number.isFinite(next) || next <= 0 || !dimensions) return; const nextMm = convertLength(next, unit, 'mm'); const scaled = scaleDimensions(dimensions, axis, nextMm); const scale = dimensions[axis] ? scaled[axis] / dimensions[axis] : 1; onSetupChange?.({ dimensions: scaled, volume: baseVolume === null ? null : baseVolume * scale ** 3, surfaceArea: baseSurfaceArea === null ? null : baseSurfaceArea * scale ** 2 }); }} />
+                </label>
+              </Fragment>
+            ))}</div>
           </section>
-          <p className="geometry-uniform-hint"><Icon name="configure" size={13} /> {t('geometry.uniformScaling')}</p>
-          <div className="geometry-metrics"><div className="geometry-metric geometry-volume"><span>{t('geometry.volume')}</span><strong>{displayVolume === null ? t('geometry.notAvailable') : formatModelValue(displayVolume, unit === 'm' ? 8 : unit === 'in' ? 5 : 2)}<small> {unit}³</small></strong></div><div className="geometry-metric geometry-area"><span>{t('geometry.surfaceArea')}</span><strong>{displaySurfaceArea === null ? t('geometry.notAvailable') : formatModelValue(displaySurfaceArea, unit === 'm' ? 8 : unit === 'in' ? 5 : 2)}<small> {unit}²</small></strong></div></div>
+          <div className="geometry-uniform-row">
+            <span className="geometry-uniform-row-icon" aria-hidden="true"><Icon name="scaling" size={14} /></span>
+            <span className="geometry-uniform-text"><b>{t('geometry.uniformScalingTitle')}</b><span>{t('geometry.uniformScalingDescription')}</span></span>
+          </div>
+          <div className="geometry-metrics"><div className="geometry-metric geometry-volume"><span className="geometry-metric-title"><Icon name="cube" size={12} /> {t('geometry.volume')}</span><strong>{displayVolume === null ? t('geometry.notAvailable') : formatModelValue(displayVolume, unit === 'm' ? 8 : unit === 'in' ? 5 : 2)}<small> {unit}³</small></strong></div><div className="geometry-metric geometry-area"><span className="geometry-metric-title"><Icon name="surface" size={12} /> {t('geometry.surfaceArea')}</span><strong>{displaySurfaceArea === null ? t('geometry.notAvailable') : formatModelValue(displaySurfaceArea, unit === 'm' ? 8 : unit === 'in' ? 5 : 2)}<small> {unit}²</small></strong></div></div>
           <section className="geometry-mesh-info">
-            <h4 className="geometry-section-label">{t('geometry.meshInformation')}</h4>
+            <div className="geometry-mesh-intro">
+              <span className="geometry-mesh-icon" aria-hidden="true"><Icon name="network" size={14} /></span>
+              <div className="geometry-mesh-intro-text">
+                <h4 className="geometry-section-label">{t('geometry.meshInformation')}</h4>
+                <p className="geometry-mesh-subtitle">{t('geometry.meshInformationSubtitle')}</p>
+              </div>
+            </div>
             <div className="geometry-mesh-stats">{meshStats.map((stat, index) => (
               <Fragment key={stat.label}>
                 {index > 0 && <span className="geometry-mesh-sep" aria-hidden="true" />}
@@ -307,15 +358,42 @@ export const CadGeometryViewer: React.FC<{ file: CadFile; onGeometry: (geometry:
         </section>
       )}
       <section className="geometry-viewer-section">
-        <section ref={panelRef} className={`geometry-canvas-panel${isFullscreen ? ' is-fullscreen' : ''}`} aria-label={is2D ? t('geometry.viewer2dLabel') : t('geometry.viewerLabel')}>
+        <section ref={panelRef} className={`geometry-canvas-panel${isFullscreen ? ' is-fullscreen' : ''}`} data-material={isPreviewMaterial(materialId) ? materialId : ''} data-color={colorId || ''} aria-label={is2D ? t('geometry.viewer2dLabel') : t('geometry.viewerLabel')}>
           {state === 'ready' && documentUrl && geometry?.format === 'SVG' && <img className="geometry-document-canvas" src={documentUrl} alt={t('geometry.viewer2dLabel')} />}
           {state === 'ready' && documentUrl && geometry?.format === 'PDF' && <iframe className="geometry-document-canvas" src={documentUrl} title={t('geometry.documentLabel')} />}
           {state === 'ready' && !documentUrl && <><div ref={mountRef} className="geometry-canvas" /><div className="geometry-toolbar"><button title={t('geometry.resetView')} aria-label={t('geometry.resetView')} onClick={fitModel}><Icon name="reset" size={16} /></button><button title={isFullscreen ? t('geometry.exitFullscreen') : t('geometry.fullscreen')} aria-label={isFullscreen ? t('geometry.exitFullscreen') : t('geometry.fullscreen')} onClick={() => setIsFullscreen((v) => !v)}><Icon name="expand" size={16} /></button></div><div className="geometry-controls-hint">{t('geometry.rotateHint')} <span>{t('geometry.zoomHint')}</span><span>{t('geometry.panHint')}</span></div></>}
           {state === 'ready' && isFullscreen && <button className="geometry-fullscreen-close" title={t('geometry.exitFullscreen')} aria-label={t('geometry.exitFullscreen')} onClick={() => setIsFullscreen(false)}><Icon name="close" size={20} /></button>}
-          {isFullscreen && !thumbnail && createPortal(<div className="geometry-fullscreen-overlay" aria-hidden="true" onClick={() => setIsFullscreen(false)} />, document.getElementById('root') ?? document.body)}
-          {(state === 'loading' || state === 'processing') && <div className="geometry-state"><span className="geometry-spinner" /><strong>{t('geometry.processing')}</strong><p>{t('geometry.processingDescription')}</p></div>}
-          {state === 'unavailable' && <div className="geometry-state"><strong>{t('geometry.unavailable')}</strong><p>{t('geometry.unavailableDescription', { format: geometry?.format || file.format })}</p></div>}
-          {state === 'error' && <div className="geometry-state geometry-error"><strong>{t('geometry.error')}</strong><p>{message}</p><button className="btn btn-outline" onClick={() => void retry()}>{t('geometry.retry')}</button></div>}
+          <AnimatePresence>
+            {isFullscreen && !thumbnail && createPortal(
+              <motion.div
+                className="geometry-fullscreen-overlay cam-motion"
+                aria-hidden="true"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3, ease: CAM_EASE }}
+                onClick={() => setIsFullscreen(false)}
+              />,
+              document.getElementById('root') ?? document.body,
+            )}
+          </AnimatePresence>
+          <AnimatePresence initial={false}>
+            {(state === 'loading' || state === 'processing') && (
+              <motion.div key="geometry-busy" className="geometry-state cam-motion" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.22, ease: CAM_EASE }}>
+                <span className="geometry-spinner" /><strong>{t('geometry.processing')}</strong><p>{t('geometry.processingDescription')}</p>
+              </motion.div>
+            )}
+            {state === 'unavailable' && (
+              <motion.div key="geometry-unavailable" className="geometry-state cam-motion" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.22, ease: CAM_EASE }}>
+                <strong>{t('geometry.unavailable')}</strong><p>{t('geometry.unavailableDescription', { format: geometry?.format || file.format })}</p>
+              </motion.div>
+            )}
+            {state === 'error' && (
+              <motion.div key="geometry-error" className="geometry-state geometry-error cam-motion" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.22, ease: CAM_EASE }}>
+                <strong>{t('geometry.error')}</strong><p>{message}</p><button className="btn btn-outline" onClick={() => void retry()}>{t('geometry.retry')}</button>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </section>
       </section>
     </div>

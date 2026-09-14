@@ -256,6 +256,42 @@ export const AdminOrderDetailView: React.FC = () => {
             </AdminCard>
 
             <AdminCard>
+              <AdminCardHeader title="Technical Notes & Documents" />
+              <AdminCardBody>
+                {order.technicalNotes ? (
+                  <div className="admin-muted" style={{ whiteSpace: 'pre-wrap', margin: '0 0 12px', padding: 12, border: '1px solid var(--admin-border)', borderRadius: 10, background: 'var(--admin-card-2)' }}>
+                    {order.technicalNotes}
+                  </div>
+                ) : (
+                  <EmptyState icon="file" text="No technical notes were provided." />
+                )}
+                <div className="admin-list">
+                  {(order.technicalDocuments || []).map((doc: any) => {
+                    const ext = (doc?.name || '').split('.').pop()?.toUpperCase() || '';
+                    const size = doc?.byteSize
+                      ? doc.byteSize < 1024 * 1024 ? `${(doc.byteSize / 1024).toFixed(0)} KB` : `${(doc.byteSize / (1024 * 1024)).toFixed(2)} MB`
+                      : '';
+                    return (
+                      <div key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', border: '1px solid var(--admin-border)', borderRadius: 10, background: 'var(--admin-card-2)' }}>
+                        <span style={{ fontWeight: 600, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, fontSize: 13 }} title={doc.name}>{doc.name}</span>
+                        <span className="admin-muted" style={{ fontSize: 12, flex: 'none' }}>{(doc.scanStatus === 'QUARANTINED' ? 'QUARANTINED · ' : '')}{[ext, size].filter(Boolean).join(' · ')}</span>
+                        <a
+                          href={ApiService.getTechnicalDocumentDownloadUrl(doc.id)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ flex: 'none', fontSize: 13, fontWeight: 600, color: 'var(--admin-primary, #1677ff)' }}
+                        >
+                          Open
+                        </a>
+                      </div>
+                    );
+                  })}
+                  {(order.technicalDocuments || []).length === 0 && <EmptyState icon="clipboard" text="No technical documents are attached to this order." />}
+                </div>
+              </AdminCardBody>
+            </AdminCard>
+
+            <AdminCard>
               <AdminCardHeader title={t('admin.orderDetail.configuration')} />
               <AdminCardBody>
                 <pre className="admin-muted" style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{JSON.stringify({

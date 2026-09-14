@@ -8,6 +8,7 @@ import { Prisma, Quote } from '@prisma/client';
 import { createObjectStorage } from '../cad/object-storage';
 import { randomInt } from 'crypto';
 import { AppError } from '../utils/errors';
+import { TechnicalDocumentsService } from './technicalDocuments.service';
 
 /**
  * Quotes Service
@@ -84,6 +85,9 @@ export class QuotesService {
     surfaceFinish: string;
     cadFileIds?: string[];
     pricing: NormalizedCustomerQuote;
+    technicalNotes?: string;
+    technicalDocumentIds?: string[];
+    guestCadId?: string;
   }): Promise<Quote> {
     const prisma = getPrismaClient();
     const validUntilDate = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
@@ -107,10 +111,20 @@ export class QuotesService {
         provider: 'CAM LABS',
         providerQuoteRef: data.pricing.quoteRef,
         cadFileIds: data.cadFileIds,
+        technicalNotes: data.technicalNotes?.trim() || '',
         pricingEquationVersionId: (data.pricing.pricingBreakdown as any)?.equationVersionId || undefined,
         pricingBreakdown: data.pricing.pricingBreakdown as unknown as Prisma.InputJsonValue,
       },
     });
+
+    if (data.technicalDocumentIds?.length) {
+      await TechnicalDocumentsService.attachToQuote({
+        userId: data.userId,
+        guestId: data.guestCadId,
+        quoteId: newQuote.id,
+        technicalDocumentIds: data.technicalDocumentIds,
+      });
+    }
 
     Logger.info(`[QuotesService] Saved quotation record to database: ${newQuote.id}`);
 
@@ -127,10 +141,13 @@ export class QuotesService {
     surfaceFinish: string;
     cadFileIds?: string[];
     pricing: MultiFileQuotationResponse;
+    technicalNotes?: string;
+    technicalDocumentIds?: string[];
+    guestCadId?: string;
   }): Promise<Quote> {
     const prisma = getPrismaClient();
     const primaryVersionId = (data.pricing.files[0]?.pricingBreakdown as any)?.equationVersionId || undefined;
-    return prisma.quote.create({
+    const newQuote = await prisma.quote.create({
       data: {
         id: this.generateQuoteId(),
         userId: data.userId,
@@ -149,10 +166,22 @@ export class QuotesService {
         provider: 'CAM LABS',
         providerQuoteRef: data.pricing.quoteId,
         cadFileIds: data.cadFileIds,
+        technicalNotes: data.technicalNotes?.trim() || '',
         pricingEquationVersionId: primaryVersionId,
         pricingBreakdown: data.pricing.pricingBreakdown as unknown as Prisma.InputJsonValue,
       },
     });
+
+    if (data.technicalDocumentIds?.length) {
+      await TechnicalDocumentsService.attachToQuote({
+        userId: data.userId,
+        guestId: data.guestCadId,
+        quoteId: newQuote.id,
+        technicalDocumentIds: data.technicalDocumentIds,
+      });
+    }
+
+    return newQuote;
   }
 
   /**
@@ -164,17 +193,18 @@ export class QuotesService {
       return prisma.quote.findMany({
         where: { userId },
         orderBy: { createdAt: 'desc' },
+        include: { technicalDocuments: true },
       });
     }
-    return prisma.quote.findMany({ orderBy: { createdAt: 'desc' } });
+    return prisma.quote.findMany({ orderBy: { createdAt: 'desc' }, include: { technicalDocuments: true } });
   }
 
   /**
    * Find quote by ID
    */
-  static async getQuoteById(id: string): Promise<Quote | null> {
+  static async getQuoteById(id: string) {
     const prisma = getPrismaClient();
-    return prisma.quote.findUnique({ where: { id } });
+    return prisma.quote.findUnique({ where: { id }, include: { technicalDocuments: true } });
   }
 
   /**

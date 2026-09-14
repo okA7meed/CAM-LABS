@@ -1,4 +1,4 @@
-import { Material, Order, Quote, CadFile, CadUploadResult, User, AdminNotification, AdminNotificationList, AdminUnreadCount } from '../types';
+import { Material, Order, Quote, CadFile, CadUploadResult, User, AdminNotification, AdminNotificationList, AdminUnreadCount, TechnicalDocument } from '../types';
 
 const API_BASE = '/api/v1';
 
@@ -107,11 +107,37 @@ export class ApiError extends Error {
   }
 }
 
+/* Stable guest identity for CAD ownership, independent of cookie-commit timing.
+   Browsers only persist a Set-Cookie response after it arrives; parallel uploads
+   fired in one tick all race that round-trip and would otherwise scatter files
+   across fresh guest ids. Sending one explicit id per session (persisted in
+   localStorage) keeps every cad-files request under the SAME owner. */
+const GUEST_SESSION_STORAGE_KEY = 'cam_labs_guest_session_id';
+const guestSessionId = ((): string => {
+  try {
+    const stored = window.localStorage.getItem(GUEST_SESSION_STORAGE_KEY);
+    if (stored) return stored;
+  } catch {
+    // Storage unavailable (private mode etc.) — fall back to an in-memory id.
+  }
+  const next = crypto.randomUUID();
+  try {
+    window.localStorage.setItem(GUEST_SESSION_STORAGE_KEY, next);
+  } catch {
+    // Ignore persistence failures; the in-memory id still stabilizes the session.
+  }
+  return next;
+})();
+const GUEST_SESSION_HEADERS: Record<string, string> = { 'X-Cad-Guest-Id': guestSessionId };
+
 export class ApiService {
   private static async request<T>(endpoint: string, options: RequestInit = {}, required = false): Promise<T | null> {
     try {
       const response = await fetch(`${API_BASE}${endpoint}`, {
-        headers: options.body instanceof FormData ? options.headers : { 'Content-Type': 'application/json', ...options.headers },
+        headers: {
+          ...GUEST_SESSION_HEADERS,
+          ...(options.body instanceof FormData ? options.headers : { 'Content-Type': 'application/json', ...options.headers }),
+        },
         credentials: 'same-origin',
         ...options,
       });
@@ -294,6 +320,7 @@ export class ApiService {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', `${API_BASE}/cad-files`);
       xhr.withCredentials = true;
+      xhr.setRequestHeader('X-Cad-Guest-Id', guestSessionId);
       xhr.upload.addEventListener('progress', (event) => {
         if (event.lengthComputable) onProgress(Math.min(100, Math.round((event.loaded / event.total) * 100)));
       });
@@ -319,7 +346,7 @@ export class ApiService {
 
   static async getCadViewerAsset(fileId: string, versionId?: string): Promise<Blob> {
     const query = versionId ? `?versionId=${encodeURIComponent(versionId)}` : '';
-    const response = await fetch(`${API_BASE}/cad-files/${fileId}/viewer-asset${query}`, { credentials: 'same-origin' });
+    const response = await fetch(`${API_BASE}/cad-files/${fileId}/viewer-asset${query}`, { credentials: 'same-origin', headers: GUEST_SESSION_HEADERS });
     if (!response.ok) throw new ApiError(response.status, 'Viewer asset is unavailable.');
     return response.blob();
   }
@@ -330,6 +357,51 @@ export class ApiService {
 
   static async deleteCadFile(fileId: string) {
     return this.requestRequired<{ id: string; deletedVersionCount: number }>(`/cad-files/${fileId}`, { method: 'DELETE' });
+  }
+
+  // Technical documents (drawings, datasheets, notes)
+  static async getTechnicalDocuments() {
+    return this.request<TechnicalDocument[]>('/technical-documents');
+  }
+
+  static async uploadTechnicalDocument(file: File, onProgress?: (percentage: number) => void) {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (!onProgress) {
+      return this.requestRequired<TechnicalDocument>('/technical-documents', {
+        method: 'POST',
+        body: formData,
+      });
+    }
+    return new Promise<TechnicalDocument | null>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `${API_BASE}/technical-documents`);
+      xhr.withCredentials = true;
+      xhr.setRequestHeader('X-Cad-Guest-Id', guestSessionId);
+      xhr.upload.addEventListener('progress', (event) => {
+        if (event.lengthComputable) onProgress(Math.min(100, Math.round((event.loaded / event.total) * 100)));
+      });
+      xhr.addEventListener('error', () => reject(new ApiError(0, 'The technical document upload service is currently unavailable.')));
+      xhr.addEventListener('load', () => {
+        try {
+          const json = JSON.parse(xhr.responseText) as { data?: TechnicalDocument; error?: { message?: string } };
+          if (xhr.status < 200 || xhr.status >= 300) throw new ApiError(xhr.status, json.error?.message || `API error: ${xhr.statusText}`);
+          onProgress(100);
+          resolve(json.data || null);
+        } catch (error) {
+          reject(error);
+        }
+      });
+      xhr.send(formData);
+    });
+  }
+
+  static async deleteTechnicalDocument(documentId: string) {
+    return this.requestRequired<{ id: string }>(`/technical-documents/${encodeURIComponent(documentId)}`, { method: 'DELETE' });
+  }
+
+  static getTechnicalDocumentDownloadUrl(documentId: string): string {
+    return `${API_BASE}/technical-documents/${encodeURIComponent(documentId)}/download`;
   }
 
   // Auth / Profile

@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { ApiResponseHelper } from '../utils/response';
 import { QuotesService } from '../services/quotes.service';
-import { requireAuth, resolveCadOwner } from '../middleware/auth.middleware';
+import { requireAuth, resolveCadOwner, getGuestCadId } from '../middleware/auth.middleware';
 import { hasRole, ROLES } from '../auth/roles';
 import { sendSafeRouteError } from '../utils/errors';
 import { AdminService } from '../services/admin.service';
@@ -105,6 +105,7 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
       const pricing = await QuotesService.calculateMultiFileQuotation({ files: body.files, cadOwner: { userId: req.auth!.id } });
       const savedQuote = await QuotesService.saveMultiFileQuotation({
         userId: req.auth!.id,
+        guestCadId: getGuestCadId(req.headers.cookie),
         partName: body.partName,
         technology: body.technology,
         material: body.material,
@@ -112,6 +113,8 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
         toleranceGrade: body.toleranceGrade || 'standard',
         surfaceFinish: body.surfaceFinish || 'standard',
         cadFileIds: body.files.map((file: any) => file.fileId),
+        technicalNotes: typeof body.technicalNotes === 'string' ? body.technicalNotes.slice(0, 500) : '',
+        technicalDocumentIds: Array.isArray(body.technicalDocumentIds) ? body.technicalDocumentIds.slice(0, 10).filter((id: unknown) => typeof id === 'string') : [],
         pricing,
       });
       // Real business event: only after the multi-file quote is committed.
@@ -144,6 +147,7 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
 
     const savedQuote = await QuotesService.saveQuotation({
       userId: req.auth!.id,
+      guestCadId: getGuestCadId(req.headers.cookie),
       partName: body.partName || 'Custom_Component.step',
       technology: body.technology || 'Industrial 3D Printing',
       material: body.material || 'PA 12 (Nylon 12)',
@@ -151,6 +155,8 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
       toleranceGrade: body.toleranceGrade || 'standard',
       surfaceFinish: body.surfaceFinish || 'Standard Bead-Blasted',
       cadFileIds: Array.isArray(body.cadFileIds) ? body.cadFileIds : undefined,
+      technicalNotes: typeof body.technicalNotes === 'string' ? body.technicalNotes.slice(0, 500) : '',
+      technicalDocumentIds: Array.isArray(body.technicalDocumentIds) ? body.technicalDocumentIds.slice(0, 10).filter((id: unknown) => typeof id === 'string') : [],
       pricing,
     });
 

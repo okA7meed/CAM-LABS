@@ -18,17 +18,24 @@ vi.mock('../src/middleware/auth.middleware', () => ({
   getGuestCadId: () => undefined,
 }));
 
-vi.mock('../src/config/database', () => ({
-  getPrismaClient: () => ({
+vi.mock('../src/config/database', () => {
+  const prisma = {
     quote: { findUnique: vi.fn(async () => state.quote), update: vi.fn(async () => state.quote), updateMany: vi.fn(async () => ({ count: 1 })) },
     user: { findUnique: vi.fn(async () => ({ address: null })) },
     cadFile: { findMany: state.cadFindMany, updateMany: vi.fn() },
     order: { create: state.orderCreate, update: vi.fn(async () => ({ id: 'order-1' })) },
+    technicalDocument: { findMany: vi.fn(async () => []), updateMany: vi.fn(async () => ({ count: 0 })) },
     manufacturingRequest: { create: vi.fn(async () => ({ id: 'mfg-1' })) },
     orderEvent: { create: vi.fn(async () => ({ id: 'evt-1' })) },
     manufacturer: { findUnique: vi.fn(async () => ({ id: 'cell-1', companyName: 'CAM LABS Internal Manufacturing Cell' })) },
-  }),
-}));
+  };
+  return {
+    getPrismaClient: () => ({
+      ...prisma,
+      $transaction: async (fn: (tx: any) => unknown) => fn(prisma),
+    }),
+  };
+});
 
 vi.mock('../src/providers/manufacturing', () => ({
   getManufacturingEngine: () => ({ dispatchOrder: state.dispatchOrder }),

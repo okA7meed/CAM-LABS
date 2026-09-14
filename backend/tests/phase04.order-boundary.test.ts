@@ -10,8 +10,8 @@ const state = vi.hoisted(() => ({
   orderEventCreate: vi.fn(async () => ({ id: 'evt-1' })),
 }));
 
-vi.mock('../src/config/database', () => ({
-  getPrismaClient: () => ({
+vi.mock('../src/config/database', () => {
+  const prisma = {
     quote: {
       findUnique: vi.fn(async () => state.quote),
       update: vi.fn(async () => state.quote),
@@ -22,11 +22,18 @@ vi.mock('../src/config/database', () => ({
     },
     cadFile: { findMany: state.cadFindMany, updateMany: vi.fn() },
     order: { create: state.orderCreate, update: vi.fn(async () => ({ id: 'order-1' })) },
+    technicalDocument: { findMany: vi.fn(async () => []), updateMany: vi.fn(async () => ({ count: 0 })) },
     manufacturingRequest: { create: state.mfgRequestCreate },
     orderEvent: { create: state.orderEventCreate },
     manufacturer: { findUnique: vi.fn(async () => ({ id: 'cell-1', companyName: 'CAM LABS Internal Manufacturing Cell' })) },
-  }),
-}));
+  };
+  return {
+    getPrismaClient: () => ({
+      ...prisma,
+      $transaction: async (fn: (tx: any) => unknown) => fn(prisma),
+    }),
+  };
+});
 
 vi.mock('../src/providers/manufacturing', () => ({
   getManufacturingEngine: () => ({ dispatchOrder: state.dispatchOrder }),
@@ -114,6 +121,25 @@ describe('Phase 04 order trust boundary', () => {
     expect(createData.totalCost).toBe('1,480.00 EGP');
     expect(createData.serviceFee).toBeNull();
     expect(order).not.toBeNull();
+  });
+
+  it('adds a server-side 100 EGP priority shipping surcharge only when requested', async () => {
+    state.quote = makeQuote({ totalPrice: '1,480.00 EGP' });
+
+    const base = await OrdersService.createOrder(orderRequest());
+    let createData = state.orderCreate.mock.calls[0][0].data;
+    expect(createData.totalCost).toBe('1,480.00 EGP');
+    expect(createData.shippingCost).toBeNull();
+    expect(createData.shippingMethod).toBe('Express Courier');
+
+    state.orderCreate.mockClear();
+    const priority = await OrdersService.createOrder(orderRequest({ priorityShipping: true }));
+    createData = state.orderCreate.mock.calls[0][0].data;
+    expect(createData.totalCost).toBe('1,580.00 EGP');
+    expect(createData.shippingCost).toBe('100.00 EGP');
+    expect(createData.shippingMethod).toBe('Priority Express Courier');
+    expect(base).not.toBeNull();
+    expect(priority).not.toBeNull();
   });
 
   it('records an in-house manufacturing request and order events (no external provider)', async () => {

@@ -416,6 +416,7 @@ router.get('/orders/:id', requireOperationsAdmin, async (req: Request, res: Resp
             },
           },
         },
+        technicalDocuments: true,
         pricingEquationVersion: true,
         events: {
           orderBy: { createdAt: 'asc' },
@@ -1243,6 +1244,7 @@ router.get('/quotes/:id', requireSupportAdmin, async (req: Request, res: Respons
     const quote = await prisma.quote.findUnique({
       where: { id: req.params.id },
       include: {
+        technicalDocuments: true,
         user: {
           select: {
             id: true,

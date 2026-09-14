@@ -9,6 +9,7 @@ import { OrdersToolbar } from './orders/OrdersToolbar';
 import { OrdersTable } from './orders/OrdersTable';
 import { OrdersPagination } from './orders/OrdersPagination';
 import { CreateOrderModal } from './orders/CreateOrderModal';
+import { AnimatePresence } from 'motion/react';
 
 const LIMIT = 20;
 
@@ -215,15 +216,17 @@ export const AdminOrdersView: React.FC = () => {
           onPageChange={setPage}
         />
 
-        {showCreateModal && (
-          <CreateOrderModal
-            onClose={() => setShowCreateModal(false)}
-            onConverted={() => {
-              setShowCreateModal(false);
-              void load();
-            }}
-          />
-        )}
+        <AnimatePresence>
+          {showCreateModal && (
+            <CreateOrderModal
+              onClose={() => setShowCreateModal(false)}
+              onConverted={() => {
+                setShowCreateModal(false);
+                void load();
+              }}
+            />
+          )}
+        </AnimatePresence>
       </div>
     </AdminLayout>
   );

@@ -1,6 +1,7 @@
 /* ==========================================================================
    CAM LABS — Reusable UI Components
    Buttons, Badges, Cards, Modals, Forms, Inputs, Tabs & Alerts
+   Premium industrial-grade interaction design
    ========================================================================== */
 
 /* --------------------------------------------------------------------------
@@ -27,9 +28,32 @@
 }
 
 .btn:disabled, .btn.disabled {
-  opacity: 0.45;
+  opacity: 0.4;
   cursor: not-allowed;
   pointer-events: none;
+  filter: saturate(0.5);
+}
+
+.btn.is-loading {
+  position: relative;
+  color: transparent !important;
+  pointer-events: none;
+}
+
+.btn.is-loading::before {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: cam-spin 0.6s linear infinite;
+}
+
+.btn-secondary.is-loading::before {
+  border-color: var(--cam-border-medium);
+  border-top-color: var(--cam-text-primary);
 }
 
 .btn:focus-visible,
@@ -342,6 +366,17 @@
   box-shadow: var(--shadow-lg);
 }
 
+.card-interactive:active {
+  transform: translateY(0);
+  box-shadow: var(--shadow-sm);
+  transition-duration: 80ms;
+}
+
+.card-interactive:focus-visible {
+  outline: 2px solid var(--cam-blue-primary);
+  outline-offset: 2px;
+}
+
 .card-highlight {
   border-color: var(--cam-border-blue);
   background: linear-gradient(180deg, rgba(0, 102, 255, 0.05) 0%, var(--cam-surface-1) 100%);
@@ -466,20 +501,31 @@
 
 .form-control {
   width: 100%;
-  background-color: var(--cam-bg);
+  background-color: var(--cam-surface-1);
   border: 1px solid var(--cam-border-medium);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   color: var(--cam-text-primary);
   font-family: var(--font-sans);
   font-size: 0.9375rem;
   padding: 0.6875rem 0.875rem;
-  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), background-color var(--transition-fast);
+}
+
+.form-control:hover:not(:disabled):not(:focus) {
+  border-color: var(--cam-border-strong);
 }
 
 .form-control:focus {
   outline: none;
   border-color: var(--cam-blue-primary);
-  box-shadow: 0 0 0 2px var(--cam-blue-subtle);
+  box-shadow: 0 0 0 3px var(--cam-blue-subtle);
+  background-color: var(--cam-bg);
+}
+
+.form-control:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background-color: var(--cam-surface-2);
 }
 
 .form-control::placeholder {
@@ -488,10 +534,20 @@
 
 .form-control.is-invalid {
   border-color: var(--cam-danger);
+  background-color: var(--cam-danger-dim);
 }
 
 .form-control.is-invalid:focus {
-  box-shadow: 0 0 0 2px var(--cam-danger-subtle);
+  box-shadow: 0 0 0 3px var(--cam-danger-subtle);
+  border-color: var(--cam-danger);
+}
+
+.form-control.is-valid {
+  border-color: var(--cam-success);
+}
+
+.form-control.is-valid:focus {
+  box-shadow: 0 0 0 3px var(--cam-success-subtle);
 }
 
 .form-feedback {
@@ -672,7 +728,8 @@ select.form-control {
   position: fixed;
   inset: 0;
   background-color: rgba(0, 0, 0, 0.75);
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   z-index: 1000;
   display: flex;
   align-items: center;
@@ -691,14 +748,15 @@ select.form-control {
 .modal-card {
   background-color: var(--cam-surface-1);
   border: 1px solid var(--cam-border-medium);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-xl);
   width: 100%;
   max-width: 600px;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: var(--shadow-xl);
-  transform: translateY(16px) scale(0.98);
-  transition: transform var(--transition-base);
+  box-shadow: var(--shadow-2xl);
+  transform: translateY(24px) scale(0.96);
+  transition: transform var(--transition-smooth), opacity var(--transition-base);
+  opacity: 0;
 }
 
 .modal-card.modal-lg {
@@ -707,6 +765,11 @@ select.form-control {
 
 .modal-overlay.active .modal-card {
   transform: translateY(0) scale(1);
+  opacity: 1;
+}
+
+.modal-card:focus {
+  outline: none;
 }
 
 .modal-header {

@@ -1,5 +1,23 @@
 @keyframes geometry-spin { to { transform: rotate(360deg); } }
 
+/* Entrance for the live viewer stages. Only ever runs when the state block
+   (motion-driven, fades via .cam-motion) is replaced by a freshly mounted
+   canvas/document, so this crossfades spinner → model without layout motion. */
+@keyframes geometry-stage-in {
+  from { opacity: 0; }
+}
+
+.geometry-canvas-panel > .geometry-canvas,
+.geometry-canvas-panel > .geometry-document-canvas {
+  animation: geometry-stage-in 280ms var(--cam-ease-out) backwards;
+}
+
+.geometry-canvas-panel > .geometry-canvas,
+.geometry-canvas-panel > .geometry-document-canvas,
+.geometry-canvas-panel > .geometry-state {
+  grid-area: stage;
+}
+
 /* ── Outer module ─────────────────────────────────────────────────────────── *
  * The 3D Model Viewer is one self-contained module: a full-width header on
  * top, and a two-panel inspection body (Model Properties | 3D Viewport)
@@ -54,24 +72,58 @@
 
 /* ── Model Properties ─────────────────────────────────────────────────────── */
 
-.geometry-properties-heading {
+.geometry-properties-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-4);
+  gap: var(--space-3);
+  min-width: 0;
 }
-.geometry-properties-heading h3 {
+
+.geometry-properties-heading {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 9px;
+  min-width: 0;
+}
+
+.geometry-properties-icon {
+  display: grid;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--cam-cyan-tech) 30%, transparent);
+  border-radius: 7px;
+  background: var(--cam-blue-subtle);
+  color: var(--cam-cyan-tech);
+}
+
+.geometry-properties-heading-text { min-width: 0; }
+.geometry-properties-heading h3 {
   margin: 0;
+  overflow: hidden;
   color: var(--cam-text-primary);
   font-size: .95rem;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.geometry-properties-heading h3 svg { color: var(--cam-cyan-tech); }
+.geometry-properties-subtitle {
+  margin: 2px 0 0;
+  color: var(--cam-text-muted);
+  font-size: .66rem;
+  line-height: 1.35;
+}
+
+.geometry-properties-divider {
+  height: 1px;
+  background: linear-gradient(90deg, var(--cam-border-medium), transparent);
+}
 
 .geometry-unit-selector {
   display: flex;
+  flex: none;
   align-items: center;
   gap: 4px;
 }
@@ -93,8 +145,12 @@
   background: var(--cam-blue-subtle);
   color: var(--cam-blue-hover);
 }
+.geometry-unit-selector button:focus-visible {
+  outline: 2px solid var(--cam-blue-primary);
+  outline-offset: 1px;
+}
 
-/* Bounding Box card */
+/* Bounding Box card — three equal editable columns split by thin rules */
 
 .geometry-bounding-card,
 .geometry-mesh-info {
@@ -116,11 +172,33 @@
 
 .geometry-dimensions {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-3);
+  grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr) 1px minmax(0, 1fr);
+  min-width: 0;
 }
-.geometry-dimension { display: grid; gap: 3px; min-width: 0; }
-.geometry-dimension b { color: var(--cam-text-muted); font: 600 .66rem var(--font-mono); letter-spacing: .05em; }
+.geometry-dimension {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding-inline: 6px;
+}
+.geometry-dimension:first-child { padding-inline-start: 0; }
+.geometry-dimension:last-child { padding-inline-end: 0; }
+.geometry-dimension-sep {
+  align-self: stretch;
+  background: var(--cam-border-subtle);
+}
+.geometry-dimension-axis {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--cam-text-muted);
+}
+.geometry-dimension-axis svg { color: var(--cam-cyan-tech); }
+.geometry-dimension-axis b {
+  color: var(--cam-text-muted);
+  font: 600 .66rem var(--font-mono);
+  letter-spacing: .05em;
+}
 .geometry-dimension input {
   width: 100%;
   min-width: 0;
@@ -130,17 +208,47 @@
   background: var(--cam-surface-1);
   color: var(--cam-text-primary);
   font: 700 .92rem var(--font-mono);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
-.geometry-dimension input:focus-visible { border-color: var(--cam-blue-primary); outline: none; }
+.geometry-dimension input:focus-visible { border-color: var(--cam-blue-primary); outline: none; box-shadow: 0 0 0 3px var(--cam-blue-subtle); }
 
-.geometry-uniform-hint {
+/* Uniform scaling row */
+
+.geometry-uniform-row {
   display: flex;
   align-items: center;
-  gap: 7px;
-  color: var(--cam-cyan-tech);
-  font-size: .7rem;
+  gap: 8px;
+  min-width: 0;
+  padding: 7px 10px;
+  border: 1px solid var(--cam-border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--cam-surface-2);
 }
-.geometry-uniform-hint svg { flex: none; }
+.geometry-uniform-row-icon {
+  display: grid;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 6px;
+  background: var(--cam-blue-subtle);
+  color: var(--cam-cyan-tech);
+}
+.geometry-uniform-text {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+.geometry-uniform-text b {
+  color: var(--cam-text-primary);
+  font: 700 .68rem var(--font-sans);
+  letter-spacing: .02em;
+}
+.geometry-uniform-text > span {
+  color: var(--cam-text-muted);
+  font-size: .62rem;
+  line-height: 1.35;
+}
 
 /* Volume | Surface Area */
 
@@ -152,25 +260,66 @@
 .geometry-metric {
   display: grid;
   gap: 5px;
+  min-width: 0;
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--cam-border-subtle);
   border-radius: var(--radius-sm);
   background: var(--cam-surface-2);
 }
-.geometry-metric > span {
+.geometry-metric-title {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  overflow: hidden;
   color: var(--cam-text-muted);
   font: 600 .7rem var(--font-mono);
   letter-spacing: .06em;
+  text-overflow: ellipsis;
   text-transform: uppercase;
+  white-space: nowrap;
 }
-.geometry-metric strong { color: var(--cam-blue-hover); font: 700 1.15rem var(--font-mono); }
+.geometry-metric strong {
+  display: block;
+  overflow: hidden;
+  color: var(--cam-blue-hover);
+  font: 700 1.15rem var(--font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .geometry-metric small { color: var(--cam-text-muted); font-size: .7rem; font-weight: 600; }
 
-.geometry-area { border-color: color-mix(in srgb, #9d76ff 38%, var(--cam-border-subtle)); }
+.geometry-volume .geometry-metric-title svg { color: var(--cam-blue-hover); }
+.geometry-area {
+  border-color: color-mix(in srgb, #9d76ff 38%, var(--cam-border-subtle));
+}
+.geometry-area .geometry-metric-title svg { color: #b197fc; }
 .geometry-area strong { color: #b197fc; }
 
-/* Mesh Information */
+/* Mesh Information — single tech strip with intro + divide-separated counts */
 
+.geometry-mesh-intro {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.geometry-mesh-icon {
+  display: grid;
+  flex: none;
+  width: 27px;
+  height: 27px;
+  place-items: center;
+  border-radius: 6px;
+  background: var(--cam-surface-3);
+  color: var(--cam-cyan-tech);
+}
+.geometry-mesh-intro-text { min-width: 0; }
+.geometry-mesh-subtitle {
+  margin: 2px 0 0;
+  color: var(--cam-text-muted);
+  font-size: .62rem;
+  line-height: 1.35;
+}
 .geometry-mesh-stats {
   display: flex;
   align-items: stretch;
@@ -205,12 +354,31 @@
 .geometry-canvas-panel {
   position: relative;
   display: grid;
+  grid-template-areas: "stage";
   min-width: 0;
   min-height: 460px;
   overflow: hidden;
   border: 1px solid var(--cam-border-medium);
   border-radius: var(--radius-sm);
-  background: var(--cam-bg);
+  background:
+    radial-gradient(ellipse at 50% 42%, rgba(0, 102, 255, 0.055), transparent 64%),
+    repeating-linear-gradient(0deg, var(--cam-border-subtle) 0 1px, transparent 1px 42px),
+    repeating-linear-gradient(90deg, var(--cam-border-subtle) 0 1px, transparent 1px 42px),
+    var(--cam-bg);
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.28);
+}
+
+/* Ambient top-edge highlight on the viewport frame */
+.geometry-canvas-panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  inset-inline: 8%;
+  height: 1px;
+  pointer-events: none;
+  z-index: 1;
+  background: linear-gradient(90deg, transparent, var(--cam-border-blue), transparent);
+  opacity: 0.35;
 }
 
 .geometry-canvas {
@@ -243,9 +411,13 @@
   left: var(--space-3);
   display: flex;
   gap: 4px;
-  padding: 0;
-  border: 0;
-  background: transparent;
+  padding: 3px;
+  border: 1px solid var(--cam-border-medium);
+  background: color-mix(in srgb, var(--cam-surface-1) 78%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 9px;
+  box-shadow: var(--shadow-lg);
 }
 
 .geometry-toolbar button {
@@ -253,9 +425,9 @@
   width: 36px;
   height: 36px;
   place-items: center;
-  border: 1px solid var(--cam-border-medium);
+  border: 0;
   border-radius: 6px;
-  background: color-mix(in srgb, var(--cam-surface-1) 92%, transparent);
+  background: transparent;
   color: var(--cam-text-secondary);
   cursor: pointer;
   font: 700 1rem var(--font-mono);
@@ -266,6 +438,18 @@
 .geometry-toolbar button:focus-visible,
 .geometry-fullscreen-close:hover,
 .geometry-fullscreen-close:focus-visible { outline: none; background: var(--cam-surface-hover); color: var(--cam-text-primary); }
+
+.geometry-unit-selector button:active,
+.geometry-toolbar button:active,
+.geometry-fullscreen-close:active {
+  transform: scale(0.94);
+}
+
+.geometry-unit-selector button,
+.geometry-toolbar button,
+.geometry-fullscreen-close {
+  transition: transform var(--transition-fast), background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+}
 
 .geometry-state {
   display: grid;
@@ -334,7 +518,6 @@
   background: rgba(2, 7, 13, 0.55);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  animation: geometry-fs-backdrop 0.22s ease-out;
 }
 
 @keyframes geometry-fs-backdrop {
@@ -351,7 +534,7 @@
   min-width: 0;
   min-height: 0;
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
-  animation: geometry-fs-panel 0.26s cubic-bezier(0.2, 0.7, 0.3, 1);
+  animation: geometry-fs-panel 0.34s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @keyframes geometry-fs-panel {
@@ -388,7 +571,10 @@
 
 @media (max-width: 640px) {
   .geometry-module-body { grid-template-columns: minmax(0, 1fr); gap: var(--space-4); min-width: 0; }
-  .geometry-dimensions, .geometry-metrics { grid-template-columns: 1fr; }
+  .geometry-dimensions { grid-template-columns: 1fr; }
+  .geometry-dimensions .geometry-dimension { padding-inline: 0; }
+  .geometry-dimensions .geometry-dimension-sep { display: none; }
+  .geometry-metrics { grid-template-columns: 1fr; }
   .geometry-canvas-panel { min-height: min(62vh, 430px); }
   .geometry-toolbar button,
   .geometry-fullscreen-close { width: 44px; height: 44px; min-width: 44px; }
@@ -407,5 +593,15 @@
 }
 
 @media (max-width: 560px) {
-  .geometry-properties-heading { align-items: flex-start; flex-direction: column; }
+  .geometry-properties-header { align-items: flex-start; flex-direction: column; }
+}
+
+/* Cadence of the state crossfades is already reduced by MotionConfig for
+   motion-driven surfaces; the CSS-managed canvas/document entrance is disabled
+   explicitly here so reduced-motion users get an instant, stable viewport. */
+@media (prefers-reduced-motion: reduce) {
+  .geometry-canvas-panel > .geometry-canvas,
+  .geometry-canvas-panel > .geometry-document-canvas {
+    animation: none;
+  }
 }

@@ -2,13 +2,12 @@ import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../../context/StoreContext';
 import { RequiredMark } from '../ui/FieldLabel';
+import { AnimatedModal } from '../ui/AnimatedModal';
 
 export const ForgotPasswordModal: React.FC = () => {
   const { t } = useTranslation();
   const { isForgotPasswordOpen, closeForgotPassword, showToast } = useStore();
   const [email, setEmail] = useState('');
-
-  if (!isForgotPasswordOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -17,9 +16,8 @@ export const ForgotPasswordModal: React.FC = () => {
   };
 
   return (
-    <div className="modal-overlay active">
-      <div className="modal-card" style={{ maxWidth: '440px' }}>
-        <div className="modal-header">
+    <AnimatedModal open={isForgotPasswordOpen} cardStyle={{ maxWidth: '440px' }}>
+      <div className="modal-header">
           <div className="modal-title">{t('auth.resetPassword')}</div>
           <button className="modal-close" onClick={closeForgotPassword}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -50,7 +48,6 @@ export const ForgotPasswordModal: React.FC = () => {
             </button>
           </form>
         </div>
-      </div>
-    </div>
+    </AnimatedModal>
   );
 };

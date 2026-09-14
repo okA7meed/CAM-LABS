@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { Icon } from '../ui/Icon';
 import { RequiredMark, OptionalMark } from '../ui/FieldLabel';
+import { AnimatedModal } from '../ui/AnimatedModal';
 
 export const AuthModal: React.FC = () => {
   const { isAuthModalOpen, closeAuthModal, authModalTab, openAuthModal, openForgotPassword, showToast, setActiveView, activeView } = useStore();
@@ -27,8 +28,6 @@ export const AuthModal: React.FC = () => {
   const [agreeTerms, setAgreeTerms] = useState(false);
 
   const [isLoading, setIsLoading] = useState(false);
-
-  if (!isAuthModalOpen) return null;
 
   // Password strength calculation
   const getPasswordStrength = () => {
@@ -119,9 +118,8 @@ export const AuthModal: React.FC = () => {
   };
 
   return (
-    <div className="modal-overlay active">
-      <div className="modal-card">
-        <div className="modal-header">
+    <AnimatedModal open={isAuthModalOpen}>
+      <div className="modal-header">
           <div className="tabs-nav" style={{ borderBottom: 'none', width: '100%' }}>
             <button
               className={`tab-btn ${authModalTab === 'login' ? 'active' : ''}`}
@@ -366,7 +364,6 @@ export const AuthModal: React.FC = () => {
             </form>
           )}
         </div>
-      </div>
-    </div>
+    </AnimatedModal>
   );
 };

@@ -63,6 +63,19 @@ export interface OrderMilestone {
 
 export type OrderStatus = 'In Review' | 'In Production' | 'Quality Inspection' | 'Delivered' | 'Cancelled';
 
+export interface TechnicalDocument {
+  id: string;
+  name: string;
+  mimeType: string;
+  byteSize: number;
+  checksum?: string;
+  scanStatus?: string;
+  quoteId?: string | null;
+  orderId?: string | null;
+  createdAt?: string;
+  userId?: string;
+}
+
 export interface Order {
   id: string;
   userId?: string;
@@ -78,11 +91,15 @@ export interface Order {
   progressStep: number;
   totalCost: string;
   tolerance: string;
+  priorityShipping?: boolean;
   trackingNum?: string;
   history: OrderMilestone[];
   cadFileIds?: string[];
   cadFileConfigs?: Array<{ cadFileId: string; configuration: Record<string, unknown>; totalCost?: string }>;
   cadFiles?: Array<{ cadFileId: string; cadFile: CadFile; configuration?: Record<string, unknown> }>;
+  technicalNotes?: string;
+  technicalDocuments?: TechnicalDocument[];
+  technicalDocumentIds?: string[];
   events?: OrderEvent[];
   user?: { id: string; name: string; email: string };
   createdAt?: string;
@@ -120,6 +137,9 @@ export interface Quote {
   totalPrice: string;
   validUntil: string;
   status: 'Draft' | 'Ready for Approval' | 'Approved' | 'Expired';
+  technicalNotes?: string;
+  technicalDocuments?: TechnicalDocument[];
+  technicalDocumentIds?: string[];
 }
 
 export interface CadFile {

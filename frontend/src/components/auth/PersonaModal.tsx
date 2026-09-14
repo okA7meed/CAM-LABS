@@ -3,13 +3,12 @@ import { useTranslation } from 'react-i18next';
 import { useStore } from '../../context/StoreContext';
 import { useAuth } from '../../context/AuthContext';
 import { DEMO_PERSONAS } from '../../data/initialData';
+import { AnimatedModal } from '../ui/AnimatedModal';
 
 export const PersonaModal: React.FC = () => {
   const { t } = useTranslation();
   const { isPersonaModalOpen, closePersonaModal, showToast } = useStore();
   const { switchPersona, currentUser } = useAuth();
-
-  if (!isPersonaModalOpen || !currentUser) return null;
 
   const handleSelect = (id: string, name: string) => {
     switchPersona(id);
@@ -18,10 +17,9 @@ export const PersonaModal: React.FC = () => {
   };
 
   return (
-    <div className="modal-overlay active">
-      <div className="modal-card">
-        <div className="modal-header">
-          <div>
+    <AnimatedModal open={isPersonaModalOpen && !!currentUser}>
+          <div className="modal-header">
+            <div>
             <div className="modal-title">{t('auth.switchPersona')}</div>
             <div style={{ fontSize: '0.75rem', color: 'var(--cam-text-muted)' }}>
               Experience CAM LABS from different customer roles
@@ -39,7 +37,7 @@ export const PersonaModal: React.FC = () => {
           {DEMO_PERSONAS.map((p) => (
             <div
               key={p.id}
-              className={`card card-interactive persona-select-card ${currentUser.id === p.id ? 'card-highlight' : ''}`}
+              className={`card card-interactive persona-select-card ${currentUser?.id === p.id ? 'card-highlight' : ''}`}
               onClick={() => handleSelect(p.id, p.name)}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -56,7 +54,6 @@ export const PersonaModal: React.FC = () => {
             </div>
           ))}
         </div>
-      </div>
-    </div>
+    </AnimatedModal>
   );
 };
