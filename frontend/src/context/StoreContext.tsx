@@ -16,6 +16,7 @@ interface StoreContextType {
 
   // Modals state
   startManufacturingRequest: () => void;
+  leavingToWorkspace: boolean;
   openComingSoon: () => void;
 
   isAuthModalOpen: boolean;
@@ -122,6 +123,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [isPersonaModalOpen, setIsPersonaModalOpen] = useState(false);
   const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
   const [isComparisonModalOpen, setIsComparisonModalOpen] = useState(false);
+  const [leavingToWorkspace, setLeavingToWorkspace] = useState(false);
 
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isOrderTimelineOpen, setIsOrderTimelineOpen] = useState(false);
@@ -171,11 +173,16 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Modals controls
   const startManufacturingRequest = () => {
-    if (window.location.pathname !== '/') {
-      window.history.pushState({}, '', '/');
+    if (activeView === 'manufacturing-request' || leavingToWorkspace) return;
+    if (window.location.pathname !== '/') window.history.pushState({}, '', '/');
+    window.scrollTo({ top: 0 });
+    const fromLanding = activeView === 'home' && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!fromLanding) {
+      setActiveView('manufacturing-request');
+      return;
     }
-    setActiveView('manufacturing-request');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setLeavingToWorkspace(true);
+    window.setTimeout(() => { setActiveView('manufacturing-request'); setLeavingToWorkspace(false); }, 580);
   };
 
   const openComingSoon = () => {
@@ -338,6 +345,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setActiveView,
 
         startManufacturingRequest,
+        leavingToWorkspace,
         openComingSoon,
 
         isAuthModalOpen,

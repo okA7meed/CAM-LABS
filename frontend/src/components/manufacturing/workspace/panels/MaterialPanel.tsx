@@ -4,11 +4,12 @@ import { PanelShell } from '../PanelShell';
 import { MATERIAL_PROPERTIES, MATERIAL_SWATCHES, panelIds } from '../constants';
 import { PanelStatus, RequestState } from '../types';
 
-export const MaterialPanel = ({ request, materialOptions, selectedColor, status, t, onSelectMaterial, onColorChange }: {
+export const MaterialPanel = ({ request, materialOptions, selectedColor, status, className, t, onSelectMaterial, onColorChange }: {
   request: RequestState;
   materialOptions: string[];
   selectedColor: string;
   status: PanelStatus;
+  className?: string;
   t: any;
   onSelectMaterial: (m: string) => void;
   onColorChange: (c: string) => void;
@@ -22,6 +23,7 @@ export const MaterialPanel = ({ request, materialOptions, selectedColor, status,
       title="Select Material"
       subtitle="Only compatible materials for your process"
       status={status}
+      className={className}
     >
       {isInactive && (
         <div className="mw-panel-empty">

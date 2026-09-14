@@ -11,7 +11,8 @@ import { ModelDimensions, ModelUnit, convertArea, convertLength, convertVolume, 
 import { isPreviewMaterial, buildPreviewMaterial, materialColor } from './materialPreview';
 import { AnimatePresence, motion } from 'motion/react';
 import { CAM_EASE } from '../ui/AnimatedModal';
-import { SUPPORTED_GEOMETRY_FORMATS, parseCadBuffer } from './cadGeometryLoaders';
+import { SUPPORTED_GEOMETRY_FORMATS } from './cadGeometryLoaders';
+import { acquireCadModel, fetchCadGeometry } from './cadGeometryCache';
 
 export interface CadViewerSetup {
   unit: ModelUnit;
@@ -30,6 +31,7 @@ export const CadGeometryViewer: React.FC<{ file: CadFile; onGeometry: (geometry:
   const controlsRef = useRef<OrbitControls | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const modelRef = useRef<THREE.Object3D | null>(null);
+  const modelHandleRef = useRef<{ release: () => void } | null>(null);
   const viewerRootRef = useRef<THREE.Group | null>(null);
   const orientationRootRef = useRef<THREE.Group | null>(null);
   const livePreviewMaterialsRef = useRef<THREE.MeshPhysicalMaterial[]>([]);
@@ -121,28 +123,32 @@ export const CadGeometryViewer: React.FC<{ file: CadFile; onGeometry: (geometry:
     const load = async () => {
       try {
         const versionId = file.latestVersion?.id;
-        const result = await ApiService.getCadGeometry(file.id, versionId);
+        const result = await fetchCadGeometry(file);
         if (!active || !result) return;
         setGeometry(result); onGeometry(result);
         if (result.status !== 'COMPLETE') { setState('processing'); timer = window.setTimeout(load, 1100); return; }
         if (result.metadata?.geometryStatus !== 'READY' || !result.metadata.viewerAsset?.available || !SUPPORTED_GEOMETRY_FORMATS.includes(result.format)) { setState('unavailable'); return; }
-        const blob = await ApiService.getCadViewerAsset(file.id, versionId); const buffer = await blob.arrayBuffer();
         if (result.format === 'SVG' || result.format === 'PDF') {
+          const blob = await ApiService.getCadViewerAsset(file.id, versionId);
           viewerUrl = URL.createObjectURL(blob);
           if (!active) { URL.revokeObjectURL(viewerUrl); return; }
           setDocumentUrl(viewerUrl); setState('ready'); return;
         }
-        const model = await parseCadBuffer(result.format, buffer);
-        if (!active) return;
-        modelRef.current = model; setState('ready');
+        const handle = await acquireCadModel(file);
+        if (!handle) return;
+        if (!active) { handle.release(); return; }
+        modelHandleRef.current?.release();
+        modelHandleRef.current = handle;
+        modelRef.current = handle.model;
+        setState('ready');
       } catch (error) {
         if (!active) return;
         setState('error'); setMessage(error instanceof ApiError ? error.message : t('geometry.loadError'));
       }
     };
     void load();
-    return () => { active = false; if (timer) window.clearTimeout(timer); if (viewerUrl) URL.revokeObjectURL(viewerUrl); };
-  }, [file.id, t]);
+    return () => { active = false; if (timer) window.clearTimeout(timer); if (viewerUrl) URL.revokeObjectURL(viewerUrl); modelRef.current = null; modelHandleRef.current?.release(); modelHandleRef.current = null; };
+  }, [file.id, file.latestVersion?.id, t]);
 
   useEffect(() => {
     const model = modelRef.current;
@@ -200,45 +206,75 @@ export const CadGeometryViewer: React.FC<{ file: CadFile; onGeometry: (geometry:
     return () => cancelAnimationFrame(raf);
   }, [state, materialId, colorId]);
 
-  useEffect(() => {
+useEffect(() => {
     const mount = mountRef.current; const model = modelRef.current;
     if (state !== 'ready' || !mount || !model) return;
-    const scene = new THREE.Scene(); sceneRef.current = scene;
-    scene.up.set(0, 0, 1);
-    const theme = getComputedStyle(document.documentElement); scene.background = new THREE.Color(theme.getPropertyValue('--cam-bg').trim() || '#0a0a0a');
-    const camera = new THREE.PerspectiveCamera(45, 1, .01, 100000); cameraRef.current = camera;
-    camera.up.set(0, 0, 1);
-    const renderer = new THREE.WebGLRenderer({ antialias: true }); rendererRef.current = renderer; renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); renderer.outputColorSpace = THREE.SRGBColorSpace; mount.appendChild(renderer.domElement);
-    // Physically-based presentation: ACES tonemapping (Mr. r185 also default-encodes sRGB output via
-    // outputColorSpace) plus a shared PMREM environment so every material reads from the same IBL.
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.05;
-    const pmrem = new THREE.PMREMGenerator(renderer);
-    scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-    pmrem.dispose();
-    const controls = new OrbitControls(camera, renderer.domElement); controls.enableDamping = true; controls.screenSpacePanning = true; controls.enableRotate = !is2D; controlsRef.current = controls;
-    // Controlled studio-style rig: soft ambient fill + key/fill/rim so curvature,
-    // roughness and reflections stay readable without flooding the model.
-    scene.add(new THREE.HemisphereLight(0xffffff, 0x2c3b4f, 1.0));
-    const key = new THREE.DirectionalLight(0xffffff, 2.0); key.position.set(6, 8, 5); scene.add(key);
-    const fillLight = new THREE.DirectionalLight(0xcdd8e6, 0.6); fillLight.position.set(-5, 3, -4); scene.add(fillLight);
-    const rimLight = new THREE.DirectionalLight(0x93a7c4, 0.65); rimLight.position.set(-4, 5, -7); scene.add(rimLight);
-    const viewerRoot = new THREE.Group(); viewerRootRef.current = viewerRoot;
-    const orientationRoot = new THREE.Group(); orientationRootRef.current = orientationRoot; orientationRoot.add(model); viewerRoot.add(orientationRoot);
-    scene.add(viewerRoot);
-    applyViewerOrientation();
-    fitModel();
+    let scene: THREE.Scene | null = null;
+    let camera: THREE.PerspectiveCamera | null = null;
+    let renderer: THREE.WebGLRenderer | null = null;
+    let controls: OrbitControls | null = null;
+    let observer: ResizeObserver | null = null;
     let frame = 0; let previous = performance.now();
-    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    controls.autoRotate = thumbnail ? false : !is2D && !reducedMotion;
-    controls.autoRotateSpeed = 0.6;
-    const resize = () => { const rect = mount.getBoundingClientRect(); renderer.setSize(rect.width, rect.height, false); camera.aspect = rect.width / Math.max(rect.height, 1); camera.updateProjectionMatrix(); };
-    const render = (now: number) => {
-      const delta = Math.min(Math.max((now - previous) / 1000, 0), 0.05); previous = now;
-      controls.update(delta); renderer.render(scene, camera); frame = requestAnimationFrame(render);
+    try {
+      scene = new THREE.Scene(); sceneRef.current = scene;
+      scene.up.set(0, 0, 1);
+      const theme = getComputedStyle(document.documentElement); scene.background = new THREE.Color(theme.getPropertyValue('--cam-bg').trim() || '#0a0a0a');
+      camera = new THREE.PerspectiveCamera(45, 1, .01, 100000); cameraRef.current = camera;
+      camera.up.set(0, 0, 1);
+      renderer = new THREE.WebGLRenderer({ antialias: true }); rendererRef.current = renderer; renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); renderer.outputColorSpace = THREE.SRGBColorSpace; mount.appendChild(renderer.domElement);
+      // Physically-based presentation: ACES tonemapping (Mr. r185 also default-encodes sRGB output via
+      // outputColorSpace) plus a shared PMREM environment so every material reads from the same IBL.
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.05;
+      const pmrem = new THREE.PMREMGenerator(renderer);
+      scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+      pmrem.dispose();
+      controls = new OrbitControls(camera, renderer.domElement); controls.enableDamping = true; controls.screenSpacePanning = true; controls.enableRotate = !is2D; controlsRef.current = controls;
+      // Controlled studio-style rig: soft ambient fill + key/fill/rim so curvature,
+      // roughness and reflections stay readable without flooding the model.
+      scene.add(new THREE.HemisphereLight(0xffffff, 0x2c3b4f, 1.0));
+      const key = new THREE.DirectionalLight(0xffffff, 2.0); key.position.set(6, 8, 5); scene.add(key);
+      const fillLight = new THREE.DirectionalLight(0xcdd8e6, 0.6); fillLight.position.set(-5, 3, -4); scene.add(fillLight);
+      const rimLight = new THREE.DirectionalLight(0x93a7c4, 0.65); rimLight.position.set(-4, 5, -7); scene.add(rimLight);
+      const viewerRoot = new THREE.Group(); viewerRootRef.current = viewerRoot;
+      const orientationRoot = new THREE.Group(); orientationRootRef.current = orientationRoot; orientationRoot.add(model); viewerRoot.add(orientationRoot);
+      scene.add(viewerRoot);
+      applyViewerOrientation();
+      fitModel();
+      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      controls.autoRotate = thumbnail ? false : !is2D && !reducedMotion;
+      controls.autoRotateSpeed = 0.6;
+      const resize = () => { const rect = mount.getBoundingClientRect(); renderer!.setSize(rect.width, rect.height, false); camera!.aspect = rect.width / Math.max(rect.height, 1); camera!.updateProjectionMatrix(); };
+      const render = (now: number) => {
+        const delta = Math.min(Math.max((now - previous) / 1000, 0), 0.05); previous = now;
+        controls!.update(delta); renderer!.render(scene!, camera!); frame = requestAnimationFrame(render);
+      };
+      resize(); render(performance.now()); observer = new ResizeObserver(resize); observer.observe(mount);
+    } catch (error) {
+      // Never let a WebGL/driver failure escape and unmount the workspace tree.
+      setState('error');
+      setMessage(error instanceof Error ? error.message : t('geometry.loadError'));
+      sceneRef.current = null; controlsRef.current = null; rendererRef.current = null; cameraRef.current = null; viewerRootRef.current = null; orientationRootRef.current = null;
+    }
+    return () => {
+      observer?.disconnect();
+      cancelAnimationFrame(frame);
+      controls?.dispose();
+      if (renderer) { renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove(); }
+      scene?.environment?.dispose();
+      if (scene) {
+        scene.traverse((object) => {
+          if (!(object instanceof THREE.Mesh) && !(object instanceof THREE.LineSegments)) return;
+          const materials = Array.isArray(object.material) ? object.material : [object.material];
+          materials.forEach((material) => material.dispose());
+        });
+      }
+      // NOTE: mesh geometry is intentionally NOT disposed here. The model is a
+      // cache clone whose geometry is owned by cadGeometryCache and is freed
+      // when the last consumer calls release() (unmount cleanup of the load
+      // effect). Disposing it here would corrupt other active consumers.
+      sceneRef.current = null; controlsRef.current = null; rendererRef.current = null; cameraRef.current = null; viewerRootRef.current = null; orientationRootRef.current = null;
     };
-    resize(); render(performance.now()); const observer = new ResizeObserver(resize); observer.observe(mount);
-    return () => { observer.disconnect(); cancelAnimationFrame(frame); controls.dispose(); renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove(); scene.environment?.dispose(); scene.traverse((object) => { if (object instanceof THREE.Mesh) { object.geometry.dispose(); const materials = Array.isArray(object.material) ? object.material : [object.material]; materials.forEach((material) => material.dispose()); } }); sceneRef.current = null; controlsRef.current = null; rendererRef.current = null; cameraRef.current = null; viewerRootRef.current = null; orientationRootRef.current = null; };
   }, [state]);
 
   useEffect(() => {

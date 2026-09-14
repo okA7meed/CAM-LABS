@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { SectionReveal } from '../ui/Reveal';
 
 export const CtaBanner: React.FC = () => {
-  const { setActiveView, openAuthModal } = useStore();
+  const { startManufacturingRequest, openAuthModal } = useStore();
   const { t } = useTranslation();
 
   return (
@@ -23,7 +23,7 @@ export const CtaBanner: React.FC = () => {
               {t('cta.description')}
             </p>
             <div style={{ display: 'flex', justifyContent: 'center', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
-              <button className="btn btn-lg btn-primary cam-shine-auto" onClick={() => setActiveView('manufacturing-request')} id="cta-banner-start-manufacturing">
+              <button className="btn btn-lg btn-primary cam-shine-auto" onClick={() => startManufacturingRequest()} id="cta-banner-start-manufacturing">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                   <polygon points="12 2 2 7 12 12 22 7 12 2" />
                   <polyline points="2 17 12 22 22 17" />

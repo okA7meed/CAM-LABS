@@ -3,9 +3,10 @@ import { PanelShell } from '../PanelShell';
 import { TECH_OPTIONS, panelIds } from '../constants';
 import { PanelStatus, RequestState, TechnologyId } from '../types';
 
-export const TechnologyPanel = ({ request, status, onSelectTechnology }: {
+export const TechnologyPanel = ({ request, status, className, onSelectTechnology }: {
   request: RequestState;
   status: PanelStatus;
+  className?: string;
   onSelectTechnology: (tech: TechnologyId) => void;
 }) => (
   <PanelShell
@@ -14,6 +15,7 @@ export const TechnologyPanel = ({ request, status, onSelectTechnology }: {
     title="Select Technology"
     subtitle="Choose a manufacturing technology"
     status={status}
+    className={className}
   >
     <div className="mw-stage-tech-list">
       {TECH_OPTIONS.map((tech) => {

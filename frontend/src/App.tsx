@@ -23,6 +23,7 @@ import { ForgotPasswordModal } from './components/auth/ForgotPasswordModal';
 import { useStore } from './context/StoreContext';
 import { useAuth } from './context/AuthContext';
 import { ApiService } from './services/api';
+import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { useTranslation } from 'react-i18next';
 
 /*
@@ -66,7 +67,7 @@ const ViewLoader: React.FC = () => (
 );
 
 export const App: React.FC = () => {
-  const { activeView, setActiveView, closeAuthModal, closePersonaModal, closeForgotPassword, closeComparisonModal, closeOrderTimeline } = useStore();
+  const { activeView, setActiveView, leavingToWorkspace, closeAuthModal, closePersonaModal, closeForgotPassword, closeComparisonModal, closeOrderTimeline } = useStore();
   const { isLoading, isAuthenticated, currentUser } = useAuth();
   const { t } = useTranslation();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -158,11 +159,40 @@ export const App: React.FC = () => {
       {isLoading && <main id="view-loading"><div className="container loading-state"><div className="skeleton loading-state-mark" /><p>{t('status.resolvingSession')}</p></div></main>}
       {!isLoading && (
         <Suspense fallback={<ViewLoader />}>
+          <ErrorBoundary
+            label="app"
+            fallback={(error, retry) => (
+              <main className="app-viewport" role="alert">
+                <div className="mw-error-boundary">
+                  <div className="mw-error-boundary-inner">
+                    <strong>A section of this page failed to load.</strong>
+                    <p>{error.message || 'An unexpected error occurred.'}</p>
+                    <button type="button" className="btn btn-primary" onClick={retry}>Reload section</button>
+                  </div>
+                </div>
+              </main>
+            )}
+          >
           {activeView === 'not-found' && <NotFoundView />}
           {activeView === 'dashboard' && isAuthenticated && <OrderCenter />}
           {activeView === 'profile' && isAuthenticated && <ProfileView />}
           {activeView === 'marketplace' && <MarketplaceView />}
-          {activeView === 'manufacturing-request' && <ManufacturingRequestView />}
+          {activeView === 'manufacturing-request' && (
+            <ErrorBoundary label="workspace" fallback={(error, retry) => (
+              <main className="app-viewport" role="alert">
+                <div className="mw-error-boundary">
+                  <div className="mw-error-boundary-inner">
+                    <strong>The Manufacturing Workspace hit a problem.</strong>
+                    <p>{error.message || 'An unexpected error occurred.'}</p>
+                    <p>Your draft and uploaded files are saved on the server and will be restored.</p>
+                    <button type="button" className="btn btn-primary" onClick={retry}>Restart workspace</button>
+                  </div>
+                </div>
+              </main>
+            )}>
+              <ManufacturingRequestView />
+            </ErrorBoundary>
+          )}
           {activeView === 'coming-soon' && <ComingSoonView />}
           {activeView === 'equation-builder' && isAuthenticated && currentUser?.role?.includes('ADMIN') && <EquationBuilderView />}
 
@@ -189,11 +219,12 @@ export const App: React.FC = () => {
           {activeView === 'admin-audit-logs' && isAuthenticated && currentUser?.role?.includes('ADMIN') && <AdminAuditLogsView />}
           {activeView === 'admin-settings' && isAuthenticated && currentUser?.role?.includes('ADMIN') && <AdminSettingsView />}
           {activeView === 'admin-pricing' && isAuthenticated && currentUser?.role?.includes('ADMIN') && <AdminPricingView />}
+          </ErrorBoundary>
         </Suspense>
       )}
 
       {!isLoading && activeView !== 'marketplace' && activeView !== 'manufacturing-request' && activeView !== 'coming-soon' && activeView !== 'equation-builder' && activeView !== 'not-found' && !activeView.startsWith('admin-') && (activeView !== 'dashboard' || !isAuthenticated) && (activeView !== 'profile' || !isAuthenticated) && (
-        <main id="view-landing">
+        <main className={leavingToWorkspace ? 'app-exiting' : ''} id="view-landing">
           <HeroSection />
           <ServicesSection />
           <WorkflowSection />

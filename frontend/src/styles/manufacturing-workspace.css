@@ -298,7 +298,7 @@
     transform var(--transition-fast),
     opacity var(--transition-base),
     filter var(--transition-base);
-  animation: mw-panel-in 0.3s ease both;
+  animation: mw-panel-in 0.3s ease backwards;
 }
 
 .mw-panel::before {
@@ -3180,4 +3180,225 @@
   .mw-profile-item:active:not(:disabled) {
     transform: scale(0.99);
   }
+}
+
+/* ==========================================================================
+   Progressive Workspace Entry
+   One persistent workspace whose spatial composition progressively changes.
+   The real Technology/Process block translates and scales into a central
+   focus composition, then physically settles into the left column while the
+   real Upload panel grows into the center focus and then contracts as the
+   remaining panels settle. Layout never changes; transforms only — the CAD
+   viewer, pricing engine, and all business logic are untouched. Reduced
+   motion collapses to fades (see motion.css).
+   ========================================================================== */
+
+/* Workspace entrance — fades in over the exiting landing */
+.mw-workspace {
+  animation: mw-workspace-enter 0.36s var(--cam-ease-out) both;
+}
+@keyframes mw-workspace-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* The canvas establishes a stacking context so focused panels (raised via
+   z-index) paint above the receding surrounding context. */
+.mw-workspace .mw-canvas {
+  z-index: 0;
+}
+
+/* During the entry choreography, columns must not clip the transformed panels
+   that travel outside their layout bounds; the normal clipped/scroll state
+   returns automatically once data-entry flips to "workspace". */
+.mw-workspace[data-entry]:not([data-entry='workspace']) .mw-col {
+  overflow: visible;
+}
+
+/* ── Spatial wrappers (motion.div) — one per panel/column group. These carry
+   the choreography transforms while preserving the flex sizing of the panels
+   they contain. ─────────────────────────────────────────────────────────── */
+.mw-mw-material,
+.mw-mw-upload {
+  flex-shrink: 0;
+  flex-grow: 0;
+  min-height: 0;
+}
+.mw-mw-viewer {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.mw-mw-dock {
+  flex-shrink: 0;
+  min-height: 0;
+}
+.mw-mw-right {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* The Technology + Process block travels as one surface during the choreography.
+   Its pointer-events are passed through so the overlapping composition never
+   locks the workspace — only the real panels inside stay interactive.
+   `contain: layout style paint` confines the block's (width-driven reflow and)
+   painting to itself — the width morph during morph/reveal never cascades into
+   the rest of the grid. The width transition itself is shortened since it runs
+   in the same window as the reveal (viewer + thumbnail startup). */
+.mw-entry-left-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex-shrink: 0;
+  min-height: 0;
+  will-change: transform;
+  pointer-events: none;
+  contain: layout style paint;
+  transition: width 0.45s cubic-bezier(0.16, 1, 0.3, 1), max-width 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.mw-entry-left-block .mw-panel {
+  flex-shrink: 0;
+  flex-grow: 0;
+  min-height: 0;
+  pointer-events: auto;
+}
+
+/* Focused Technology & Process states */
+.mw-workspace[data-entry='tech-focus'] .mw-entry-left-block,
+.mw-workspace[data-entry='process-focus'] .mw-entry-left-block {
+  width: min(520px, calc(100vw - 48px));
+  max-width: 520px;
+}
+
+.mw-workspace[data-entry='tech-focus'] .mw-panel-tech,
+.mw-workspace[data-entry='process-focus'] .mw-panel-tech {
+  border-color: rgba(22, 119, 255, 0.45);
+  box-shadow:
+    0 24px 64px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(22, 119, 255, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.mw-workspace[data-entry='process-focus'] .mw-panel-process {
+  border-color: rgba(22, 119, 255, 0.45);
+  box-shadow:
+    0 24px 64px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(22, 119, 255, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+/* Next / Continue action in ProcessPanel */
+.mw-stage-focus-action {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--mw-border);
+}
+.mw-stage-next-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 8px;
+  background: var(--mw-blue);
+  color: #FFFFFF;
+  border: 1px solid var(--mw-blue);
+  box-shadow: 0 4px 14px rgba(22, 119, 255, 0.35);
+  cursor: pointer;
+  animation: mw-next-fade-in 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  transition: all var(--transition-fast);
+}
+.mw-stage-next-btn:hover {
+  background: #388bff;
+  box-shadow: 0 6px 20px rgba(22, 119, 255, 0.5);
+  transform: translateY(-1px);
+}
+.mw-stage-next-btn:active {
+  transform: translateY(0);
+}
+@keyframes mw-next-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Upload Focus State */
+.mw-workspace[data-entry='upload-focus'] .mw-col-center {
+  justify-content: center;
+}
+.mw-workspace[data-entry='upload-focus'] .mw-mw-upload {
+  width: 100%;
+}
+.mw-workspace[data-entry='upload-focus'] .mw-panel-upload {
+  border-color: rgba(22, 119, 255, 0.5);
+  box-shadow:
+    0 24px 64px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(22, 119, 255, 0.3);
+}
+
+.mw-upload-dropzone {
+  transition: padding 0.45s cubic-bezier(0.16, 1, 0.3, 1), background 0.3s ease, border-color 0.3s ease;
+}
+
+.mw-workspace[data-entry='upload-focus'] .mw-upload-dropzone {
+  border-color: var(--mw-blue);
+  background: rgba(22, 119, 255, 0.05);
+  padding: 32px 20px;
+}
+
+/* Process chips — cascade in when a technology is chosen */
+.mw-stage-process-chip {
+  animation: mw-process-chip-in 280ms var(--cam-ease-out) both;
+}
+.mw-stage-process-chip:nth-child(2) { animation-delay: 40ms; }
+.mw-stage-process-chip:nth-child(3) { animation-delay: 80ms; }
+.mw-stage-process-chip:nth-child(4) { animation-delay: 120ms; }
+@keyframes mw-process-chip-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Crash-containment fallback surfaces (ErrorBoundary). These are honest real
+   failure states with an explicit retry — never a fake-success placeholder. */
+.mw-error-boundary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 24px;
+  background: var(--cam-bg, #08090b);
+}
+.app-viewport > .mw-error-boundary {
+  min-height: 100vh;
+}
+.mw-error-boundary-inner {
+  max-width: 460px;
+  padding: 28px 32px;
+  border-radius: 12px;
+  background: var(--mw-panel-bg, #121318);
+  border: 1px solid var(--mw-border, #262a32);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
+  color: var(--mw-text, #e8edf5);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mw-error-boundary-inner strong {
+  font-size: 15px;
+}
+.mw-error-boundary-inner p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--mw-text-secondary, #98a1b3);
+}
+.mw-error-boundary-inner .btn,
+.mw-error-boundary-inner .mw-btn {
+  align-self: flex-start;
+  margin-top: 6px;
 }

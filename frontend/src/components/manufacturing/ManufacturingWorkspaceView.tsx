@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { CadGeometryViewer } from './CadGeometryViewer';
 import { TechnicalDocumentPreview } from './TechnicalDocumentPreview';
 import { Icon } from '../ui/Icon';
+import { ErrorBoundary } from '../ui/ErrorBoundary';
 import { ModelUnit } from '../../utils/modelUnits';
 import { useMaterials } from '../../hooks/useMaterials';
 import { useQuoteEngine } from '../../hooks/useQuoteEngine';
@@ -27,6 +28,101 @@ import { ViewerPanel } from './workspace/panels/ViewerPanel';
 import { ConfigurationPanel } from './workspace/panels/ConfigurationPanel';
 import { NotesPanel } from './workspace/panels/NotesPanel';
 import { QuotePanel } from './workspace/panels/QuotePanel';
+
+// Progressive entry flow — the panels themselves ARE the workflow (never a
+// wizard): technology focus → process focus → Technology + Process physically
+// settle into the left column → upload focus → upload contracts as the rest of
+// the workspace progressively reveals → settled existing workspace. The stage
+// machine is only choreography; real application state drives every advance.
+type EntryStage = 'tech-focus' | 'process-focus' | 'morph' | 'upload-focus' | 'reveal' | 'workspace';
+
+// One pose per spatial unit. The poses are pure transform/opacity targets for
+// the real panels — layout never changes, so the CAD viewer (and everything
+// else) is never resized or reloaded. `dir` mirrors the x-axis for RTL.
+type EntryPose = { x?: number | string; y?: number | string; scale?: number; opacity?: number; zIndex?: number };
+type EntryPoseSet = {
+  leftBlock: EntryPose;
+  material: EntryPose;
+  upload: EntryPose;
+  viewer: EntryPose;
+  dock: EntryPose;
+  right: EntryPose;
+};
+
+const entryPoses = (
+  stage: EntryStage,
+  dir: -1 | 1,
+  reduced: boolean,
+  focusDelta: { x: number; y: number }
+): EntryPoseSet => {
+  if (reduced) {
+    // Reduced motion: plain state-change hierarchy, fades only — the spatial
+    // choreography (transforms) is disabled, the functional sequence is kept.
+    const dim = stage !== 'reveal' && stage !== 'workspace';
+    return {
+      leftBlock: { x: 0, y: 0, scale: 1, opacity: dim ? (stage === 'upload-focus' ? 0.65 : 1) : 1 },
+      material: { x: 0, y: 0, scale: 1, opacity: dim ? 0.45 : 1 },
+      upload: { x: 0, y: 0, scale: 1, opacity: stage === 'upload-focus' ? 1 : dim ? 0.45 : 1 },
+      viewer: { x: 0, y: 0, scale: 1, opacity: dim ? 0.35 : 1 },
+      dock: { x: 0, y: 0, scale: 1, opacity: dim ? 0.35 : 1 },
+      right: { x: 0, y: 0, scale: 1, opacity: dim ? 0.35 : 1 },
+    };
+  }
+  const focus = stage === 'tech-focus' || stage === 'process-focus';
+  const settled = stage === 'reveal' || stage === 'workspace';
+  const targetX = focusDelta.x !== 0 ? focusDelta.x : `${dir * 165}%`;
+  const targetY = focusDelta.y;
+
+  return {
+    leftBlock: stage === 'tech-focus'
+      ? { x: targetX, y: targetY, scale: 1.12, opacity: 1, zIndex: 40 }
+      : stage === 'process-focus'
+        ? { x: targetX, y: targetY, scale: 1.06, opacity: 1, zIndex: 40 }
+        : { x: 0, y: 0, scale: 1, opacity: 1, zIndex: 10 },
+    material: focus
+      ? { x: 0, y: 6, scale: 0.98, opacity: 0.28 }
+      : stage === 'morph'
+        ? { x: 0, y: 4, scale: 0.99, opacity: 0.6 }
+        : { x: 0, y: 0, scale: 1, opacity: 1 },
+    upload: focus
+      ? { x: 0, y: 0, scale: 0.98, opacity: 0.28 }
+      : stage === 'morph'
+        ? { x: 0, y: 0, scale: 1.02, opacity: 0.85 }
+        : stage === 'upload-focus'
+          ? { x: 0, y: 0, scale: 1.06, opacity: 1, zIndex: 35 }
+          : { x: 0, y: 0, scale: 1, opacity: 1 },
+    viewer: settled
+      ? { x: 0, y: 0, scale: 1, opacity: 1 }
+      : { x: 0, y: 8, scale: 0.98, opacity: focus ? 0.28 : 0.35 },
+    dock: settled
+      ? { x: 0, y: 0, scale: 1, opacity: 1 }
+      : { x: 0, y: 8, scale: 0.98, opacity: focus ? 0.28 : 0.35 },
+    right: settled
+      ? { x: 0, y: 0, scale: 1, opacity: 1 }
+      : { x: dir * 6, y: 6, scale: 0.98, opacity: focus ? 0.28 : 0.35 },
+  };
+};
+
+const settledDelay = (stage: EntryStage, delay: number) => (stage === 'reveal' ? delay : 0);
+
+const entryTransition = (stage: EntryStage, key: keyof EntryPoseSet, reduced: boolean) => {
+  if (reduced) return { duration: 0.22, ease: CAM_EASE };
+  const base = { ease: CAM_EASE };
+  switch (key) {
+    case 'leftBlock':
+      return { ...base, duration: stage === 'morph' ? 0.6 : 0.52 };
+    case 'material':
+      return { ...base, duration: 0.3, delay: settledDelay(stage, 0) };
+    case 'upload':
+      return { ...base, duration: stage === 'reveal' ? 0.52 : stage === 'upload-focus' ? 0.5 : 0.42 };
+    case 'viewer':
+      return { ...base, duration: 0.3, delay: settledDelay(stage, 0.08) };
+    case 'dock':
+      return { ...base, duration: 0.28, delay: settledDelay(stage, 0.16) };
+    case 'right':
+      return { ...base, duration: 0.28, delay: settledDelay(stage, 0.24) };
+  }
+};
 
 export const ManufacturingRequestView: React.FC = () => {
   const { t } = useTranslation();
@@ -61,6 +157,56 @@ export const ManufacturingRequestView: React.FC = () => {
   const [isDocDragging, setIsDocDragging] = useState(false);
   const [previewDoc, setPreviewDoc] = useState<TechnicalDocumentItem | null>(null);
 
+  const [entryStage, setEntryStage] = useState<EntryStage>('tech-focus');
+  const restoredRef = useRef(false);
+  const entryFocusMovedRef = useRef(false);
+  const rtlRef = useRef(typeof document !== 'undefined' && document.documentElement.dir === 'rtl');
+  const reducedMotionRef = useRef(typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+  const gridRef = useRef<HTMLDivElement>(null);
+  const leftBlockRef = useRef<HTMLDivElement>(null);
+  const [focusDelta, setFocusDelta] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  const calculateFocusDelta = useCallback(() => {
+    if (!gridRef.current || !leftBlockRef.current) return;
+    const gridEl = gridRef.current;
+    const leftBlockEl = leftBlockRef.current;
+    const colLeftEl = leftBlockEl.parentElement;
+    if (!colLeftEl) return;
+
+    const gridW = gridEl.clientWidth;
+    const gridH = gridEl.clientHeight;
+    const colLeft = colLeftEl.offsetLeft;
+    const blockW = leftBlockEl.offsetWidth;
+    const blockH = leftBlockEl.offsetHeight;
+
+    if (gridW <= 0 || blockW <= 0) return;
+
+    const targetCenterX = gridW / 2;
+    const currentCenterX = colLeft + blockW / 2;
+    const dx = targetCenterX - currentCenterX;
+
+    const targetCenterY = gridH * 0.44;
+    const currentCenterY = leftBlockEl.offsetTop + blockH / 2;
+    const dy = targetCenterY - currentCenterY;
+
+    setFocusDelta({ x: dx, y: dy });
+  }, []);
+
+  useEffect(() => {
+    calculateFocusDelta();
+    const onResize = () => calculateFocusDelta();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [calculateFocusDelta]);
+
+  useEffect(() => {
+    const id = requestAnimationFrame(() => {
+      calculateFocusDelta();
+    });
+    return () => cancelAnimationFrame(id);
+  }, [calculateFocusDelta]);
+
   const submissionInFlightRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const docInputRef = useRef<HTMLInputElement>(null);
@@ -89,7 +235,7 @@ export const ManufacturingRequestView: React.FC = () => {
   const updateRequest = useCallback((p: Partial<RequestState>) => setRequest((c) => ({ ...c, ...p })), []);
   const { invalidateQuote } = useQuoteEngine({ request, fileConfigurations, uploadItems, setQuote, setIsCalculatingQuote, setQuoteFailed, setError });
   const setUploadBusy = useCallback((b: boolean) => { uploadLifecycleBusyRef.current = b; }, []);
-  const { thumbnails, thumbFailed, activeThumbIds } = useCadThumbnails({ uploadItems, fileConfigurations, request });
+  const { thumbnails, thumbFailed, activeThumbIds } = useCadThumbnails({ uploadItems, fileConfigurations, request, enabled: entryStage === 'reveal' || entryStage === 'workspace' });
 
   const focusSection = useCallback((id: string, label: string) => {
     const el = document.getElementById(id);
@@ -108,7 +254,17 @@ export const ManufacturingRequestView: React.FC = () => {
   useDraftPersistence({
     request, note, fileConfigurations, fileSetupStates, configTouched, activeConfigTab, technicalDocuments,
     onRestore: useCallback((data: DraftData) => {
+      restoredRef.current = true;
       if (data?.request) setRequest((c) => ({ ...c, ...data.request }));
+      if (data.request?.technology) {
+        if (data.request?.cadFile) {
+          setEntryStage('workspace');
+        } else if (data.request.process) {
+          setEntryStage('upload-focus');
+        } else {
+          setEntryStage('process-focus');
+        }
+      }
       if (typeof data.note === 'string') setNote(data.note);
       if (Array.isArray(data.technicalDocuments)) {
         setTechnicalDocuments(data.technicalDocuments
@@ -120,7 +276,7 @@ export const ManufacturingRequestView: React.FC = () => {
       if (typeof data.configTouched === 'boolean') setConfigTouched(data.configTouched);
       if (data.activeConfigTab === 'advanced') setActiveConfigTab('advanced');
       setToast('Draft restored');
-    }, [setRequest, setNote, setTechnicalDocuments, setFileConfigurations, setFileSetupStates, setConfigTouched, setActiveConfigTab, setToast]),
+    }, [setRequest, setNote, setTechnicalDocuments, setFileConfigurations, setFileSetupStates, setConfigTouched, setActiveConfigTab, setToast, setEntryStage]),
   });
 
   useEffect(() => {
@@ -128,6 +284,95 @@ export const ManufacturingRequestView: React.FC = () => {
     const id = window.setTimeout(() => setToast(''), 2600);
     return () => window.clearTimeout(id);
   }, [toast]);
+
+  // ── Progressive entry choreography (one-shot, driven by real state) ──────
+  const advanceFromTechFocus = useCallback(() => {
+    if (request.technology) setEntryStage('process-focus');
+  }, [request.technology]);
+  useEffect(() => {
+    if (entryStage !== 'tech-focus') return;
+    advanceFromTechFocus();
+  }, [entryStage, advanceFromTechFocus]);
+
+  // morph → upload-focus is presentation-only (the left block has finished its
+  // travel). Animating elements report completion via onAnimationComplete on the
+  // left block; a short bounded fallback keeps the choreography alive even if
+  // that callback is suppressed (e.g. reduced motion / interrupted animation).
+  useEffect(() => {
+    if (entryStage !== 'morph') return;
+    const id = window.setTimeout(() => setEntryStage('upload-focus'), 900);
+    return () => window.clearTimeout(id);
+  }, [entryStage]);
+
+  // reveal → workspace settles the workspace AFTER every uploaded file is
+  // actually ready — never on an arbitrary wall-clock while the backend is still
+  // scanning/processing. The settle completes on the right column's animation
+  // completion (added in the render below); this bounded fallback only touches
+  // the PRESENTATION stage and is gated on real business readiness, so it can
+  // never reveal the workspace early. The synthetic resize dispatch is gone —
+  // the viewer's own ResizeObserver refits when the columns settle.
+  useEffect(() => {
+    if (entryStage !== 'reveal') return;
+    if (uploadItems.length > 0 && areAllUploadsReady(uploadItems)) {
+      const id = window.setTimeout(() => setEntryStage('workspace'), 1600);
+      return () => window.clearTimeout(id);
+    }
+    return undefined;
+  }, [entryStage, uploadItems]);
+
+  useEffect(() => {
+    if (entryStage !== 'upload-focus') return;
+    // The reveal is driven by REAL application state — every uploaded file has
+    // been processed, validated and is viewer + quote ready. Files mid-scan or
+    // mid-process keep the focused upload panel (honest, never fake-early).
+    if (areAllUploadsReady(uploadItems)) {
+      setEntryStage('reveal');
+    }
+  }, [entryStage, uploadItems]);
+
+  // If every file is removed mid-reveal, do not strand the workspace in the
+  // reveal pose — glide the focus back to the Process section.
+  useEffect(() => {
+    if (entryStage !== 'reveal' || uploadItems.length > 0) return;
+    setEntryStage('process-focus');
+  }, [entryStage, uploadItems]);
+
+  // If the user revisits technology/process after the morph, steer the focus
+  // back to the left column instead of leaving the emphasis stranded on upload.
+  useEffect(() => {
+    if (entryStage !== 'upload-focus' && entryStage !== 'reveal') return;
+    if (request.technology && !request.process) setEntryStage('process-focus');
+    else if (!request.technology) setEntryStage('tech-focus');
+  }, [entryStage, request.technology, request.process]);
+
+  // A restored draft skips the choreography — touch nothing if we got one.
+  const focusFirstTechOption = useCallback(() => {
+    if (restoredRef.current || entryStage !== 'tech-focus' || request.technology) return;
+    const id = window.setTimeout(() => {
+      const el = document.querySelector<HTMLElement>('#mw-sec-tech .mw-stage-tech-item');
+      if (el) el.focus({ preventScroll: true });
+    }, 240);
+    return () => window.clearTimeout(id);
+  }, [entryStage, request.technology]);
+  useEffect(() => {
+    if (entryFocusMovedRef.current) return;
+    entryFocusMovedRef.current = true;
+    focusFirstTechOption();
+  }, [focusFirstTechOption]);
+
+  const focusFirstProcessChip = useCallback(() => {
+    if (entryStage !== 'process-focus' || request.process) return;
+    const id = window.setTimeout(() => {
+      if (entryStage !== 'process-focus' || request.process) return;
+      const el = document.querySelector<HTMLElement>('#mw-sec-process .mw-stage-process-chip');
+      if (el) el.focus({ preventScroll: true });
+    }, 160);
+    return () => window.clearTimeout(id);
+  }, [entryStage, request.process]);
+  useEffect(() => {
+    if (restoredRef.current) return;
+    focusFirstProcessChip();
+  }, [focusFirstProcessChip]);
 
   // ── Upload lifecycle ─────────────────────────────────────────────────────
   useEffect(() => { if (uploadLifecycleBusyRef.current && !hasUploadInFlight(uploadItems)) setUploadBusy(false); }, [uploadItems, setUploadBusy]);
@@ -155,6 +400,7 @@ export const ManufacturingRequestView: React.FC = () => {
   }, []);
 
   const pollProcessing = useCallback(async (itemId: string, fileId: string): Promise<CadFile> => {
+    let lastStatus: UploadItemStatus | null = null;
     for (let i = 0; i < 40; i++) {
       const files = await ApiService.getCadFiles();
       const f = files?.find((c) => c.id === fileId); const v = f?.latestVersion;
@@ -165,7 +411,14 @@ export const ManufacturingRequestView: React.FC = () => {
         if (hasViewerGeometry(f)) return f;
         throw new Error(t('request.processingFailed'));
       }
-      updateUploadItem(itemId, { status: v?.scanStatus === 'PENDING' ? 'scanning' : 'processing' });
+      // Skip redundant re-renders: only write to React state when the status
+      // actually changed (typically scanning → processing → done, not every
+      // 500ms tick of an unchanged backend status).
+      const nextStatus: UploadItemStatus = v?.scanStatus === 'PENDING' ? 'scanning' : 'processing';
+      if (lastStatus !== nextStatus) {
+        lastStatus = nextStatus;
+        updateUploadItem(itemId, { status: nextStatus });
+      }
       await new Promise((r) => window.setTimeout(r, 500));
     }
     throw new Error(t('request.processingTimeout'));
@@ -399,8 +652,23 @@ export const ManufacturingRequestView: React.FC = () => {
   }, [activeMaterialId, activeMaterialConfig]);
 
   // ── Render ───────────────────────────────────────────────────────────────
+  const isSettled = entryStage === 'workspace';
+  const showSurrounding = entryStage === 'reveal' || isSettled;
+  const showUpload = entryStage === 'upload-focus' || entryStage === 'reveal' || isSettled;
+
+  const pose = entryPoses(entryStage, rtlRef.current ? -1 : 1, reducedMotionRef.current, focusDelta);
+  const trans = (key: keyof EntryPoseSet) => entryTransition(entryStage, key, reducedMotionRef.current);
+
   return (
-    <main className="mw-workspace" aria-live="polite">
+    <main
+      className="mw-workspace"
+      data-entry={entryStage}
+      aria-live="polite"
+      onPointerDownCapture={(e) => {
+        if (entryStage !== 'upload-focus') return;
+        if (!(e.target as HTMLElement).closest('.mw-panel-upload') && areAllUploadsReady(uploadItems)) setEntryStage('reveal');
+      }}
+    >
       {/* Full-viewport engineering canvas — three logical columns of panels */}
       <div className="mw-canvas">
         <AnimatePresence>
@@ -432,130 +700,239 @@ export const ManufacturingRequestView: React.FC = () => {
           )}
         </AnimatePresence>
 
-        <div className="mw-workspace-grid">
-          {/* ── LEFT — what am I manufacturing? ─────────────────────────────── */}
+        <div className="mw-workspace-grid" ref={gridRef}>
+          {/* ── LEFT — Technology + Process travel as one block during focus,
+              then settle into the column. Material rests below them. */}
           <aside className="mw-col mw-col-left">
-            <TechnologyPanel
-              request={request}
-              status={techStatus}
-              onSelectTechnology={(tech) => {
-                if (tech !== request.technology) { invalidateQuote(); if (uploadItems.length > 0) void clearAllUploads(); }
-                updateRequest({ technology: tech, process: null, material: null, cadFile: null, geometry: null });
-                setConfigTouched(false);
+            <motion.div
+              ref={leftBlockRef}
+              className="mw-entry-left-block"
+              animate={pose.leftBlock}
+              transition={trans('leftBlock')}
+              onAnimationComplete={() => {
+                if (entryStage === 'morph' && request.process) setEntryStage('upload-focus');
               }}
-            />
+            >
+              <TechnologyPanel
+                request={request}
+                status={techStatus}
+                className="mw-panel-tech"
+                onSelectTechnology={(tech) => {
+                  if (tech !== request.technology) { invalidateQuote(); if (uploadItems.length > 0) void clearAllUploads(); }
+                  updateRequest({ technology: tech, process: null, material: null, cadFile: null, geometry: null });
+                  setConfigTouched(false);
+                  if (entryStage === 'tech-focus') {
+                    setEntryStage('process-focus');
+                  }
+                }}
+              />
 
-            <ProcessPanel
-              request={request}
-              status={processStatus}
-              onSelectProcess={(p) => {
-                if (p !== request.process) { invalidateQuote(); if (uploadItems.length > 0) void clearAllUploads(); }
-                updateRequest({ technology: request.technology ?? 'printing', process: p, material: p === 'fdm' ? 'pla' : null, cadFile: null, geometry: null });
-                setConfigTouched(false);
-              }}
-            />
+              <AnimatePresence>
+                {(entryStage !== 'tech-focus' || request.technology) && (
+                  <motion.div
+                    key="mw-process-wrapper"
+                    initial={{ opacity: 0, y: 12, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                    transition={{ duration: 0.26, ease: CAM_EASE }}
+                  >
+                    <ProcessPanel
+                      request={request}
+                      status={processStatus}
+                      className="mw-panel-process"
+                      showNextButton={entryStage === 'process-focus'}
+                      onNext={() => setEntryStage('morph')}
+                      t={t}
+                      onSelectProcess={(p) => {
+                        if (p !== request.process) { invalidateQuote(); if (uploadItems.length > 0) void clearAllUploads(); }
+                        updateRequest({ technology: request.technology ?? 'printing', process: p, material: p === 'fdm' ? 'pla' : null, cadFile: null, geometry: null });
+                        setConfigTouched(false);
+                      }}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
 
-            <MaterialPanel
-              request={request}
-              materialOptions={materialOptions}
-              selectedColor={selectedQuoteColor}
-              status={materialStatus}
-              t={t}
-              onSelectMaterial={(m) => updateMaterialConfiguration({ material: m })}
-              onColorChange={(c) => updateMaterialConfiguration({ color: c })}
-            />
+            <AnimatePresence>
+              {showSurrounding && (
+                <motion.div
+                  key="mw-material-wrap"
+                  className="mw-mw-material"
+                  initial={isSettled ? false : { opacity: 0, y: 14 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.28, ease: CAM_EASE }}
+                >
+                  <MaterialPanel
+                    request={request}
+                    materialOptions={materialOptions}
+                    selectedColor={selectedQuoteColor}
+                    status={materialStatus}
+                    t={t}
+                    className="mw-panel-material"
+                    onSelectMaterial={(m) => updateMaterialConfiguration({ material: m })}
+                    onColorChange={(c) => updateMaterialConfiguration({ color: c })}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
           </aside>
 
-          {/* ── CENTER — how do I upload, inspect and configure my part? ────── */}
+          {/* ── CENTER — Upload focus grows here, Viewer and Dock settle during reveal */}
           <main className="mw-col mw-col-center">
-            <UploadPanel
-              status={uploadStatus}
-              hasProcess={hasProcess}
-              isDragging={isDragging}
-              isUploading={uploadBusy}
-              uploadItems={uploadItems}
-              fileConfigurations={fileConfigurations}
-              request={request}
-              thumbnails={thumbnails}
-              thumbFailed={thumbFailed}
-              activeThumbIds={activeThumbIds}
-              onBrowse={() => inputRef.current?.click()}
-              onFiles={addFiles}
-              onDragState={setIsDragging}
-              onDelete={openDelete}
-              onPreview={openPreview}
-              onClearAll={clearAllUploads}
-              t={t}
-            />
+            <AnimatePresence>
+              {showUpload && (
+                <motion.div
+                  key="mw-upload-wrap"
+                  className="mw-mw-upload"
+                  initial={isSettled ? false : { opacity: 0, y: 14, scale: 0.98 }}
+                  animate={pose.upload}
+                  exit={{ opacity: 0 }}
+                  transition={trans('upload')}
+                >
+                  <UploadPanel
+                    status={uploadStatus}
+                    hasProcess={hasProcess}
+                    isDragging={isDragging}
+                    isUploading={uploadBusy}
+                    uploadItems={uploadItems}
+                    fileConfigurations={fileConfigurations}
+                    request={request}
+                    thumbnails={thumbnails}
+                    thumbFailed={thumbFailed}
+                    activeThumbIds={activeThumbIds}
+                    onBrowse={() => inputRef.current?.click()}
+                    onFiles={addFiles}
+                    onDragState={setIsDragging}
+                    onDelete={openDelete}
+                    onPreview={openPreview}
+                    onClearAll={clearAllUploads}
+                    t={t}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
 
-            <ViewerPanel
-              status={activeMaterialItem?.cadFile ? undefined : 'inactive'}
-              activeItem={activeMaterialItem}
-              fileSetupStates={fileSetupStates}
-              materialId={activeMaterialConfig?.material ?? request.material ?? null}
-              colorId={activeMaterialConfig?.color ?? request.color ?? null}
-              onGeometry={(g, id) => {
-                updateRequest({ geometry: g });
-                const u: ModelUnit = g.metadata?.units ? (g.metadata.units.toLowerCase().includes('in') ? 'in' : g.metadata.units.toLowerCase().includes('cm') ? 'cm' : 'mm') : 'mm';
-                setFileSetupStates((c) => ({ ...c, [id]: { ...(c[id] || { unit: u, dimensions: null, baseDimensions: null, volume: null, surfaceArea: null, triangleCount: null, selected: false }), dimensions: g.metadata?.dimensions ? { x: g.metadata.dimensions.width, y: g.metadata.dimensions.height, z: g.metadata.dimensions.depth } : null, baseDimensions: g.metadata?.dimensions ? { x: g.metadata.dimensions.width, y: g.metadata.dimensions.height, z: g.metadata.dimensions.depth } : null, volume: g.metadata?.volume ?? null, surfaceArea: g.metadata?.surfaceArea ?? null, triangleCount: g.metadata?.triangleCount ?? null } }));
-              }}
-            />
+            <AnimatePresence>
+              {showSurrounding && (
+                <>
+                  <motion.div
+                    key="mw-viewer-wrap"
+                    className="mw-mw-viewer"
+                    initial={isSettled ? false : { opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.3, delay: 0.08, ease: CAM_EASE }}
+                  >
+                    <ViewerPanel
+                      status={activeMaterialItem?.cadFile ? undefined : 'inactive'}
+                      activeItem={activeMaterialItem}
+                      fileSetupStates={fileSetupStates}
+                      materialId={activeMaterialConfig?.material ?? request.material ?? null}
+                      colorId={activeMaterialConfig?.color ?? request.color ?? null}
+                      onGeometry={(g, id) => {
+                        updateRequest({ geometry: g });
+                        const u: ModelUnit = g.metadata?.units ? (g.metadata.units.toLowerCase().includes('in') ? 'in' : g.metadata.units.toLowerCase().includes('cm') ? 'cm' : 'mm') : 'mm';
+                        setFileSetupStates((c) => ({ ...c, [id]: { ...(c[id] || { unit: u, dimensions: null, baseDimensions: null, volume: null, surfaceArea: null, triangleCount: null, selected: false }), dimensions: g.metadata?.dimensions ? { x: g.metadata.dimensions.width, y: g.metadata.dimensions.height, z: g.metadata.dimensions.depth } : null, baseDimensions: g.metadata?.dimensions ? { x: g.metadata.dimensions.width, y: g.metadata.dimensions.height, z: g.metadata.dimensions.depth } : null, volume: g.metadata?.volume ?? null, surfaceArea: g.metadata?.surfaceArea ?? null, triangleCount: g.metadata?.triangleCount ?? null } }));
+                      }}
+                    />
+                  </motion.div>
 
-            <div className="mw-center-dock">
-            <ConfigurationPanel
-              request={request}
-              isPrinting={isPrinting}
-              activeConfigTab={activeConfigTab}
-              configReady={hasProcess && hasMaterial && uploadsDone}
-              status={configStatus}
-              selectedSupportEnabled={activeSupportEnabled}
-              priorityShipping={priorityShipping}
-              onTabChange={setActiveConfigTab}
-              onUpdate={handleConfigUpdate}
-              onConfigUpdate={(u) => updateMaterialConfiguration(u)}
-              onPriorityShippingChange={setPriorityShipping}
-            />
+                  <motion.div
+                    key="mw-dock-wrap"
+                    className="mw-mw-dock mw-center-dock"
+                    initial={isSettled ? false : { opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.28, delay: 0.16, ease: CAM_EASE }}
+                  >
+                    <ConfigurationPanel
+                      request={request}
+                      isPrinting={isPrinting}
+                      activeConfigTab={activeConfigTab}
+                      configReady={hasProcess && hasMaterial && uploadsDone}
+                      status={configStatus}
+                      selectedSupportEnabled={activeSupportEnabled}
+                      priorityShipping={priorityShipping}
+                      onTabChange={setActiveConfigTab}
+                      onUpdate={handleConfigUpdate}
+                      onConfigUpdate={(u) => updateMaterialConfiguration(u)}
+                      onPriorityShippingChange={setPriorityShipping}
+                    />
 
-            <NotesPanel
-              note={note}
-              onNoteChange={setNote}
-              documents={technicalDocuments}
-              isDragging={isDocDragging}
-              onBrowse={() => docInputRef.current?.click()}
-              onDocs={handleDocs}
-              onDragState={setIsDocDragging}
-              onRemove={removeDocument}
-              onPreview={setPreviewDoc}
-            />
-            </div>
-        </main>
+                    <NotesPanel
+                      note={note}
+                      onNoteChange={setNote}
+                      documents={technicalDocuments}
+                      isDragging={isDocDragging}
+                      onBrowse={() => docInputRef.current?.click()}
+                      onDocs={handleDocs}
+                      onDragState={setIsDocDragging}
+                      onRemove={removeDocument}
+                      onPreview={setPreviewDoc}
+                    />
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
+          </main>
 
-          {/* ── RIGHT — what is in my order, how much, and how do I submit? ─── */}
+          {/* ── RIGHT — Review / Quote, settles last during the reveal ──── */}
           <aside className="mw-col mw-col-right">
-            <QuotePanel
-              request={request}
-              quote={quote}
-              isCalculatingQuote={isCalculatingQuote}
-              quoteFailed={quoteFailed}
-              usableUploadItems={usableUploadItems}
-              fileConfigurations={fileConfigurations}
-              thumbnails={thumbnails}
-              thumbFailed={thumbFailed}
-              activeThumbIds={activeThumbIds}
-              selectedSetupId={selectedSetupId}
-              orderReady={orderReady}
-              authGateOpen={authGateOpen}
-              onConfigUpdate={(u, id) => updateMaterialConfiguration(u, false, id)}
-              onSelectItem={setSelectedSetupId}
-              isAuthenticated={isAuthenticated}
-              isSubmitting={isSubmitting}
-              onSignIn={() => openAuthModal('login')}
-              onRegister={() => openAuthModal('register')}
-              onSubmit={() => void submit()}
-              priorityShipping={priorityShipping}
-              onPriorityShippingChange={setPriorityShipping}
-              t={t}
-            />
+            <AnimatePresence>
+              {showSurrounding && (
+                <motion.div
+                  key="mw-right-wrap"
+                  className="mw-mw-right"
+                  initial={isSettled ? false : { opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.3, delay: 0.24, ease: CAM_EASE }}
+                  onAnimationComplete={() => {
+                    if (entryStage === 'reveal' && areAllUploadsReady(uploadItems)) setEntryStage('workspace');
+                  }}
+                >
+                  <ErrorBoundary
+                    label="quote-panel"
+                    fallback={(error, retry) => (
+                      <div className="mw-panel mw-panel-quote" role="alert">
+                        <div className="mw-error-boundary-inner">
+                          <strong>Your quote could not be displayed.</strong>
+                          <p>{error.message || 'An unexpected error occurred.'}</p>
+                          <button type="button" className="mw-btn mw-btn-secondary" onClick={retry}>Retry quote</button>
+                        </div>
+                      </div>
+                    )}
+                  >
+                    <QuotePanel
+                      request={request}
+                      quote={quote}
+                      isCalculatingQuote={isCalculatingQuote}
+                      quoteFailed={quoteFailed}
+                      usableUploadItems={usableUploadItems}
+                      fileConfigurations={fileConfigurations}
+                      thumbnails={thumbnails}
+                      thumbFailed={thumbFailed}
+                      activeThumbIds={activeThumbIds}
+                      selectedSetupId={selectedSetupId}
+                      orderReady={orderReady}
+                      authGateOpen={authGateOpen}
+                      onConfigUpdate={(u, id) => updateMaterialConfiguration(u, false, id)}
+                      onSelectItem={setSelectedSetupId}
+                      isAuthenticated={isAuthenticated}
+                      isSubmitting={isSubmitting}
+                      onSignIn={() => openAuthModal('login')}
+                      onRegister={() => openAuthModal('register')}
+                      onSubmit={() => void submit()}
+                      priorityShipping={priorityShipping}
+                      onPriorityShippingChange={setPriorityShipping}
+                      t={t}
+                    />
+                  </ErrorBoundary>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </aside>
         </div>
       </div>
@@ -590,7 +967,21 @@ export const ManufacturingRequestView: React.FC = () => {
                 <div className="mw-modal-title"><Icon name="cube" size={16} /> {previewFile.name}</div>
                 <button className="mw-modal-close" onClick={() => setPreviewFile(null)}><Icon name="close" size={14} /></button>
               </div>
-              <div className="mw-modal-body" style={{ padding: 0 }}><CadGeometryViewer file={previewFile} onGeometry={() => undefined} materialId={fileConfigurations[previewFile.id]?.material ?? request.material ?? null} colorId={fileConfigurations[previewFile.id]?.color ?? request.color ?? null} /></div>
+              <div className="mw-modal-body" style={{ padding: 0 }}>
+                <ErrorBoundary
+                  label="cad-viewer-preview"
+                  fallback={(error, retry) => (
+                    <div className="mw-stage-viewer-empty" role="alert" style={{ minHeight: 420, justifyContent: 'center' }}>
+                      <span className="mw-stage-viewer-empty-icon"><Icon name="cube" size={22} /></span>
+                      <span className="mw-stage-viewer-empty-text">The 3D preview could not start on this device.</span>
+                      <span className="mw-stage-viewer-empty-hint">{error.message || 'WebGL may be unavailable or a graphics driver failed.'}</span>
+                      <button type="button" className="mw-btn mw-btn-secondary" onClick={retry}>Retry preview</button>
+                    </div>
+                  )}
+                >
+                  <CadGeometryViewer file={previewFile} onGeometry={() => undefined} materialId={fileConfigurations[previewFile.id]?.material ?? request.material ?? null} colorId={fileConfigurations[previewFile.id]?.color ?? request.color ?? null} />
+                </ErrorBoundary>
+              </div>
             </motion.div>
           </motion.div>
         )}

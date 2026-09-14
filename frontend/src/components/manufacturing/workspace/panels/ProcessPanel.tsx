@@ -3,10 +3,14 @@ import { PanelShell } from '../PanelShell';
 import { PROCESS_INFO, panelIds, processGroups } from '../constants';
 import { PanelStatus, ProcessId, RequestState } from '../types';
 
-export const ProcessPanel = ({ request, status, onSelectProcess }: {
+export const ProcessPanel = ({ request, status, className, onSelectProcess, showNextButton, onNext, t }: {
   request: RequestState;
   status: PanelStatus;
+  className?: string;
   onSelectProcess: (p: ProcessId) => void;
+  showNextButton?: boolean;
+  onNext?: () => void;
+  t?: any;
 }) => {
   const processOptions = request.technology
     ? (processGroups.find((g) => g.group === request.technology || (request.technology === 'sheet' && g.group === 'sheetMetal'))?.options ?? []).map((id) => ({ id, info: PROCESS_INFO[id] }))
@@ -18,6 +22,7 @@ export const ProcessPanel = ({ request, status, onSelectProcess }: {
       title="Select Process / Type"
       subtitle="Available for the selected technology"
       status={status}
+      className={className}
     >
       {!request.technology ? (
         <div className="mw-panel-empty">
@@ -30,23 +35,37 @@ export const ProcessPanel = ({ request, status, onSelectProcess }: {
           <span className="mw-panel-empty-hint">Processes for this technology are coming soon</span>
         </div>
       ) : (
-        <div className="mw-stage-process-grid">
-          {processOptions.map(({ id, info }) => {
-            const sel = request.process === id;
-            return (
+        <>
+          <div className="mw-stage-process-grid">
+            {processOptions.map(({ id, info }) => {
+              const sel = request.process === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  className={`mw-stage-process-chip ${sel ? 'is-selected' : ''}`}
+                  onClick={() => onSelectProcess(id)}
+                >
+                  <span className="mw-stage-process-name">{info.title}</span>
+                  {info.badge && <span className="mw-stage-process-badge">{info.badge}</span>}
+                  {sel && <span className="mw-stage-process-check" aria-hidden="true"><Icon name="check" size={11} /></span>}
+                </button>
+              );
+            })}
+          </div>
+          {showNextButton && request.process && onNext && (
+            <div className="mw-stage-focus-action">
               <button
-                key={id}
                 type="button"
-                className={`mw-stage-process-chip ${sel ? 'is-selected' : ''}`}
-                onClick={() => onSelectProcess(id)}
+                className="mw-btn mw-btn-primary mw-stage-next-btn"
+                onClick={onNext}
               >
-                <span className="mw-stage-process-name">{info.title}</span>
-                {info.badge && <span className="mw-stage-process-badge">{info.badge}</span>}
-                {sel && <span className="mw-stage-process-check" aria-hidden="true"><Icon name="check" size={11} /></span>}
+                <span>{t ? `${t('request.next')}: ${t('request.uploadDesign')}` : 'Next: Upload Design'}</span>
+                <Icon name="arrowRight" size={14} />
               </button>
-            );
-          })}
-        </div>
+            </div>
+          )}
+        </>
       )}
     </PanelShell>
   );

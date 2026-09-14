@@ -1,5 +1,6 @@
 import { CadGeometryData } from '../../../../services/api';
 import { Icon } from '../../../ui/Icon';
+import { ErrorBoundary } from '../../../ui/ErrorBoundary';
 import { CadGeometryViewer } from '../../CadGeometryViewer';
 import { PanelShell } from '../PanelShell';
 import { panelIds } from '../constants';
@@ -23,14 +24,26 @@ export const ViewerPanel = ({ status, activeItem, fileSetupStates, materialId, c
   >
     {activeItem?.cadFile ? (
       <div className="mw-stage-viewer-wrap">
-        <CadGeometryViewer
-          file={activeItem.cadFile}
-          setup={fileSetupStates[activeItem.id]}
-          materialId={materialId}
-          colorId={colorId}
-          onGeometry={(g) => onGeometry(g, activeItem.id)}
-          onSetupChange={(u) => { void u; }}
-        />
+        <ErrorBoundary
+          label="cad-viewer"
+          fallback={(error, retry) => (
+            <div className="mw-stage-viewer-empty" role="alert">
+              <span className="mw-stage-viewer-empty-icon"><Icon name="cube" size={22} /></span>
+              <span className="mw-stage-viewer-empty-text">The 3D viewer could not start on this device.</span>
+              <span className="mw-stage-viewer-empty-hint">{error.message || 'WebGL may be unavailable or a graphics driver failed.'}</span>
+              <button type="button" className="mw-btn mw-btn-secondary" onClick={retry}>Retry viewer</button>
+            </div>
+          )}
+        >
+          <CadGeometryViewer
+            file={activeItem.cadFile}
+            setup={fileSetupStates[activeItem.id]}
+            materialId={materialId}
+            colorId={colorId}
+            onGeometry={(g) => onGeometry(g, activeItem.id)}
+            onSetupChange={(u) => { void u; }}
+          />
+        </ErrorBoundary>
       </div>
     ) : (
       <div className="mw-stage-viewer-empty">

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { CadFile } from '../../types';
-import { ApiService } from '../../services/api';
-import { SUPPORTED_GEOMETRY_FORMATS, CadGeometryUnavailableError, parseCadBuffer, disposeCadModel, applyCadMaterial } from './cadGeometryLoaders';
+import { CadGeometryUnavailableError, applyCadMaterial } from './cadGeometryLoaders';
+import { acquireCadModel, disposeCadClone } from './cadGeometryCache';
 import { buildPreviewMaterial } from './materialPreview';
 
 /**
@@ -12,8 +12,13 @@ import { buildPreviewMaterial } from './materialPreview';
  * renderer whose canvas never leaves this module. Jobs are serialized through a
  * promise chain, so any number of uploaded files only ever uses ONE WebGL
  * context: no per-card viewers, no context exhaustion, no paint/layout coupling
- * to the React tree. Geometries and materials are always disposed right after
- * the frame is exported (`preserveDrawingBuffer` keeps the last frame readable).
+ * to the React tree.
+ *
+ * Geometry is NOT fetched or parsed here any more: thumbnail and interactive
+ * viewer both acquire from the shared cadGeometryCache, so one file version is
+ * fetched + parsed exactly once platform-wide. Each job renders its own cache
+ * clone and releases it (and its material instance) after the frame is exported
+ * (`preserveDrawingBuffer` keeps the last frame readable).
  */
 
 const THUMB_SIZE = 176;
@@ -39,24 +44,6 @@ const getSharedRenderer = (): THREE.WebGLRenderer => {
   return renderer;
 };
 
-interface LoadedModel {
-  model: THREE.Object3D;
-  is2D: boolean;
-}
-
-/** Fetches and parses the exact geometry the main viewer renders, or throws. */
-const loadModel = async (file: CadFile): Promise<LoadedModel> => {
-  const versionId = file.latestVersion?.id;
-  const result = await ApiService.getCadGeometry(file.id, versionId);
-  if (!result) throw new CadGeometryUnavailableError('No geometry data returned.');
-  const ready = result.status === 'COMPLETE' && result.metadata?.geometryStatus === 'READY';
-  const supported = result.metadata?.viewerAsset?.available && SUPPORTED_GEOMETRY_FORMATS.includes(result.format);
-  if (!ready || !supported) throw new CadGeometryUnavailableError('Geometry is not ready for viewing.');
-  const blob = await ApiService.getCadViewerAsset(file.id, versionId);
-  const is2D = result.format === 'DXF' || result.metadata?.geometryKind === '2D';
-  return { model: await parseCadBuffer(result.format, await blob.arrayBuffer()), is2D };
-};
-
 /** Frames the camera around a model using the same convention as the main
     viewer's fit: model centered at origin, bounding-sphere distance, Z-up for
     solids, straight-on for 2D vector drawings. */
@@ -77,7 +64,7 @@ const fitAndFrame = (model: THREE.Object3D, is2D: boolean, camera: THREE.Perspec
   camera.updateProjectionMatrix();
 };
 
-const renderOnce = (loaded: LoadedModel, material: THREE.Material, renderer: THREE.WebGLRenderer): string => {
+const renderOnce = (model: THREE.Object3D, is2D: boolean, material: THREE.Material, renderer: THREE.WebGLRenderer): string => {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color('#0b101b');
   scene.add(new THREE.HemisphereLight(0xffffff, 0x1b2b3f, 1.15));
@@ -88,10 +75,10 @@ const renderOnce = (loaded: LoadedModel, material: THREE.Material, renderer: THR
   const rim = new THREE.DirectionalLight(0xffffff, 0.7);
   rim.position.set(-4, 5, -7);
   scene.add(key, fill, rim);
-  applyCadMaterial(loaded.model, material);
-  scene.add(loaded.model);
+  applyCadMaterial(model, material);
+  scene.add(model);
   const camera = new THREE.PerspectiveCamera(40, 1, 0.01, 100000);
-  fitAndFrame(loaded.model, loaded.is2D, camera);
+  fitAndFrame(model, is2D, camera);
   renderer.setSize(THUMB_SIZE, THUMB_SIZE, false);
   renderer.render(scene, camera);
   const dataUrl = renderer.domElement.toDataURL('image/png');
@@ -99,13 +86,14 @@ const renderOnce = (loaded: LoadedModel, material: THREE.Material, renderer: THR
 };
 
 const execute = async (job: CadThumbnailJob): Promise<string> => {
-  const loaded = await loadModel(job.file);
+  const handle = await acquireCadModel(job.file);
   const material = buildPreviewMaterial(job.materialId ?? null, job.colorId ?? null, { doubleSide: true });
   try {
-    return renderOnce(loaded, material, getSharedRenderer());
+    return renderOnce(handle.model, handle.is2D, material, getSharedRenderer());
   } finally {
-    disposeCadModel(loaded.model);
+    disposeCadClone(handle.model);
     material.dispose();
+    handle.release();
   }
 };
 

@@ -579,3 +579,49 @@
     animation: none;
   }
 }
+
+/* --------------------------------------------------------------------------
+   12. App View Transitions
+   The landing fades out just before the workspace swaps in (StoreContext
+   drives `.app-exiting`; the workspace itself plays its own fade entrance).
+   -------------------------------------------------------------------------- */
+#view-landing.app-exiting {
+  animation: app-exit-out 580ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  pointer-events: none;
+}
+@keyframes app-exit-out {
+  0% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.985) translateY(-8px);
+  }
+}
+
+/* Start Manufacturing button instant interaction feedback */
+#hero-cta-start-manufacturing:active,
+#cta-banner-start-manufacturing:active,
+.btn-primary:active {
+  transform: scale(0.975) translateY(0);
+  filter: brightness(0.96);
+  transition: transform 120ms cubic-bezier(0.16, 1, 0.3, 1), filter 120ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Entry choreography collapses to quick fades: no large transforms, the
+     sequence itself (tech → process → upload → reveal) is preserved. */
+  #view-landing.app-exiting {
+    animation: none;
+  }
+
+  .mw-workspace {
+    animation-duration: 300ms;
+  }
+
+  .mw-stage-process-chip {
+    animation: none;
+    opacity: 1;
+  }
+}

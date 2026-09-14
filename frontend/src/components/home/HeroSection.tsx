@@ -9,7 +9,7 @@ import { Icon } from '../ui/Icon';
 const STAGE_TILT_RANGE = 6;
 
 export const HeroSection: React.FC = () => {
-  const { setActiveView } = useStore();
+  const { setActiveView, startManufacturingRequest } = useStore();
   const { t } = useTranslation();
   const stageShellRef = useRef<HTMLDivElement | null>(null);
 
@@ -62,7 +62,7 @@ export const HeroSection: React.FC = () => {
             <div className="hero-cta-group cam-hero-in" style={{ '--cam-hero-delay': '400ms' } as React.CSSProperties}>
               <button
                 className="btn btn-lg btn-primary cam-shine-auto"
-                onClick={() => setActiveView('manufacturing-request')}
+                onClick={() => startManufacturingRequest()}
                 id="hero-cta-start-manufacturing"
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
