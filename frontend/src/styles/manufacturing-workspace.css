@@ -44,6 +44,56 @@
   font-family: var(--font-sans);
 }
 
+/* Light theme — remaps the workspace's dedicated industrial palette to the
+   light surface system so it mirrors the rest of the platform. */
+[data-theme='light'] .mw-workspace {
+  --mw-bg: #f6f8fb;
+  --mw-surface: #ffffff;
+  --mw-surface-2: #f2f5f9;
+  --mw-surface-3: #e8edf3;
+  --mw-card: #ffffff;
+  --mw-border: rgba(15, 23, 42, 0.14);
+  --mw-border-soft: rgba(15, 23, 42, 0.09);
+  --mw-border-focus: rgba(22, 119, 255, 0.55);
+  --mw-text: #0f172a;
+  --mw-text-2: #475569;
+  --mw-text-muted: #64748b;
+  --mw-blue: #1677FF;
+  --mw-blue-soft: rgba(22, 119, 255, 0.10);
+  --mw-cyan: #0e7490;
+  --mw-green: #059669;
+  --mw-green-soft: rgba(5, 150, 105, 0.10);
+  --mw-amber: #b45309;
+  --mw-amber-soft: rgba(180, 83, 9, 0.10);
+  --mw-red: #dc2626;
+  --mw-red-soft: rgba(220, 38, 38, 0.10);
+}
+
+[data-theme='light'] .mw-workspace .mw-panel {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(246, 248, 251, 0.98) 100%);
+  box-shadow:
+    0 1px 3px rgba(15, 23, 42, 0.06),
+    0 6px 20px rgba(15, 23, 42, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+[data-theme='light'] .mw-workspace .mw-panel-header {
+  background: linear-gradient(180deg, rgba(242, 245, 249, 0.6) 0%, rgba(242, 245, 249, 0.25) 100%);
+}
+
+[data-theme='light'] .mw-workspace .mw-panel.is-active .mw-panel-title { color: #0f172a; }
+
+[data-theme='light'] .mw-workspace .mw-canvas {
+  background:
+    radial-gradient(1100px 500px at 18% -10%, rgba(22, 119, 255, 0.05), transparent 60%),
+    radial-gradient(900px 480px at 90% 110%, rgba(124, 77, 255, 0.04), transparent 55%),
+    var(--mw-bg);
+}
+
+[data-theme='light'] .mw-workspace .mw-canvas::before {
+  background-image: radial-gradient(rgba(15, 23, 42, 0.06) 1px, transparent 1px);
+}
+
 
 /* --------------------------------------------------------------------------
    Canvas — the workspace fills the remaining viewport
