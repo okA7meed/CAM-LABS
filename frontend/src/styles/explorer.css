@@ -1,205 +1,561 @@
 /* ==========================================================================
    CAM LABS — Materials & Manufacturing Technologies Explorer Styles
+   Target: wide 3-card catalog with atmospheric navy environment, glass
+   filter panel, technical material cards with visual thumbnails, and an
+   in-place "View More Results" expansion control.
    ========================================================================== */
 
+/* ── Section environment ──────────────────────────────────────────────────
+   Very dark navy base with restrained blue atmospheric lighting and a subtle
+   engineering grid. All decoration stays behind the content (z-index) and at
+   low opacity so text readability is never reduced. Pure CSS — no image
+   assets, no new dependencies. */
 .explorer-section {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   padding-top: var(--space-8);
   padding-bottom: var(--space-16);
+  background:
+    radial-gradient(ellipse 60% 34% at 50% 0%, rgba(0, 102, 255, 0.14), transparent 70%),
+    radial-gradient(ellipse 26% 30% at 4% 22%, rgba(70, 130, 220, 0.12), transparent 72%),
+    radial-gradient(ellipse 26% 32% at 96% 24%, rgba(70, 130, 220, 0.10), transparent 72%),
+    radial-gradient(ellipse 70% 45% at 50% 112%, rgba(0, 102, 255, 0.08), transparent 72%),
+    linear-gradient(180deg, #050B18 0%, #081226 48%, #050B18 100%);
 }
 
+/* Subtle engineering grid, masked so it reads as atmosphere, not content. */
+.explorer-section::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(148, 184, 228, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 184, 228, 0.055) 1px, transparent 1px);
+  background-size: 56px 56px;
+  -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 0%, #000, transparent 80%);
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 0%, #000, transparent 80%);
+}
+
+.explorer-section > .explorer-container {
+  position: relative;
+  z-index: 1;
+  /* Wider than the global 1280px container so 3 equal cards reach a large,
+     premium width at desktop while keeping horizontal breathing room. */
+  max-width: 1440px;
+}
+
+.explorer-section .section-badge {
+  background: linear-gradient(180deg, rgba(22, 32, 46, 0.92), rgba(12, 18, 28, 0.92));
+  border-color: rgba(110, 150, 210, 0.28);
+  color: #D7E1EE;
+  letter-spacing: 0.14em;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 0 14px rgba(0, 102, 255, 0.08);
+}
+
+.explorer-section .section-subtitle {
+  color: #9DB1C9;
+}
+
+/* ── Filter panel ─────────────────────────────────────────────────────────
+   Dark navy glass technical panel: rounded, subtle blue border, ambient
+   depth, clear grouping. */
 .explorer-toolbar {
-  background-color: var(--cam-surface-1);
-  border: 1px solid var(--cam-border-medium);
-  border-radius: var(--radius-md);
-  padding: var(--space-5);
+  background: linear-gradient(180deg, rgba(17, 30, 51, 0.94), rgba(9, 16, 30, 0.94));
+  border: 1px solid rgba(110, 150, 210, 0.22);
+  border-radius: var(--radius-xl);
+  padding: var(--space-5) var(--space-6);
   margin-bottom: var(--space-8);
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 18px 44px -22px rgba(0, 0, 0, 0.7),
+    0 0 32px -12px rgba(0, 102, 255, 0.18);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .toolbar-search-row {
   display: flex;
   gap: var(--space-4);
   align-items: center;
-  flex-wrap: wrap;
 }
 
 .search-input-box {
   flex: 1;
-  min-width: 260px;
+  min-width: 0;
+}
+
+.explorer-toolbar .form-control {
+  min-height: 48px;
+  border-radius: var(--radius-lg);
+  background-color: rgba(5, 11, 24, 0.85);
+  border-color: rgba(110, 150, 210, 0.22);
+  font-size: 0.9375rem;
+}
+
+.explorer-toolbar .form-control:focus {
+  background-color: rgba(5, 11, 24, 0.95);
+}
+
+.explorer-reset-btn {
+  flex: none;
+  border-radius: var(--radius-full);
+  border-color: rgba(0, 102, 255, 0.45);
+  background-color: rgba(0, 102, 255, 0.06);
+  color: var(--cam-text-secondary);
+  min-height: 44px;
+  padding-inline: var(--space-5);
+}
+
+.explorer-reset-btn:hover {
+  background-color: var(--cam-blue-subtle);
+  border-color: var(--cam-blue-primary);
+  color: var(--cam-text-primary);
 }
 
 .filter-group-row {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-4);
   flex-wrap: wrap;
 }
 
 .filter-label {
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  color: var(--cam-text-muted);
-  min-width: 90px;
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #9DB1C9;
+  min-width: 92px;
 }
 
 .filter-chips {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
 .chip-btn {
-  background: var(--cam-bg);
-  border: 1px solid var(--cam-border-subtle);
-  --btn-block-size: calc(1em + 8px + 2px);
-  border-radius: var(--btn-radius);
-  color: var(--cam-text-muted);
+  background: rgba(5, 11, 24, 0.7);
+  border: 1px solid rgba(110, 150, 210, 0.22);
+  --btn-block-size: calc(1em + 16px + 2px);
+  border-radius: var(--radius-full);
+  color: #B9C8DC;
   font-size: 0.8125rem;
-  font-family: var(--font-mono);
-  padding: 4px 10px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  padding: 8px 16px;
+  min-height: 36px;
   cursor: pointer;
   transition: all var(--transition-fast);
+  white-space: nowrap;
 }
 
 .chip-btn:hover {
-  border-color: var(--cam-border-medium);
+  border-color: rgba(110, 150, 210, 0.5);
   color: var(--cam-text-primary);
 }
 
 .chip-btn.active {
-  background-color: var(--cam-blue-subtle);
+  background: var(--cam-blue-primary);
   border-color: var(--cam-blue-primary);
-  color: var(--cam-blue-primary);
-  font-weight: 600;
+  color: #FFFFFF;
+  font-weight: 700;
+  box-shadow: 0 4px 16px -4px var(--cam-blue-glow);
 }
 
-/* Materials Grid */
+/* ── Materials grid ───────────────────────────────────────────────────────
+   Desktop 3 equal columns · tablet 2 · mobile 1. minmax(0,1fr) prevents
+   horizontal overflow on intermediate viewports. */
 .materials-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--space-6);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-5);
+  align-items: stretch;
 }
 
 @media (max-width: 1100px) {
   .materials-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 680px) {
   .materials-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
+/* ── Material card ────────────────────────────────────────────────────────
+   Large rounded dark-navy container with subtle border, depth, and blue
+   atmospheric lighting. Flex column so the configure action anchors to the
+   bottom and cards in a row keep a coherent height. */
 .material-card {
-  background-color: var(--cam-surface-1);
-  border: 1px solid var(--cam-border-subtle);
-  border-radius: var(--radius-md);
-  padding: var(--space-6);
+  background: linear-gradient(180deg, #0D1830 0%, #0A1326 55%, #080F20 100%);
+  border: 1px solid rgba(110, 150, 210, 0.20);
+  border-radius: var(--radius-2xl);
+  padding: var(--space-5);
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  transition: all var(--transition-fast);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
   position: relative;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 16px 36px -20px rgba(0, 0, 0, 0.7);
 }
 
 .material-card:hover {
-  border-color: var(--cam-border-medium);
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-lg);
+  border-color: rgba(110, 150, 210, 0.45);
+  transform: translateY(-3px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 22px 44px -20px rgba(0, 0, 0, 0.75),
+    0 0 28px -12px rgba(0, 102, 255, 0.30);
 }
 
-.material-header {
+/* Card header: thumbnail + identity + compare, consistently aligned. */
+.material-card-top {
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-2);
+  gap: var(--space-4);
+}
+
+.material-thumb {
+  flex: none;
+  width: 76px;
+  height: 76px;
+  border-radius: var(--radius-xl);
+  display: grid;
+  place-items: center;
+  background: linear-gradient(165deg, #16233C, #0B1428 70%);
+  border: 1px solid rgba(110, 150, 210, 0.28);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.material-thumb--polymer { color: #5EA2FF; border-color: rgba(94, 162, 255, 0.40); }
+.material-thumb--metal { color: #A9C3DE; border-color: rgba(169, 195, 222, 0.40); }
+.material-thumb--resin { color: #B79CFF; border-color: rgba(183, 156, 255, 0.40); }
+.material-thumb--performance { color: #FBBF24; border-color: rgba(251, 191, 36, 0.40); }
+.material-thumb--elastomer { color: #34D399; border-color: rgba(52, 211, 153, 0.40); }
+
+.material-identity {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.material-compare {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.material-compare-label {
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  color: var(--cam-text-muted);
 }
 
 .material-name {
   font-size: 1.1875rem;
   font-weight: 700;
   color: var(--cam-text-primary);
-  line-height: 1.2;
+  line-height: 1.25;
 }
 
 .material-tech-pill {
-  font-family: var(--font-mono);
+  align-self: flex-start;
+  font-family: var(--font-sans);
   font-size: 0.6875rem;
-  padding: 2px 6px;
-  border-radius: var(--radius-sm);
-  background: var(--cam-surface-2);
-  border: 1px solid var(--cam-border-medium);
-  color: var(--cam-text-secondary);
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  background: rgba(0, 102, 255, 0.10);
+  border: 1px solid rgba(110, 150, 210, 0.28);
+  color: #9DB1C9;
+  white-space: nowrap;
 }
 
+.material-desc {
+  font-size: 0.8125rem;
+  color: #8FA3BC;
+  line-height: 1.6;
+}
+
+/* Technical property rows with subtle separators and icon + label/value. */
 .material-props-list {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  margin-top: var(--space-2);
+}
+
+.prop-item {
+  padding: 9px 0;
+}
+
+.prop-item:not(:first-child) {
+  border-top: 1px solid rgba(148, 184, 228, 0.10);
 }
 
 .prop-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: var(--space-3);
   font-size: 0.8125rem;
 }
 
+.prop-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: #8FA3BC;
+}
+
+.prop-icon {
+  flex: none;
+  color: #5B8DD6;
+}
+
 .prop-name {
-  color: var(--cam-text-muted);
+  color: #8FA3BC;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .prop-val {
   font-family: var(--font-mono);
-  font-weight: 600;
+  font-size: 0.8125rem;
+  font-weight: 700;
   color: var(--cam-text-primary);
+  white-space: nowrap;
+}
+
+.prop-val--lead {
+  color: #34D399;
 }
 
 .prop-bar-track {
   width: 100%;
   height: 4px;
-  background-color: var(--cam-surface-2);
-  border-radius: 2px;
+  background-color: rgba(148, 184, 228, 0.14);
+  border-radius: var(--radius-full);
   overflow: hidden;
-  margin-top: 2px;
+  margin-top: 7px;
 }
 
 .prop-bar-fill {
   height: 100%;
   background-color: var(--cam-blue-primary);
-  border-radius: 2px;
+  border-radius: var(--radius-full);
 }
 
+/* Tags: compact rounded technical pills, wrapping naturally. */
 .material-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 6px;
 }
 
 .prop-tag {
-  font-family: var(--font-mono);
-  font-size: 0.6875rem;
-  padding: 2px 6px;
-  background: var(--cam-surface-2);
-  border: 1px solid var(--cam-border-subtle);
-  border-radius: 3px;
-  color: var(--cam-text-muted);
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 5px 12px;
+  background: rgba(0, 102, 255, 0.08);
+  border: 1px solid rgba(110, 150, 210, 0.22);
+  border-radius: var(--radius-full);
+  color: #B9C8DC;
+  white-space: nowrap;
 }
 
 .material-card-actions {
   margin-top: auto;
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--cam-border-subtle);
+  padding-top: var(--space-2);
+  display: flex;
+}
+
+.material-configure {
+  width: 100%;
+  min-height: 46px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, var(--cam-blue-primary) 0%, #0B8CFF 55%, var(--cam-cyan-tech) 130%);
+  border-color: transparent;
+  font-weight: 700;
+  font-size: 0.875rem;
+  box-shadow: 0 8px 22px -8px var(--cam-blue-glow);
+}
+
+.material-configure:hover {
+  box-shadow: 0 10px 28px -8px var(--cam-blue-glow);
+  color: #FFFFFF;
+}
+
+/* ── View More Results ────────────────────────────────────────────────────
+   Centered pill button with subtle horizontal rails extending both sides. */
+.view-more-wrap {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
+  gap: var(--space-5);
+  margin-top: var(--space-8);
+}
+
+.view-more-rail {
+  flex: 1;
+  min-width: 24px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0, 102, 255, 0.45), transparent);
+  opacity: 0.7;
+}
+
+.view-more-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 12px 28px;
+  border-radius: var(--radius-full);
+  background: rgba(0, 102, 255, 0.06);
+  border: 1px solid rgba(0, 102, 255, 0.5);
+  color: var(--cam-text-primary);
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 0 18px -6px var(--cam-blue-glow), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
+}
+
+.view-more-btn:hover {
+  background: rgba(0, 102, 255, 0.14);
+  border-color: var(--cam-blue-primary);
+  transform: translateY(-1px);
+  box-shadow: 0 0 26px -6px var(--cam-blue-glow), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* ── Responsive ─────────────────────────────────────────────────────────── */
+@media (max-width: 680px) {
+  .explorer-toolbar {
+    padding: var(--space-4);
+  }
+
+  .toolbar-search-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .search-input-box {
+    width: 100%;
+  }
+
+  .explorer-reset-btn {
+    width: 100%;
+  }
+
+  .filter-label {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .material-thumb {
+    width: 64px;
+    height: 64px;
+  }
+
+  .material-compare-label {
+    display: none;
+  }
+
+  .view-more-wrap {
+    gap: var(--space-3);
+  }
+}
+
+/* ── Light theme ──────────────────────────────────────────────────────────
+   The catalog section keeps its deep-navy technical identity in dark mode.
+   Under the light theme the same structure adapts to light surfaces so text
+   contrast and control affordances hold. */
+[data-theme='light'] .explorer-section {
+  background:
+    radial-gradient(ellipse 60% 34% at 50% 0%, rgba(0, 102, 255, 0.10), transparent 70%),
+    linear-gradient(180deg, #EFF4FB 0%, #E4ECF7 50%, #EFF4FB 100%);
+}
+
+[data-theme='light'] .explorer-section .section-subtitle {
+  color: var(--cam-text-muted);
+}
+
+[data-theme='light'] .explorer-toolbar {
+  background: linear-gradient(180deg, #FFFFFF, #F1F5FA);
+  border-color: var(--cam-border-medium);
+  box-shadow: var(--shadow-md);
+}
+
+[data-theme='light'] .explorer-toolbar .form-control {
+  background-color: #FFFFFF;
+  border-color: var(--cam-border-medium);
+}
+
+[data-theme='light'] .explorer-reset-btn {
+  background-color: transparent;
+  color: var(--cam-text-secondary);
+}
+
+[data-theme='light'] .chip-btn {
+  background: #FFFFFF;
+  border-color: var(--cam-border-medium);
+  color: var(--cam-text-secondary);
+}
+
+[data-theme='light'] .filter-label {
+  color: var(--cam-text-muted);
+}
+
+[data-theme='light'] .material-card {
+  background: linear-gradient(180deg, #FFFFFF, #F4F7FC);
+  border-color: var(--cam-border-medium);
+  box-shadow: var(--shadow-md);
+}
+
+[data-theme='light'] .material-thumb {
+  background: linear-gradient(165deg, #EAF1FC, #DCE7F7);
+}
+
+[data-theme='light'] .material-desc,
+[data-theme='light'] .prop-left,
+[data-theme='light'] .prop-name {
+  color: var(--cam-text-muted);
+}
+
+[data-theme='light'] .material-tech-pill {
+  background: var(--cam-blue-subtle);
+  border-color: rgba(0, 102, 255, 0.25);
+  color: var(--cam-text-secondary);
+}
+
+[data-theme='light'] .prop-tag {
+  background: var(--cam-surface-2);
+  border-color: var(--cam-border-subtle);
+  color: var(--cam-text-secondary);
+}
+
+[data-theme='light'] .view-more-btn {
+  background: #FFFFFF;
+  box-shadow: var(--shadow-sm);
 }
 
 /* Comparison Floating Bar & Drawer */

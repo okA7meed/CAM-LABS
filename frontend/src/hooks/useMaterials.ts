@@ -17,7 +17,14 @@ const fetchCatalog = (): Promise<Material[] | null> => {
   if (!inflightRequest) {
     inflightRequest = ApiService.getMaterials()
       .then((materials) => {
-        cachedMaterials = materials ?? [];
+        // ApiService returns null when the HTTP request itself fails (it only
+        // throws for `requestRequired` calls). A failed catalog fetch must
+        // surface as an error, never as an empty list — otherwise the
+        // explorer misreports an outage as "no materials match your filters".
+        if (materials == null) {
+          throw new Error('Material catalog request failed.');
+        }
+        cachedMaterials = materials;
         return cachedMaterials;
       })
       .catch((error) => {

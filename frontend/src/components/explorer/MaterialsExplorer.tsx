@@ -3,7 +3,9 @@ import { MaterialCard } from './MaterialCard';
 import { useMaterials } from '../../hooks/useMaterials';
 import { useTranslation } from 'react-i18next';
 import { SectionReveal } from '../ui/Reveal';
+import { Icon } from '../ui/Icon';
 
+const COLLAPSED_VISIBLE_COUNT = 3;
 
 export const MaterialsExplorer: React.FC = () => {
   const { t } = useTranslation();
@@ -11,6 +13,7 @@ export const MaterialsExplorer: React.FC = () => {
   const [activeTech, setActiveTech] = useState<string>('ALL');
   const [activeCat, setActiveCat] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [isExpanded, setIsExpanded] = useState<boolean>(false);
 
   const techOptions: { label: string; value: string }[] = [
     { label: t('materials.allTech'), value: 'ALL' },
@@ -39,15 +42,39 @@ export const MaterialsExplorer: React.FC = () => {
       q === '' ||
       mat.name.toLowerCase().includes(q) ||
       mat.description.toLowerCase().includes(q) ||
-      mat.tags.some((t) => t.toLowerCase().includes(q));
+      mat.tags.some((tag) => tag.toLowerCase().includes(q));
 
     return matchTech && matchCat && matchSearch;
   });
+
+  // Presentation-only visibility rule: the collapsed state shows the first 3
+  // of the already-filtered result set. Filtering/searching always operate on
+  // the full catalog result; expansion never duplicates cards.
+  const visibleMaterials = isExpanded
+    ? filteredMaterials
+    : filteredMaterials.slice(0, COLLAPSED_VISIBLE_COUNT);
+  const hasMoreResults = filteredMaterials.length > COLLAPSED_VISIBLE_COUNT;
 
   const handleReset = () => {
     setActiveTech('ALL');
     setActiveCat('ALL');
     setSearchQuery('');
+    setIsExpanded(false);
+  };
+
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    setIsExpanded(false);
+  };
+
+  const handleTechChange = (value: string) => {
+    setActiveTech(value);
+    setIsExpanded(false);
+  };
+
+  const handleCatChange = (value: string) => {
+    setActiveCat(value);
+    setIsExpanded(false);
   };
 
   return (
@@ -55,7 +82,7 @@ export const MaterialsExplorer: React.FC = () => {
       className="section-padding explorer-section themed-section-band"
       id="materials-section"
     >
-      <div className="container">
+      <div className="container explorer-container">
         <div className="section-header">
           <div className="section-badge">
             <span className="section-badge-dot"></span>
@@ -70,16 +97,21 @@ export const MaterialsExplorer: React.FC = () => {
         {/* Filter Toolbar */}
         <div className="explorer-toolbar">
           <div className="toolbar-search-row">
-            <div className="search-input-box">
+            <div className="search-input-box input-with-icon">
+              <span className="input-icon-left" aria-hidden="true">
+                <Icon name="search" size={17} />
+              </span>
               <input
                 type="text"
                 className="form-control"
                 placeholder={t('materials.searchPlaceholder')}
+                aria-label={t('materials.searchPlaceholder')}
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => handleSearchChange(e.target.value)}
               />
             </div>
-            <button className="btn btn-outline btn-sm" onClick={handleReset}>
+            <button type="button" className="btn btn-outline btn-sm explorer-reset-btn" onClick={handleReset}>
+              <Icon name="reset" size={15} />
               {t('materials.reset')}
             </button>
           </div>
@@ -90,8 +122,10 @@ export const MaterialsExplorer: React.FC = () => {
               {techOptions.map((opt) => (
                 <button
                   key={opt.value}
+                  type="button"
+                  aria-pressed={activeTech === opt.value}
                   className={`chip-btn tech-filter-chip ${activeTech === opt.value ? 'active' : ''}`}
-                  onClick={() => setActiveTech(opt.value)}
+                  onClick={() => handleTechChange(opt.value)}
                 >
                   {opt.label}
                 </button>
@@ -105,8 +139,10 @@ export const MaterialsExplorer: React.FC = () => {
               {catOptions.map((opt) => (
                 <button
                   key={opt.value}
+                  type="button"
+                  aria-pressed={activeCat === opt.value}
                   className={`chip-btn cat-filter-chip ${activeCat === opt.value ? 'active' : ''}`}
-                  onClick={() => setActiveCat(opt.value)}
+                  onClick={() => handleCatChange(opt.value)}
                 >
                   {opt.label}
                 </button>
@@ -166,9 +202,27 @@ export const MaterialsExplorer: React.FC = () => {
               </button>
             </div>
           ) : (
-            filteredMaterials.map((mat) => <MaterialCard key={mat.id} material={mat} />)
+            visibleMaterials.map((mat) => <MaterialCard key={mat.id} material={mat} />)
           )}
         </div>
+
+        {hasMoreResults && !loading && !error && (
+          <div className="view-more-wrap">
+            <span className="view-more-rail" aria-hidden="true"></span>
+            <button
+              type="button"
+              className="view-more-btn"
+              aria-expanded={isExpanded}
+              aria-controls="materials-explorer-grid"
+              onClick={() => setIsExpanded((prev) => !prev)}
+            >
+              <Icon name={isExpanded ? 'chevronDown' : 'expand'} size={16} />
+              {isExpanded ? t('materials.showLess') : t('materials.viewMore')}
+              <Icon name="arrowRight" size={16} />
+            </button>
+            <span className="view-more-rail" aria-hidden="true"></span>
+          </div>
+        )}
       </div>
     </SectionReveal>
   );
