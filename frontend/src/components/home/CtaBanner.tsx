@@ -16,7 +16,7 @@ export const CtaBanner: React.FC = () => {
               <span className="section-badge-dot"></span>
               <span>{t('cta.kicker')}</span>
             </div>
-            <h2 style={{ fontSize: 'clamp(1.875rem, 4vw, 2.75rem)', marginBottom: 'var(--space-4)' }}>
+            <h2 className="section-title">
               {t('cta.title')}
             </h2>
             <p style={{ color: 'var(--cam-text-secondary)', fontSize: '1.125rem', marginBottom: 'var(--space-8)' }}>

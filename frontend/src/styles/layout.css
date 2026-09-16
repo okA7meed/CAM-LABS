@@ -11,23 +11,62 @@
   top: 0;
   width: 100%;
   height: var(--header-height);
-  background-color: color-mix(in srgb, var(--cam-bg) 86%, transparent);
-  border-bottom: 1px solid var(--cam-border-medium);
+  background: var(--glass-nav-dark-bg);
+  backdrop-filter: blur(var(--glass-nav-blur));
+  -webkit-backdrop-filter: blur(var(--glass-nav-blur));
+  border-bottom: 1px solid var(--glass-dark-border);
   z-index: 500;
   display: flex;
   align-items: center;
   animation: navbar-enter 480ms cubic-bezier(0.16, 1, 0.3, 1) both;
-  transition: background-color var(--transition-base), border-color var(--transition-base), box-shadow var(--transition-base);
+  transition: background-color 220ms ease, border-color 220ms ease, backdrop-filter 220ms ease;
 }
+
+/* Pure theme-aware backdrop blur: the surface is transparent and the only
+   treatment is the blur, so page content passing behind is softly smeared into
+   an unreadable impression while the navbar's own content stays sharp. */
 
 .cam-header.scrolled {
-  background-color: color-mix(in srgb, var(--cam-bg) 94%, var(--cam-surface-1));
-  border-color: var(--cam-border-strong);
-  backdrop-filter: blur(16px) saturate(1.12);
-  -webkit-backdrop-filter: blur(16px) saturate(1.12);
-  box-shadow: 0 5px 16px rgba(0, 0, 0, 0.12);
+  background: var(--glass-nav-dark-bg-scrolled);
+  backdrop-filter: blur(var(--glass-nav-blur-scrolled));
+  -webkit-backdrop-filter: blur(var(--glass-nav-blur-scrolled));
+  border-color: rgba(255, 255, 255, 0.10);
 }
 
+/* Light mode — same blur-only treatment; the lighter appearance comes from the
+   lighter content sitting behind the navbar, not from a colored surface. */
+[data-theme='light'] .cam-header {
+  background: var(--glass-nav-light-bg);
+  backdrop-filter: blur(var(--glass-nav-blur));
+  -webkit-backdrop-filter: blur(var(--glass-nav-blur));
+  border-bottom: 1px solid var(--glass-light-border);
+}
+
+[data-theme='light'] .cam-header.scrolled {
+  background: var(--glass-nav-light-bg-scrolled);
+  backdrop-filter: blur(var(--glass-nav-blur-scrolled));
+  -webkit-backdrop-filter: blur(var(--glass-nav-blur-scrolled));
+  border-color: rgba(15, 23, 42, 0.10);
+}
+
+/* Fallback for browsers without backdrop-filter: the frosted-glass blur is
+   dropped, so the header background becomes near-opaque to keep contrast. */
+@supports not ((backdrop-filter: blur(4px)) or (-webkit-backdrop-filter: blur(4px))) {
+  .cam-header {
+    background: rgba(8, 12, 20, 0.96);
+    border-bottom-color: rgba(255, 255, 255, 0.12);
+  }
+  .cam-header.scrolled {
+    background: rgba(8, 12, 20, 0.98);
+  }
+  [data-theme='light'] .cam-header {
+    background: rgba(247, 249, 252, 0.96);
+    border-bottom-color: rgba(15, 23, 42, 0.12);
+  }
+  [data-theme='light'] .cam-header.scrolled {
+    background: rgba(255, 255, 255, 0.98);
+  }
+}
 /* Compact header — used inside the manufacturing request flow workspace */
 .cam-header.cam-header--compact {
   --header-height: 56px;
@@ -201,7 +240,7 @@
   padding: 0;
   border: 1px solid var(--cam-border-subtle);
   --btn-block-size: var(--navbar-control-height);
-  border-radius: var(--btn-radius);
+  border-radius: var(--radius-full);
   background: color-mix(in srgb, var(--cam-surface-1) 84%, transparent);
   color: var(--cam-text-secondary);
   cursor: pointer;
@@ -276,7 +315,7 @@
   height: var(--navbar-control-height);
   border: 1px solid var(--cam-border-medium);
   --btn-block-size: var(--navbar-control-height);
-  border-radius: var(--btn-radius);
+  border-radius: var(--radius-full);
   background: transparent;
   color: var(--cam-text-secondary);
   font: 600 0.75rem var(--font-sans);
@@ -297,7 +336,7 @@
   padding: 0 13px;
   border: 1px solid var(--cam-blue-hover);
   --btn-block-size: var(--navbar-control-height);
-  border-radius: var(--btn-radius);
+  border-radius: var(--radius-full);
   background: var(--cam-blue-primary);
   color: #fff;
   font: 700 0.8125rem var(--font-sans);
@@ -382,7 +421,7 @@
   background: var(--cam-surface-2);
   border: 1px solid var(--cam-border-subtle);
   --btn-block-size: var(--navbar-control-height);
-  border-radius: var(--btn-radius);
+  border-radius: var(--radius-full);
   color: var(--cam-text-primary);
   cursor: pointer;
   padding: 0;
@@ -462,7 +501,7 @@
   .header-actions { gap: 6px; }
   .header-sign-in { display: none; }
   .nav-preferences { gap: 6px; }
-  .header-cta { width: var(--navbar-control-height); height: var(--navbar-control-height); padding: 0; --btn-block-size: var(--navbar-control-height); border-radius: var(--btn-radius); }
+  .header-cta { width: var(--navbar-control-height); height: var(--navbar-control-height); padding: 0; --btn-block-size: var(--navbar-control-height); border-radius: var(--radius-full); }
   .header-cta span { display: none; }
   .mobile-menu-drawer { top: 64px; left: 0; right: 0; bottom: 0; border-radius: 0; padding: var(--space-4); }
 }
@@ -481,8 +520,6 @@
   padding-bottom: 0;
 }
 
-[data-theme='light'] .cam-header { background-color: color-mix(in srgb, var(--cam-bg) 86%, transparent); }
-[data-theme='light'] .cam-header.scrolled { background-color: color-mix(in srgb, var(--cam-bg) 94%, var(--cam-surface-1)); }
 [data-theme='light'] .mobile-menu-drawer { background: var(--cam-bg); }
 [dir='rtl'] { text-align: start; }
 [dir='rtl'] .header-container { direction: rtl; }
@@ -512,9 +549,25 @@
    -------------------------------------------------------------------------- */
 .hero-section {
   position: relative;
-  padding-top: var(--space-12);
-  padding-bottom: 0;
   overflow: hidden;
+  background-color: var(--cam-bg);
+}
+
+/* Full-bleed hero visual — image fills the wrapper; height is content-driven so
+   the anchored feature strip always sits flush with the bottom of the image. */
+.hero-visual {
+  position: relative;
+  width: 100%;
+}
+
+.hero-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
 }
 
 /* Engineering grid background — subtle industrial blueprint texture */
@@ -548,11 +601,55 @@
   pointer-events: none;
 }
 
+/* Readability overlay above the full-bleed hero image (theme-aware) */
+.hero-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(90deg, rgba(4, 10, 20, 0.72), rgba(4, 10, 20, 0.28) 55%, rgba(4, 10, 20, 0.42));
+}
+
+[data-theme='light'] .hero-overlay {
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.74), rgba(255, 255, 255, 0.30) 55%, rgba(255, 255, 255, 0.42));
+}
+
+.hero-visual > .container {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  padding-top: clamp(3rem, 8vw, 6rem);
+  padding-bottom: clamp(8rem, 12vw, 11rem);
+}
+
+/* Desktop: the hero visual holds a strict 16:9 frame (matching the artboard of
+   the on-disk assets), and the overlay container is absolutely pinned so the
+   intro content is vertically centered inside that frame with the anchored
+   feature strip at the bottom. Below 1024px the section stays content-driven
+   so the shorter viewport never lets the frame clip the copy. */
+@media (min-width: 1024px) {
+  .hero-visual {
+    aspect-ratio: 16 / 9;
+    min-height: max(480px, 46vw);
+  }
+
+  .hero-visual > .container {
+    position: absolute;
+    inset: 0;
+    padding-top: clamp(3.5rem, 6vw, 5rem);
+    padding-bottom: clamp(6.5rem, 9vw, 8.5rem);
+  }
+}
+
 .hero-grid {
+  flex: 1 1 auto;
+  min-height: 0;
   display: grid;
-  grid-template-columns: 1.15fr 0.85fr;
-  gap: var(--space-12);
-  align-items: center;
+  grid-template-columns: 1fr;
+  gap: var(--space-10);
+  justify-items: center;
+  align-content: center;
 }
 
 @media (max-width: 1024px) {
@@ -565,6 +662,24 @@
 .hero-content {
   position: relative;
   z-index: 10;
+  justify-self: start;
+  text-align: start;
+}
+
+/* Arabic keeps its mirrored placement on the right within the hero column. */
+[dir='rtl'] .hero-content {
+  justify-self: end;
+}
+
+/* Wide desktop only: pull the English/LTR copy slightly left into the empty
+   gutter that opens once the viewport is wider than the shared 1280px
+   container. Scoped to [dir='ltr'] so Arabic RTL alignment is untouched, and
+   gated at >=1366px so the copy never reaches the viewport edge on 1280px and
+   below (where the container fills the full width). */
+@media (min-width: 1366px) {
+  [dir='ltr'] .hero-content {
+    margin-inline-start: clamp(-3.5rem, -3vw, -2rem);
+  }
 }
 
 .hero-title {
@@ -577,45 +692,27 @@
   margin-bottom: var(--space-6);
 }
 
+/* The static prefix ("Ideas Realized") and the animated phrase each get their own
+   line. Direction-aware text-align keeps English/LTR and Arabic/RTL correct. */
+.hero-title-prefix,
+.hero-title-action {
+  display: block;
+}
+
 [lang='ar'] h1.hero-title {
   font-family: var(--font-hero-arabic);
   font-weight: 900;
 }
 
 .hero-title-highlight {
-  color: var(--cam-blue-primary);
   position: relative;
   display: inline-block;
-  background: linear-gradient(120deg, var(--cam-blue-primary), var(--cam-cyan-tech));
+  color: var(--cam-blue-primary);
+  background: var(--cam-heading-gradient);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-  filter: drop-shadow(0 2px 14px var(--cam-blue-glow));
-}
-
-/* Underline accent on the highlighted title words */
-.hero-title-highlight::after {
-  content: '';
-  position: absolute;
-  left: 2%;
-  right: 2%;
-  bottom: 0.04em;
-  height: 0.09em;
-  border-radius: var(--radius-full);
-  background: linear-gradient(90deg, var(--cam-blue-primary), var(--cam-cyan-tech));
-  opacity: 0.55;
-}
-
-@media (max-width: 640px) {
-  .hero-title-prefix,
-  .hero-title-action,
-  .hero-title-outro {
-    display: block;
-  }
-
-  .hero-title-highlight {
-    display: inline;
-  }
+  filter: var(--cam-heading-glow);
 }
 
 .hero-description {
@@ -634,28 +731,34 @@
   margin-bottom: var(--space-10);
 }
 
-/* Manufacturing Feature Strip — full-width industrial band */
+/* Hero CTA buttons are pill-shaped; the shared --btn-radius stays intact for
+   every other button on the platform. */
+.hero-cta-group .btn {
+  border-radius: var(--radius-full);
+}
+
+/* Manufacturing Feature Strip — transparent glass information layer.
+   Absolutely anchored to the bottom edge of the hero visual so the strip
+   always sits flush with the bottom of the image. */
 .hero-benefits {
-  --hb-bg-deep: #0a0f1e;
-  --hb-bg-hi: #0d1426;
   --hb-ink: #eef2fb;
   --hb-muted: #8a93a8;
-  --hb-border: rgba(148, 163, 184, 0.16);
-  --hb-divider: rgba(148, 163, 184, 0.14);
   --hb-accent: #4d9bff;
 
   font-family: var(--font-google-sans), var(--font-arabic), sans-serif;
-  width: 100vw;
-  margin-inline: calc(50% - 50vw);
-  margin-top: clamp(1.5rem, 2.5vw, 2.5rem);
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   align-items: stretch;
-  background:
-    radial-gradient(ellipse 80% 90% at 50% -10%, rgba(0, 102, 255, 0.14), transparent 60%),
-    linear-gradient(180deg, var(--hb-bg-hi) 0%, var(--hb-bg-deep) 100%);
-  border-top: 1px solid var(--hb-border);
-  border-bottom: 1px solid var(--hb-border);
+  background: var(--glass-dark-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border-top: 1px solid var(--glass-dark-border);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
   padding-block: clamp(1.1rem, 1.5vw, 1.3rem);
 }
 
@@ -665,7 +768,7 @@
   justify-content: center;
   gap: clamp(0.875rem, 1.5vw, 1.25rem);
   padding-inline: clamp(1rem, 2vw, 2rem);
-  border-inline-start: 1px solid var(--hb-divider);
+  border-inline-start: 1px solid var(--glass-dark-border);
 }
 
 .hero-benefit-item:first-child {
@@ -752,347 +855,49 @@
   .hero-benefit-label { font-size: 0.64rem; letter-spacing: 0.07em; white-space: normal; text-wrap: balance; }
 }
 
-/* Hero 3D CAD Showcase Stage — macOS-inspired engineering application window */
-.hero-cad-stage {
-  /* Self-contained window palette so the inspector stays dark in every theme */
-  --cad-chrome-top: #1b1f26;
-  --cad-chrome-bottom: #15181e;
-  --cad-chrome-flat: #14171c;
-  --cad-window-border: rgba(255, 255, 255, 0.09);
-  --cad-window-text: #e8ecf2;
-  --cad-window-muted: #99a1af;
-  --cad-window-faint: #666e7c;
-  --cad-accent: #4d9bff;
-
-  position: relative;
-  width: 100%;
-  min-width: 0;
-  container-type: inline-size;
-  background: var(--cad-chrome-flat);
-  border: 1px solid var(--cad-window-border);
-  border-radius: clamp(12px, 1.3vw, 18px);
-  overflow: hidden;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.04);
-}
-
-.cad-stage-header {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-width: 0;
-  padding: 10px var(--space-4);
-  background: linear-gradient(180deg, var(--cad-chrome-top), var(--cad-chrome-bottom));
-  border-bottom: 1px solid var(--cad-window-border);
-}
-
-.cad-window-lights {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: none;
-}
-
-.cad-light {
-  display: block;
-  width: 11px;
-  height: 11px;
-  border-radius: 50%;
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
-  opacity: 0.9;
-}
-
-.cad-light-red { background: #ff5f57; }
-.cad-light-amber { background: #febc2e; }
-.cad-light-green { background: #28c840; }
-
-.cad-part-meta {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex: 1 1 auto;
-  min-width: 0;
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  color: var(--cad-window-muted);
-}
-
-.cad-app-name {
-  flex: none;
-  color: var(--cad-window-text);
-  font-size: 0.6875rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-.cad-meta-divider {
-  flex: none;
-  width: 1px;
-  height: 12px;
-  background: var(--cad-window-border);
-}
-
-.cad-filename {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.cad-controls-hud {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  flex: none;
-  max-width: 100%;
-  padding: 2px;
-  border: 1px solid var(--cad-window-border);
-  border-radius: var(--radius-sm);
-  background: rgba(0, 0, 0, 0.3);
-  overflow-x: auto;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-}
-
-.cad-controls-hud::-webkit-scrollbar,
-.cad-part-switch::-webkit-scrollbar,
-.cad-status-readout::-webkit-scrollbar {
-  display: none;
-}
-
-.hud-btn {
-  background: transparent;
-  border: 1px solid var(--cam-border-subtle);
-  --btn-block-size: calc(1em + 6px + 2px);
-  border-radius: var(--btn-radius);
-  color: var(--cam-text-muted);
-  font-family: var(--font-mono);
-  font-size: 0.6875rem;
-  padding: 3px 8px;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.hud-btn:hover, .hud-btn.active {
-  background-color: var(--cam-blue-subtle);
-  border-color: var(--cam-blue-primary);
-  color: var(--cam-blue-primary);
-}
-
-/* Window-scoped control chrome (kept separate so .hud-btn stays reusable) */
-.hero-cad-stage .hud-btn {
-  flex: none;
-  padding: 4px 10px;
-  border-color: transparent;
-  border-radius: 5px;
-  background: transparent;
-  color: var(--cad-window-muted);
-  white-space: nowrap;
-  transition: color var(--transition-fast), background-color var(--transition-fast),
-    box-shadow var(--transition-fast);
-}
-
-.hero-cad-stage .hud-btn:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--cad-window-text);
-}
-
-.hero-cad-stage .hud-btn.active {
-  background: rgba(0, 102, 255, 0.16);
-  color: var(--cad-accent);
-  box-shadow: inset 0 0 0 1px rgba(0, 102, 255, 0.45);
-}
-
-.hero-cad-stage .hud-btn:focus-visible {
-  outline: 2px solid var(--cam-blue-primary);
-  outline-offset: 1px;
-}
-
-.cad-canvas-wrapper {
-  position: relative;
-  height: 380px;
-  width: 100%;
-  background:
-    radial-gradient(ellipse at 50% 44%, rgba(255, 255, 255, 0.05), transparent 62%),
-    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.022) 0 1px, transparent 1px 44px),
-    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.022) 0 1px, transparent 1px 44px),
-    #06070a;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-#hero-cad-canvas {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-
-.cad-overlay-crosshairs {
-  position: absolute;
-  inset: var(--space-3);
-  pointer-events: none;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-}
-
-.cad-crosshair-row {
-  display: flex;
-  gap: var(--space-3);
-  justify-content: space-between;
-  font-family: var(--font-mono);
-  font-size: 0.625rem;
-  color: var(--cad-window-faint);
-}
-
-.cad-stage-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  min-width: 0;
-  padding: 9px var(--space-4);
-  background: var(--cad-chrome-flat);
-  border-top: 1px solid var(--cad-window-border);
-  font-family: var(--font-mono);
-  font-size: 0.6875rem;
-  color: var(--cad-window-muted);
-}
-
-.cad-part-switch {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  min-width: 0;
-  overflow-x: auto;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-}
-
-.cad-status-readout {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
-  overflow-x: auto;
-  white-space: nowrap;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-}
-
-.cad-status-sep {
-  flex: none;
-  width: 1px;
-  height: 11px;
-  background: var(--cad-window-border);
-}
-
-.cad-status-flag {
-  color: var(--cam-success);
-  letter-spacing: 0.04em;
-}
-
-.cad-status-material {
-  color: var(--cam-cyan-tech);
-}
-
-/* ── Light mode: re-target the hero strips' dark palettes ─────────────────
-   Both .hero-benefits and .hero-cad-stage carry their own dark color
-   palettes via custom properties. Re-map those tokens to the existing light
-   theme variables so the bands adapt alongside [data-theme='light'] instead
-   of staying dark. Dark mode is left untouched. */
+/* Light mode — glass statistics strip */
 [data-theme='light'] .hero-benefits {
-  --hb-bg-deep: var(--cam-surface-2);
-  --hb-bg-hi: var(--cam-surface-1);
   --hb-ink: var(--cam-text-primary);
   --hb-muted: var(--cam-text-muted);
-  --hb-border: var(--cam-border-medium);
-  --hb-divider: var(--cam-border-subtle);
   --hb-accent: var(--cam-blue-primary);
-  background:
-    radial-gradient(ellipse 80% 90% at 50% -10%, rgba(0, 102, 255, 0.06), transparent 60%),
-    linear-gradient(180deg, var(--hb-bg-hi) 0%, var(--hb-bg-deep) 100%);
-}
-
-[data-theme='light'] .hero-cad-stage {
-  --cad-chrome-top: var(--cam-surface-1);
-  --cad-chrome-bottom: var(--cam-surface-2);
-  --cad-chrome-flat: var(--cam-surface-1);
-  --cad-window-border: var(--cam-border-medium);
-  --cad-window-text: var(--cam-text-primary);
-  --cad-window-muted: var(--cam-text-muted);
-  --cad-window-faint: var(--cam-text-faint);
-  --cad-accent: var(--cam-blue-primary);
-  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.6);
-}
-
-[data-theme='light'] .cad-canvas-wrapper {
-  background:
-    radial-gradient(ellipse at 50% 44%, rgba(0, 102, 255, 0.06), transparent 62%),
-    repeating-linear-gradient(0deg, rgba(15, 23, 42, 0.05) 0 1px, transparent 1px 44px),
-    repeating-linear-gradient(90deg, rgba(15, 23, 42, 0.05) 0 1px, transparent 1px 44px),
-    #eef2f7;
-}
-
-[data-theme='light'] .cad-controls-hud {
-  background: rgba(15, 23, 42, 0.05);
-}
-
-[data-theme='light'] .hero-cad-stage .hud-btn:hover {
-  background: rgba(15, 23, 42, 0.06);
-}
-
-@media (max-width: 900px) {
-  .cad-canvas-wrapper {
-    height: 340px;
-  }
-}
-
-@media (max-width: 640px) {
-  .cad-stage-header,
-  .cad-stage-footer {
-    padding-inline: var(--space-3);
-  }
-
-  .cad-app-name {
-    font-size: 0.625rem;
-    letter-spacing: 0.06em;
-  }
-
-  .cad-part-meta {
-    font-size: 0.6875rem;
-  }
-
-  .cad-canvas-wrapper {
-    height: 300px;
-  }
-}
-
-/* The window adapts to its own width, not just the viewport, because the hero
-   column is far narrower than the page. */
-@container (max-width: 720px) {
-  .cad-stage-header,
-  .cad-stage-footer {
-    flex-wrap: wrap;
-    row-gap: var(--space-2);
-  }
-
-  .cad-controls-hud,
-  .cad-status-readout {
-    flex: 1 1 100%;
-    justify-content: flex-start;
-  }
+  background: var(--glass-light-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border-top: 1px solid var(--glass-light-border);
+  border-bottom: 1px solid rgba(15, 23, 42, 0.04);
 }
 
 /* --------------------------------------------------------------------------
-   3. Manufacturing Services Section
+   3. Manufacturing Services Section — Premium Industrial
    -------------------------------------------------------------------------- */
 .services-section {
-  background-color: var(--cam-surface-1);
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 70% 55% at 50% -5%, var(--cam-blue-dim), transparent 70%),
+    var(--cam-bg);
   border-top: 1px solid var(--cam-border-subtle);
   border-bottom: 1px solid var(--cam-border-subtle);
+}
+
+.services-section::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.028) 1px, transparent 1px);
+  background-size: 56px 56px;
+  -webkit-mask-image: radial-gradient(ellipse 75% 65% at 50% 0%, #000, transparent 78%);
+  mask-image: radial-gradient(ellipse 75% 65% at 50% 0%, #000, transparent 78%);
+}
+
+.services-section .container {
+  position: relative;
+  max-width: 1444px;
 }
 
 .themed-section-band {
@@ -1101,15 +906,23 @@
   border-bottom: 1px solid var(--cam-border-subtle);
 }
 
+/* ── 5-column service grid ─────────────────────────────────────────────── */
 .services-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--space-6);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--space-4);
+  align-items: stretch;
+}
+
+@media (max-width: 1280px) {
+  .services-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 1024px) {
   .services-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -1119,57 +932,138 @@
   }
 }
 
+/* ── Service card ──────────────────────────────────────────────────────── */
 .service-card {
   display: flex;
   flex-direction: column;
   height: 100%;
+  padding: 0;
+  overflow: hidden;
   background: linear-gradient(180deg, var(--cam-surface-elevated), var(--cam-surface-1));
+  border: 1px solid var(--cam-border-subtle);
+  border-radius: var(--radius-2xl);
   box-shadow: var(--shadow-md);
-  transition: all var(--transition-smooth);
 }
 
 .service-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--cam-border-blue);
   box-shadow: var(--shadow-xl), 0 0 0 1px var(--cam-border-blue);
-  transform: translateY(-3px);
 }
 
-.service-icon-wrapper {
-  width: 52px;
-  height: 52px;
-  border-radius: var(--radius-md);
-  background-color: var(--cam-surface-3);
-  border: 1px solid var(--cam-border-medium);
-  color: var(--cam-blue-primary);
+/* Placeholder image area — swap for real service imagery later */
+.service-card-image {
+  position: relative;
+  height: 92px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  overflow: hidden;
+  border-bottom: 1px solid var(--cam-border-subtle);
+  --service-accent: var(--cam-blue-primary);
+  background:
+    radial-gradient(ellipse 90% 70% at 50% 112%, color-mix(in srgb, var(--service-accent) 30%, transparent), transparent 72%),
+    linear-gradient(165deg, var(--cam-surface-3), var(--cam-surface-2) 60%, var(--cam-surface-1));
+}
+
+.service-card-image::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent 52%, var(--cam-surface-elevated) 100%);
+}
+
+.service-card-image-icon {
+  position: relative;
+  z-index: 1;
+  width: 48px;
+  height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: var(--space-4);
-  transform: rotate(0deg);
-  transition: transform var(--transition-smooth), color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
+  color: var(--service-accent);
+  background: color-mix(in srgb, var(--cam-bg) 55%, transparent);
+  border: 1px solid var(--cam-border-medium);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 8px 24px -10px color-mix(in srgb, var(--service-accent) 55%, transparent);
+  transition: transform var(--transition-smooth), box-shadow var(--transition-smooth), border-color var(--transition-smooth), color var(--transition-fast);
 }
 
-.service-card:hover .service-icon-wrapper {
-  transform: rotate(-4deg) scale(1.06);
-  background-color: var(--cam-blue-subtle);
-  border-color: var(--cam-border-blue);
-  box-shadow: var(--shadow-glow-sm);
-  color: var(--cam-blue-hover);
+.service-card:hover .service-card-image-icon {
+  transform: rotate(-4deg) scale(1.08);
+  border-color: color-mix(in srgb, var(--service-accent) 45%, transparent);
+  box-shadow: 0 14px 34px -10px color-mix(in srgb, var(--service-accent) 70%, transparent);
 }
 
-[dir='rtl'] .service-card:hover .service-icon-wrapper {
-  transform: rotate(4deg) scale(1.06);
+[dir='rtl'] .service-card:hover .service-card-image-icon {
+  transform: rotate(4deg) scale(1.08);
+}
+
+.service-card-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  padding: var(--space-4);
+}
+
+.service-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2-5);
+}
+
+.service-category-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--cam-cyan-tech);
+  background: var(--cam-cyan-subtle);
+  border: 1px solid color-mix(in srgb, var(--cam-cyan-tech) 26%, transparent);
+}
+
+.service-index {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--cam-text-faint);
+}
+
+.service-card .card-title {
+  font-size: 1.0625rem;
+  line-height: 1.25;
+  color: var(--cam-text-primary);
+  margin-bottom: var(--space-1-5);
+}
+
+.service-card .card-description {
+  flex: 1 1 auto;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--cam-text-muted);
+  margin-bottom: var(--space-3);
 }
 
 .service-tech-tags {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin: var(--space-3) 0 var(--space-4) 0;
+  margin: 0 0 var(--space-3) 0;
 }
 
 .service-spec-matrix {
-  margin-top: auto;
-  padding-top: var(--space-4);
+  margin-top: var(--space-2);
+  padding-top: var(--space-2-5);
   border-top: 1px solid var(--cam-divider);
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1180,10 +1074,12 @@
 .spec-entry {
   display: flex;
   flex-direction: column;
-  padding: var(--space-2) var(--space-2-5);
+  justify-content: center;
+  padding: var(--space-1-5) var(--space-2);
   background: var(--cam-surface-2);
   border: 1px solid var(--cam-border-subtle);
   border-radius: var(--radius-sm);
+  min-width: 0;
   transition: background-color var(--transition-fast), border-color var(--transition-fast);
 }
 
@@ -1195,126 +1091,569 @@
 .spec-key {
   color: var(--cam-text-muted);
   font-family: var(--font-mono);
-  font-size: 0.625rem;
+  font-size: 0.5625rem;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
 }
 
 .spec-val {
   color: var(--cam-text-primary);
   font-weight: 600;
   font-family: var(--font-mono);
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
+  line-height: 1.3;
   margin-top: 2px;
+  word-break: break-word;
 }
 
-/* --------------------------------------------------------------------------
-   4. How CAM LABS Works (Interactive 4-Stage Pipeline)
-   -------------------------------------------------------------------------- */
-.workflow-stepper-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: var(--space-4);
+.service-card-action {
+  margin-top: var(--space-3);
+}
+
+.service-card-action .btn {
+  width: 100%;
+  white-space: normal;
+  line-height: 1.25;
+  padding-block: 0.625rem;
+}
+
+.services-section .section-header {
+  margin-bottom: var(--space-8);
+}
+
+/* ── Ambient conveyor rail (desktop + precision pointers) ─────────────── */
+/*
+  Active only when (pointer: fine) AND (min-width: 1281px) AND motion not
+  reduced. Ten seats lay out two passes of the five services on one shared
+  computational circle, so the row never has a hole and no full-track reset
+  is ever visible:
+    x[k] = (k - 5) * pitch + q,  q = phase mod loop
+  Every adjacent pair is exactly one pitch apart at all times; the two
+  passes hand off with identical pixels when q wraps, so individual cards
+  appear to travel endlessly.
+
+  Layering (no transform may overwrite another):
+    .services-scroller  edge masks only, does NOT clip
+      .services-viewport  horizontal clip + vertical breathing room
+        .services-lane
+          .svc-seat        conveyor X translation (translate3d, per seat)
+            .svc-shift     hover X displacement (±20px, svc-left/right)
+              .service-card  hover lift (translateY + scale on svc-active-card)
+
+  Card heights: every seat resolves height: var(--cam-svc-card-h, auto). The
+  value is measured once (mount / resize / seat remount / dir|lang change) as
+  the tallest card plus a small ceil slack, so every card shares one outer
+  height: tops align (top: 0) and bottoms align (same resolved height). The
+  .service-card description (flex: 1 1 auto) absorbs any slack, keeping the
+  spec matrix + CTA anchored at the bottom of every card.
+
+  The top padding of .services-viewport is the reserved space the raised
+  card rises into — it must be larger than translateY + scale growth, or the
+  hovered card gets clipped at the top.
+*/
+.services-scroller {
+  --cam-svc-card-w: 266.4px;
+  --cam-svc-gap: 17px;
+  --cam-svc-card-h: auto;
   position: relative;
-  margin-top: var(--space-8);
 }
 
-@media (max-width: 1024px) {
-  .workflow-stepper-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (max-width: 640px) {
-  .workflow-stepper-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.step-card {
-  background: linear-gradient(180deg, var(--cam-surface-elevated), var(--cam-surface-1));
-  border: 1px solid var(--cam-border-subtle);
-  border-radius: var(--radius-lg);
-  padding: var(--space-6);
-  position: relative;
-  transition: all var(--transition-smooth);
-  z-index: 1;
-}
-
-.step-card:hover {
-  border-color: var(--cam-border-blue);
-  transform: translateY(-3px);
-  box-shadow: var(--shadow-lg), 0 0 0 1px var(--cam-border-blue);
-  background: linear-gradient(180deg, var(--cam-surface-3), var(--cam-surface-1));
-}
-
-.step-card:hover .step-icon {
-  color: var(--cam-blue-primary);
-  transform: scale(1.12);
-}
-
-.step-number {
-  font-family: var(--font-mono);
-  font-size: 1.75rem;
-  font-weight: 800;
-  color: var(--cam-blue-primary);
-  line-height: 1;
-  margin-bottom: var(--space-3);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.step-card::after {
+.services-scroller::before,
+.services-scroller::after {
   content: '';
   position: absolute;
   top: 0;
+  bottom: 0;
+  width: clamp(96px, 12%, 150px);
+  z-index: 4;
+  pointer-events: none;
+}
+
+.services-scroller::before {
   left: 0;
+  background:
+    radial-gradient(ellipse 140px 90% at 0% 50%, color-mix(in srgb, var(--cam-blue-primary) 10%, transparent), transparent 72%),
+    linear-gradient(90deg, var(--cam-bg) 6%, transparent 86%);
+}
+
+.services-scroller::after {
   right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--cam-border-blue), transparent);
+  background:
+    radial-gradient(ellipse 140px 90% at 100% 50%, color-mix(in srgb, var(--cam-blue-primary) 10%, transparent), transparent 72%),
+    linear-gradient(270deg, var(--cam-bg) 6%, transparent 86%);
+}
+
+[dir='rtl'] .services-scroller::before {
+  left: auto;
+  right: 0;
+  background:
+    radial-gradient(ellipse 140px 90% at 100% 50%, color-mix(in srgb, var(--cam-blue-primary) 10%, transparent), transparent 72%),
+    linear-gradient(270deg, var(--cam-bg) 6%, transparent 86%);
+}
+
+[dir='rtl'] .services-scroller::after {
+  right: auto;
+  left: 0;
+  background:
+    radial-gradient(ellipse 140px 90% at 0% 50%, color-mix(in srgb, var(--cam-blue-primary) 10%, transparent), transparent 72%),
+    linear-gradient(90deg, var(--cam-bg) 6%, transparent 86%);
+}
+
+/* Horizontal clip viewport + reserved vertical breathing room. 36px on top
+   clears the ~23px hover rise (translateY 10 + ~13px from scale(1.06))
+   so the raised card is never cut off, while the sides stay clipped. */
+.services-viewport {
+  position: relative;
+  overflow: hidden;
+  padding-top: 36px;
+  padding-bottom: 30px;
+}
+
+.services-lane {
+  position: relative;
+}
+
+.svc-seat {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--cam-svc-card-w);
+  height: var(--cam-svc-card-h, auto);
+  z-index: 1;
+  will-change: transform;
+}
+
+.svc-seat.svc-active-seat {
+  z-index: 3;
+}
+
+/* Smart hoverable: the on-screen copy of a service is what the pointer is
+   over, whether it comes from the first or second pass. Both passes carry a
+   real, identity-bound card so hover works everywhere; keyboard focus only
+   reaches the first pass (echo buttons carry tabindex="-1"). */
+.svc-seat--echo {}
+
+/* Interaction layer: uniform side displacement for the hover/focus spread */
+.svc-shift {
+  height: 100%;
+  /* Use the timing-only easing token: var(--transition-smooth) already
+     contains a duration (350ms), which this shorthand would otherwise parse
+     as a 350ms DELAY, pushing the spread out of sync with the active card. */
+  transition: transform 400ms var(--cam-ease-out);
+}
+
+.svc-shift.svc-left { transform: translateX(-20px); }
+.svc-shift.svc-right { transform: translateX(20px); }
+
+/* Neutralize the static hover lift inside the rail; the active card takes over */
+.services-scroller.services-scroller--conveyor .service-card {
+  transition: transform 400ms var(--cam-ease-out),
+    box-shadow var(--transition-smooth),
+    border-color var(--transition-smooth);
+}
+
+.services-scroller.services-scroller--conveyor .service-card:hover {
+  transform: none;
+  border-color: var(--cam-border-subtle);
+  box-shadow: var(--shadow-md);
+}
+
+.services-scroller.services-scroller--conveyor .service-card:hover .service-card-image-icon {
+  transform: none;
+  border-color: var(--cam-border-medium);
+  box-shadow: 0 8px 24px -10px color-mix(in srgb, var(--service-accent) 55%, transparent);
+}
+
+.services-scroller.services-scroller--conveyor .svc-seat.svc-active-seat .service-card.svc-active-card {
+  transform: translateY(-10px) scale(1.06);
+  border-color: var(--cam-border-blue);
+  box-shadow: var(--shadow-xl), 0 0 0 1px var(--cam-border-blue);
+}
+
+/* --------------------------------------------------------------------------
+   4. How CAM LABS Works — End-to-End Workflow Pipeline
+   -------------------------------------------------------------------------- */
+.workflow-section {
+  --wf-bg: #04080D;
+  --wf-card-top: #0D141E;
+  --wf-card-mid: #0A1018;
+  --wf-card-bottom: #070D15;
+  --wf-card-top-hover: #0F1824;
+  --wf-card-bottom-hover: #0A1320;
+  --wf-border: rgba(96, 120, 150, 0.28);
+  --wf-border-strong: rgba(128, 165, 215, 0.45);
+  --wf-border-active: rgba(0, 140, 255, 0.55);
+  --wf-text: #F4F7FA;
+  --wf-text-muted: #9AA5B5;
+  --wf-icon: #4FA8FF;
+
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background-color: var(--wf-bg);
+  border-top: 1px solid rgba(120, 150, 200, 0.12);
+  border-bottom: 1px solid rgba(120, 150, 200, 0.12);
+}
+
+/* Engineering grid — thin 1px lines, 44px pitch, faded at the edges */
+.workflow-section::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(150, 170, 195, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(150, 170, 195, 0.08) 1px, transparent 1px);
+  background-size: 44px 44px;
+  -webkit-mask-image: radial-gradient(ellipse 90% 82% at 50% 32%, #000 28%, transparent 86%);
+  mask-image: radial-gradient(ellipse 90% 82% at 50% 32%, #000 28%, transparent 86%);
+}
+
+/* Restrained ambient illumination toward the bottom of the cards */
+.workflow-section::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 55% 40% at 50% 108%, rgba(0, 102, 255, 0.10), transparent 72%),
+    radial-gradient(ellipse 38% 26% at 8% 0%, rgba(0, 150, 255, 0.05), transparent 72%);
+}
+
+.workflow-section > .container {
+  position: relative;
+  z-index: 1;
+  /* Wider than the global 1280px container so four equal cards can reach the
+     ~300px target width at the 1440–1536px reference viewport without forcing
+     narrow 1fr columns. Header stays centered via its own 760px max-width. */
+  max-width: 1440px;
+}
+
+.workflow-section .section-header {
+  margin-bottom: clamp(var(--space-10), 4vw, var(--space-14));
+}
+
+.workflow-section .section-badge {
+  background: linear-gradient(180deg, rgba(22, 32, 46, 0.92), rgba(12, 18, 28, 0.92));
+  border-color: rgba(110, 150, 210, 0.28);
+  color: #D7E1EE;
+  letter-spacing: 0.14em;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 0 14px rgba(0, 102, 255, 0.08);
+}
+
+.workflow-section .section-subtitle {
+  color: var(--wf-text-muted);
+}
+
+.workflow-stepper-grid {
+  display: grid;
+  gap: clamp(12px, 1.6vw, 16px);
+  width: 100%;
+  margin-inline: auto;
+  align-items: stretch;
+  justify-content: center;
+}
+
+/* Desktop — single row: card · connector · card · connector · card · connector · card.
+   Target geometry: 4 equal cards ~300px wide × ~250px high at the 1440–1536px
+   reference viewport (Image 2). Math at 1440px viewport / 1440px container:
+   content 1392px − 3×40px connectors − 6×12px gaps = 1200px → 300px per card.
+   minmax(0,1fr) (not a 260–290px floor) avoids horizontal overflow on smaller
+   desktop viewports (e.g. 1025–1280px) where 300px cards cannot physically fit;
+   cards grow to the target as viewport width allows. */
+@media (min-width: 1025px) {
+  .workflow-stepper-grid {
+    grid-template-columns: minmax(0, 1fr) 40px minmax(0, 1fr) 40px minmax(0, 1fr) 40px minmax(0, 1fr);
+    grid-template-areas: 'card1 conn1 card2 conn2 card3 conn3 card4';
+    gap: 12px;
+    align-items: stretch;
+  }
+}
+
+/* Tablet — 2 × 2; the 02→03 connector drops vertically between the rows */
+@media (max-width: 1024px) and (min-width: 641px) {
+  .workflow-stepper-grid {
+    grid-template-columns: 1fr auto 1fr;
+    grid-template-areas:
+      'card1 conn1 card2'
+      '.     conn2 .    '
+      'card3 conn3 card4';
+  }
+}
+
+/* Mobile — vertical pipeline with down connectors */
+@media (max-width: 640px) {
+  .workflow-stepper-grid {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      'card1'
+      'conn1'
+      'card2'
+      'conn2'
+      'card3'
+      'conn3'
+      'card4';
+  }
+}
+
+/* Grid placement — the component renders exactly 4 steps + 3 connectors
+   in a fixed order, so each direct child maps to a named area. */
+.workflow-stepper-grid > :nth-child(1) { grid-area: card1; }
+.workflow-stepper-grid > :nth-child(2) { grid-area: conn1; }
+.workflow-stepper-grid > :nth-child(3) { grid-area: card2; }
+.workflow-stepper-grid > :nth-child(4) { grid-area: conn2; }
+.workflow-stepper-grid > :nth-child(5) { grid-area: card3; }
+.workflow-stepper-grid > :nth-child(6) { grid-area: conn3; }
+.workflow-stepper-grid > :nth-child(7) { grid-area: card4; }
+
+.workflow-card {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: var(--space-7);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--wf-border);
+  background: linear-gradient(180deg, var(--wf-card-top), var(--wf-card-mid) 48%, var(--wf-card-bottom));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 12px 28px -16px rgba(0, 0, 0, 0.65);
+  transition: border-color var(--transition-base), background var(--transition-smooth),
+    transform var(--transition-smooth), box-shadow var(--transition-smooth);
+}
+
+@media (min-width: 1025px) {
+  /* Target card height 250–255px (Image 2: ~250px). */
+  .workflow-card { min-height: 252px; }
+}
+
+@media (min-width: 1440px) {
+  .workflow-card { min-height: 254px; }
+}
+
+/* Hover illumination — generic interaction state shared by every card.
+   There is no permanent active card: STEP 03 brightens only while hovered,
+   exactly like STEP 01, 02 and 04. */
+.workflow-card:hover {
+  border-color: var(--wf-border-active);
+  transform: translateY(-2px);
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(0, 110, 255, 0.10), transparent 55%),
+    linear-gradient(180deg, #0E1826, #0B1420 55%, #09121C);
+  box-shadow:
+    0 0 0 1px rgba(0, 140, 255, 0.22),
+    0 8px 30px -6px rgba(0, 110, 255, 0.16),
+    0 0 25px -4px rgba(0, 180, 255, 0.07),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.workflow-card:hover .workflow-card-icon-box {
+  color: #6BC0FF;
+  border-color: rgba(0, 170, 255, 0.5);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 0 18px rgba(0, 140, 255, 0.22);
+}
+
+.workflow-card:hover .workflow-card-accent {
+  height: 3px;
+  opacity: 1;
+  background: linear-gradient(90deg, var(--cam-blue-hover), var(--cam-cyan-tech));
+  box-shadow: 0 0 12px rgba(0, 140, 255, 0.45);
+}
+
+.workflow-card-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.workflow-card-icon-box {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(0, 140, 255, 0.32);
+  background: linear-gradient(180deg, rgba(13, 25, 42, 0.92), rgba(8, 16, 28, 0.92));
+  color: var(--wf-icon);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 0 14px rgba(0, 102, 255, 0.10);
+  transition: color var(--transition-fast), border-color var(--transition-base), box-shadow var(--transition-base);
+}
+
+.workflow-card-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  color: var(--wf-text);
+  margin-bottom: var(--space-2);
+}
+
+.workflow-card-desc {
+  /* Target: muted gray-blue, 15–16px, line-height 1.5–1.6. */
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: var(--wf-text-muted);
+}
+
+.workflow-card-number {
+  position: absolute;
+  z-index: 1;
+  top: 8px;
+  inset-inline-end: 18px;
+  pointer-events: none;
+  user-select: none;
+  /* Same typographic family as the Hero's "Ideas Realized" prefix
+     (.hero-title → --font-hero-display, weight 900). Size, placement and
+     decorative layering stay exactly as the workflow target design. */
+  font-family: var(--font-hero-display);
+  font-weight: 900;
+  /* Target decorative number ~72px (4.5rem) top-right, gradient, behind content. */
+  font-size: 4.5rem;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: transparent;
+  background: linear-gradient(180deg, rgba(170, 195, 225, 0.42), rgba(170, 195, 225, 0.05));
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+/* Arabic voice matches the Hero title's Arabic face (see
+   [lang='ar'] h1.hero-title → --font-hero-arabic). */
+[lang='ar'] .workflow-card-number {
+  font-family: var(--font-hero-arabic);
+}
+
+/* Hover illumination overlay — reuses the Hero's "Digital tech" treatment
+   (.hero-title-highlight → --cam-heading-gradient + --cam-heading-glow) so the
+   number feels powered on in the same visual language. A pseudo-element
+   overlay cross-fades via opacity because background gradients themselves
+   cannot transition; the base muted number stays untouched underneath. */
+.workflow-card-number::after {
+  content: attr(data-number);
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  font: inherit;
+  letter-spacing: inherit;
+  line-height: inherit;
+  color: transparent;
+  background: var(--cam-heading-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: var(--cam-heading-glow);
   opacity: 0;
   transition: opacity var(--transition-base);
 }
 
-.step-card:hover::after {
-  opacity: 0.4;
+/* Scoped per card: hovering a card illuminates ONLY its own number. */
+.workflow-card:hover .workflow-card-number::after {
+  opacity: 1;
 }
 
-.step-icon {
-  width: 28px;
-  height: 28px;
-  color: var(--cam-text-muted);
-  transition: color var(--transition-fast), transform var(--transition-smooth);
+@media (max-width: 1280px) and (min-width: 1025px) {
+  .workflow-card-number {
+    font-size: clamp(3.5rem, 5vw, 4.5rem);
+  }
 }
 
-.step-title {
-  font-size: 1.125rem;
-  font-weight: 700;
-  color: var(--cam-text-primary);
-  margin-bottom: var(--space-2);
+@media (max-width: 640px) {
+  .workflow-card-number {
+    font-size: clamp(2.5rem, 9vw, 3.25rem);
+    top: 6px;
+    inset-inline-end: 14px;
+  }
 }
 
-.step-desc {
-  font-size: 0.875rem;
-  color: var(--cam-text-muted);
-  line-height: 1.5;
+.workflow-card-accent {
+  position: absolute;
+  z-index: 2;
+  inset-inline: 0;
+  bottom: 0;
+  height: 2px;
+  border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+  background: linear-gradient(90deg, rgba(0, 102, 255, 0.55), rgba(6, 182, 212, 0.45));
+  opacity: 0.85;
+  transition: opacity var(--transition-base), box-shadow var(--transition-base);
+}
+
+.workflow-card:hover .workflow-card-accent {
+  opacity: 1;
+}
+
+/* Connector — circular arrow with faint rails bridging adjacent cards.
+   Occupies its own 40px layout column on desktop (card · connector · card …),
+   vertically centered against the cards; never overlaps card borders. */
+.workflow-connector {
+  display: grid;
+  place-items: center;
+  align-self: center;
+  min-width: 40px;
+  min-height: 48px;
+  width: 100%;
+}
+
+.workflow-connector-inner {
+  display: flex;
+  align-items: center;
+}
+
+.workflow-connector-rail {
+  width: 10px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0, 140, 255, 0.40));
+}
+
+.workflow-connector-rail:last-child {
+  background: linear-gradient(90deg, rgba(0, 140, 255, 0.40), transparent);
+}
+
+.workflow-connector-circle {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full);
+  border: 1px solid rgba(0, 140, 255, 0.32);
+  background: linear-gradient(180deg, rgba(13, 22, 36, 0.95), rgba(7, 12, 20, 0.95));
+  color: var(--wf-icon);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 0 12px rgba(0, 102, 255, 0.12);
+}
+
+.workflow-connector-icon {
+  display: block;
+}
+
+[dir='rtl'] .workflow-connector-icon {
+  transform: scaleX(-1);
+}
+
+/* Vertical connectors — tablet middle drop + full mobile stack.
+   Rotating the inner element turns the arrow and rails downward. */
+@media (max-width: 1024px) and (min-width: 641px) {
+  .workflow-stepper-grid > :nth-child(4) .workflow-connector-inner {
+    transform: rotate(90deg);
+  }
+}
+
+@media (max-width: 640px) {
+  .workflow-connector-inner {
+    transform: rotate(90deg);
+  }
 }
 
 /* Platform-wide visual language refinement */
-.hero-section {
-  padding-top: clamp(3rem, 8vw, 7rem);
-  background: radial-gradient(circle at 78% 28%, rgba(0, 102, 255, 0.12), transparent 28%);
-}
-
 .hero-title { letter-spacing: 0; }
-.hero-title-highlight { text-shadow: 0 0 24px rgba(0, 102, 255, 0.24); }
-.workflow-stepper-grid::before { content: ''; position: absolute; top: 32px; right: 10%; left: 10%; height: 1px; background: var(--cam-border-subtle); pointer-events: none; }
-.step-card { z-index: 1; }
 
 @media (max-width: 640px) {
-  .workflow-stepper-grid::before { display: none; }
-  .hero-section { padding-top: var(--space-8); }
+  .hero-visual > .container { padding-bottom: clamp(13rem, 42vw, 17rem); }
 }
 
 /* --------------------------------------------------------------------------
@@ -1410,6 +1749,13 @@
   margin: 0 auto;
   position: relative;
   z-index: 2;
+}
+
+/* CTA heading keeps its banner-scale presence while inheriting the shared
+   Hero typography, gradient, and glow from .section-title. */
+.cta-banner-content .section-title {
+  font-size: clamp(1.875rem, 4vw, 2.75rem);
+  margin-bottom: var(--space-4);
 }
 
 /* --------------------------------------------------------------------------

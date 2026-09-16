@@ -29,6 +29,7 @@ export const en = {
   'theme.system': 'System',
   'status.resolvingSession': 'Resolving secure session...',
   'hero.digitalCad': 'Ideas Realized',
+  'hero.backgroundAlt': 'CAM LABS precision manufacturing facility',
   'hero.industrialProduction': 'Industrial Production',
   'hero.digitalTech': 'Digital Tech',
   'hero.digitalManufacturing': 'Digital Manufacturing',

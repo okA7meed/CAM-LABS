@@ -31,6 +31,7 @@ export const ar: Record<TranslationKey, string> = {
   'theme.system': 'النظام',
   'status.resolvingSession': 'جارٍ التحقق من الجلسة الآمنة...',
   'hero.digitalCad': 'الأفكار تتحول لواقع',
+  'hero.backgroundAlt': 'منشأة التصنيع الدقيق في CAM LABS',
   'hero.industrialProduction': 'الإنتاج الصناعي',
   'hero.digitalTech': 'التقنية الرقمية',
   'hero.digitalManufacturing': 'التصنيع الرقمي',

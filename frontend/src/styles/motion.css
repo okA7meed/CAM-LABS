@@ -128,49 +128,6 @@
 }
 
 /* --------------------------------------------------------------------------
-   4. Hero CAD Stage Interaction
-   -------------------------------------------------------------------------- */
-.hero-stage-shell {
-  position: relative;
-  min-width: 0;
-  transition: transform 500ms var(--cam-ease-out);
-}
-
-.hero-stage-shell .hero-cad-stage {
-  transition: transform var(--transition-base), border-color var(--transition-base),
-    box-shadow var(--transition-smooth);
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .hero-stage-shell {
-    transform: translate3d(var(--cam-tilt-x, 0px), var(--cam-tilt-y, 0px), 0);
-  }
-
-  .hero-stage-shell:hover .hero-cad-stage {
-    transform: translateY(-2px);
-    border-color: rgba(255, 255, 255, 0.16);
-    box-shadow: 0 32px 74px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  }
-}
-
-/* --------------------------------------------------------------------------
-   5. Workflow Connector Line
-   -------------------------------------------------------------------------- */
-.workflow-stepper-grid::before {
-  transform: scaleX(0);
-  transform-origin: left center;
-  transition: transform 900ms var(--cam-ease-out) 160ms;
-}
-
-.workflow-stepper-grid.is-revealed::before {
-  transform: scaleX(1);
-}
-
-[dir='rtl'] .workflow-stepper-grid::before {
-  transform-origin: right center;
-}
-
-/* --------------------------------------------------------------------------
    6. Button & Navigation Micro-Interactions
    -------------------------------------------------------------------------- */
 .btn:not(:disabled):not(.disabled):active {
@@ -536,20 +493,6 @@
     opacity: 1;
     filter: none;
     transform: none;
-  }
-
-  .hero-stage-shell {
-    transform: none;
-  }
-
-  .hero-stage-shell:hover .hero-cad-stage {
-    transform: none;
-  }
-
-  .workflow-stepper-grid::before,
-  .workflow-stepper-grid.is-revealed::before {
-    transform: scaleX(1);
-    transition: none;
   }
 
   .btn:not(:disabled):active,

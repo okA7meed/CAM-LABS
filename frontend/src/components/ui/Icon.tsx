@@ -6,6 +6,7 @@ export type IconName =
   | 'bell'
   | 'globe'
   | 'arrowRight'
+  | 'calculator'
   | 'calendar'
   | 'check'
   | 'chevronDown'
@@ -59,6 +60,7 @@ const paths: Record<IconName, React.ReactNode> = {
   bell: <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0" />,
   globe: <><circle cx="12" cy="12" r="9" /><path d="M3 12h18" /><path d="M12 3a13.5 13.5 0 0 1 0 18 13.5 13.5 0 0 1 0-18Z" /></>,
   calendar: <><path d="M8 3v4m8-4v4M3.5 9h17M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z" /><path d="M8 13.5h.01M12 13.5h.01M16 13.5h.01" /></>,
+  calculator: <><rect x="5.5" y="3" width="13" height="18" rx="2" /><path d="M9 3v3M15 3v3M9 11h6M8.5 15h.01M12 15h.01M15.5 15h.01M8.5 18.5h.01M12 18.5h.01M15.5 18.5h.01" /></>,
   copy: <><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></>,
   database: <><ellipse cx="12" cy="5.5" rx="8" ry="2.8" /><path d="M4 5.5V12c0 1.55 3.58 2.8 8 2.8s8-1.25 8-2.8V5.5" /><path d="M4 12v6.5c0 1.55 3.58 2.8 8 2.8s8-1.25 8-2.8V12" /></>,
   dimensionX: <path d="M4 12h16m-7-5 5 5-5 5M13 7l-5 5 5 5" />,
