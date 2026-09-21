@@ -1,90 +1,157 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { useStore } from '../../context/StoreContext';
-import { ViewType } from '../../types';
+import { useAuth } from '../../context/AuthContext';
+import type { ViewType } from '../../types';
 import { Logo } from './Logo';
+import { Icon } from '../ui/Icon';
+import type { IconName } from '../ui/Icon';
 import { useTranslation } from 'react-i18next';
 import { FooterReveal } from '../ui/Reveal';
+import { FOOTER_COLUMNS, FOOTER_LEGAL, FOOTER_SOCIAL, type FooterRow, type FooterTarget } from './footerNav';
+import { enterAdminPath, resetPathname } from '../../routing/hashRouter';
 
+/**
+ * CAM LABS Mega Footer — brand + Manufacturing + Platform + Company & Support.
+ * Every row resolves through footerNav.ts to real application content:
+ * no placeholder hrefs, no fake destinations, auth-aware customer links.
+ */
 export const Footer: React.FC = () => {
-  const { setActiveView } = useStore();
+  const {
+    setActiveView,
+    startManufacturingRequest,
+    requestMaterialsPreset,
+    openAuthModal,
+    setPostAuthDestination,
+  } = useStore();
+  const { isAuthenticated, currentUser } = useAuth();
   const { t } = useTranslation();
+  const isAdmin = isAuthenticated && Boolean(currentUser?.role?.includes('ADMIN'));
 
-  const handleLink = (view: ViewType, sectionId?: string) => {
+  const scrollToSection = useCallback((sectionId: string) => {
+    window.setTimeout(() => {
+      const el = document.getElementById(sectionId);
+      if (!el) return;
+      const headerH = document.querySelector('.cam-header')?.getBoundingClientRect().height ?? 72;
+      const targetTop = el.getBoundingClientRect().top + window.scrollY - headerH - 16;
+      window.scrollTo({ top: targetTop, behavior: 'smooth' });
+    }, 60);
+  }, []);
+
+  const goView = useCallback((view: ViewType, sectionId?: string) => {
+    resetPathname();
     setActiveView(view);
-    if (sectionId) {
-      setTimeout(() => {
-        const el = document.getElementById(sectionId);
-        if (el) el.scrollIntoView({ behavior: 'smooth' });
-      }, 50);
-    } else {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (sectionId) scrollToSection(sectionId);
+    else window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [setActiveView, scrollToSection]);
+
+  const activate = useCallback((target: FooterTarget) => {
+    switch (target.kind) {
+      case 'view':
+        goView(target.view, target.sectionId);
+        return;
+      case 'materials':
+        requestMaterialsPreset(target.preset);
+        goView('materials', 'materials-section');
+        return;
+      case 'submitQuote':
+        // Existing manufacturing request flow: creates a Quote ONLY,
+        // preserves the auth gate and server-persisted draft.
+        startManufacturingRequest();
+        return;
+      case 'customer': {
+        if (!isAuthenticated) {
+          // Real auth flow with resume: login returns here, not dashboard.
+          setPostAuthDestination(target.view);
+          openAuthModal('login');
+          return;
+        }
+        if (target.view === 'dashboard' && isAdmin) {
+          enterAdminPath();
+          setActiveView('admin-dashboard');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          return;
+        }
+        goView(target.view);
+        return;
+      }
     }
-  };
+  }, [goView, requestMaterialsPreset, startManufacturingRequest, isAuthenticated, isAdmin, setActiveView, setPostAuthDestination, openAuthModal]);
+
+  const goHome = useCallback(() => goView('home'), [goView]);
+
+  const renderRow = (row: FooterRow) => (
+    <li key={row.labelKey} className="mf-row-wrap">
+      <button type="button" className="mf-row" onClick={() => activate(row.target)}>
+        <span className="mf-row-icon" aria-hidden="true">
+          <Icon name={row.icon} size={19} />
+        </span>
+        <span className="mf-row-label">{t(row.labelKey)}</span>
+        <Icon name="chevronRight" size={15} className="mf-row-chevron" />
+      </button>
+    </li>
+  );
 
   return (
-    <FooterReveal className="cam-footer">
-      <div className="container">
-        <div className="footer-grid">
-          {/* Brand Column */}
-          <div className="footer-col-brand">
-            <Logo className="footer-logo" alt="CAM LABS" />
-            <p className="footer-desc">
-              {t('footer.description')}
-            </p>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--cam-text-muted)' }}>
-              {t('footer.compliance')}
-            </div>
+    <FooterReveal className="cam-footer mf-footer">
+      <div className="container mf-container">
+        <div className="mf-grid">
+          {/* Brand column — stacked lockup: the real CAM mark is a wide
+              asset, so the wordmark sits beneath it instead of colliding. */}
+          <div className="mf-brand">
+            <button type="button" className="mf-brand-lockup" onClick={goHome} aria-label="CAM LABS — home">
+              <Logo className="mf-logo" alt="CAM LABS" />
+              <span className="mf-wordmark" aria-hidden="true">
+                <span className="mf-wordmark-main">
+                  CAM <em>LABS</em>
+                </span>
+                <span className="mf-wordmark-sub">{t('footer2.brandTag')}</span>
+              </span>
+            </button>
+            <p className="mf-brand-copy">{t('footer2.brandCopy')}</p>
           </div>
 
-          {/* Technologies Column */}
-          <div>
-            <div className="footer-heading">{t('footer.technologies')}</div>
-            <ul className="footer-links">
-              <li><a href="#materials" onClick={(e) => { e.preventDefault(); handleLink('materials', 'materials-section'); }}>{t('footer.sls')}</a></li>
-              <li><a href="#materials" onClick={(e) => { e.preventDefault(); handleLink('materials', 'materials-section'); }}>{t('footer.sla')}</a></li>
-              <li><a href="#materials" onClick={(e) => { e.preventDefault(); handleLink('materials', 'materials-section'); }}>{t('footer.cnc')}</a></li>
-              <li><a href="#materials" onClick={(e) => { e.preventDefault(); handleLink('materials', 'materials-section'); }}>{t('footer.dmls')}</a></li>
-              <li><a href="#materials" onClick={(e) => { e.preventDefault(); handleLink('materials', 'materials-section'); }}>{t('footer.sheetMetal')}</a></li>
-              <li><a href="#materials" onClick={(e) => { e.preventDefault(); handleLink('materials', 'materials-section'); }}>{t('footer.injection')}</a></li>
-            </ul>
-          </div>
-
-          {/* Materials Column */}
-          <div>
-            <div className="footer-heading">{t('footer.materials')}</div>
-            <ul className="footer-links">
-              <li><a href="#materials" onClick={(e) => { e.preventDefault(); handleLink('materials', 'materials-section'); }}>{t('footer.pa12')}</a></li>
-              <li><a href="#materials" onClick={(e) => { e.preventDefault(); handleLink('materials', 'materials-section'); }}>{t('footer.peek')}</a></li>
-              <li><a href="#materials" onClick={(e) => { e.preventDefault(); handleLink('materials', 'materials-section'); }}>{t('footer.aluminum')}</a></li>
-              <li><a href="#materials" onClick={(e) => { e.preventDefault(); handleLink('materials', 'materials-section'); }}>{t('footer.steel')}</a></li>
-              <li><a href="#materials" onClick={(e) => { e.preventDefault(); handleLink('materials', 'materials-section'); }}>{t('footer.titanium')}</a></li>
-              <li><a href="#materials" onClick={(e) => { e.preventDefault(); handleLink('materials', 'materials-section'); }}>{t('footer.resins')}</a></li>
-            </ul>
-          </div>
-
-          {/* Platform Column */}
-          <div>
-            <div className="footer-heading">{t('footer.platform')}</div>
-            <ul className="footer-links">
-              <li><a href="#dashboard" onClick={(e) => { e.preventDefault(); handleLink('dashboard'); }}>{t('footer.customerDashboard')}</a></li>
-              <li><a href="#workflow" onClick={(e) => { e.preventDefault(); handleLink('workflow', 'workflow-section'); }}>{t('footer.dfmRules')}</a></li>
-              <li><a href="#capabilities-section" onClick={(e) => { e.preventDefault(); handleLink('home', 'capabilities-section'); }}>{t('footer.cmmProtocol')}</a></li>
-              <li><a href="#profile" onClick={(e) => { e.preventDefault(); handleLink('profile'); }}>{t('footer.enterpriseIntegration')}</a></li>
-              <li><a href="#home" onClick={(e) => { e.preventDefault(); handleLink('home'); }}>{t('footer.networkStatus')}</a></li>
-            </ul>
-          </div>
+          {FOOTER_COLUMNS.map((col) => (
+            <React.Fragment key={col.headingKey}>
+              <span className="mf-divider" aria-hidden="true" />
+              <nav className="mf-col" aria-label={t(col.headingKey)}>
+                <div className="mf-col-head">
+                  <span className="mf-col-icon" aria-hidden="true">
+                    <Icon name={col.headingIcon as IconName} size={26} />
+                  </span>
+                  <span className="mf-col-titles">
+                    <span className="mf-col-heading">{t(col.headingKey)}</span>
+                    <span className="mf-col-sub">{t(col.subtitleKey)}</span>
+                  </span>
+                </div>
+                <ul className="mf-rows">{col.rows.map(renderRow)}</ul>
+              </nav>
+            </React.Fragment>
+          ))}
         </div>
 
-        <div className="footer-bottom">
-          <div>
-            {t('footer.rights')}
+        {/* Bottom bar */}
+        <div className="mf-bottom">
+          <p className="mf-copy">{t('footer.rights')}</p>
+          <div className="mf-social" role="group" aria-label="Social">
+            {FOOTER_SOCIAL.map((s) => (
+              <span
+                key={s.key}
+                className="mf-social-btn is-disabled"
+                title={t('footer2.socialPending')}
+                aria-label={`${t(s.labelKey)} — ${t('footer2.socialPending')}`}
+                aria-disabled="true"
+              >
+                <Icon name={s.icon} size={19} />
+              </span>
+            ))}
           </div>
-          <div style={{ display: 'flex', gap: 'var(--space-4)' }}>
-            <a href="#home">{t('footer.privacy')}</a>
-            <a href="#home">{t('footer.terms')}</a>
-            <a href="#home">{t('footer.nda')}</a>
-            <a href="#home">{t('footer.security')}</a>
-          </div>
+          <nav className="mf-legal" aria-label="Legal">
+            {FOOTER_LEGAL.map((entry) => (
+              <button key={entry.view} type="button" onClick={() => goView(entry.view)}>
+                {t(entry.labelKey)}
+              </button>
+            ))}
+          </nav>
         </div>
       </div>
     </FooterReveal>

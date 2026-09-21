@@ -19,6 +19,7 @@ export interface OrderCadFileRef {
 
 export interface OrderRow {
   id: string;
+  reference?: string | null;
   partName: string;
   technology: string;
   material: string;

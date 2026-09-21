@@ -5,9 +5,19 @@ import { CadValidationService } from '../services/cadValidation.service';
 import { CadService } from '../services/cad.service';
 import { parseMultipartForm } from '../cad/multipart';
 import { resolveCadOwner } from '../middleware/auth.middleware';
+import { hasRole, ROLES } from '../auth/roles';
 
 const router = Router();
 const uploadBody = express.raw({ type: 'multipart/form-data', limit: '160mb' });
+
+/** Rank >= OPERATIONS_ADMIN. Mirrors the admin order workspace authorization. */
+const CAD_STAFF_ROLE = ROLES.OPERATIONS_ADMIN;
+
+const isStaff = (req: Request): boolean => {
+  const user = (req as Request & { auth?: { role?: string } }).auth;
+  if (!user?.role) return false;
+  return hasRole(user.role, [CAD_STAFF_ROLE]);
+};
 
 const handle = (handler: (req: Request, res: Response) => Promise<void>) => (req: Request, res: Response, next: NextFunction) => {
   handler(req, res).catch(next);
@@ -19,6 +29,10 @@ router.get('/', resolveCadOwner, handle(async (req, res) => {
 }));
 
 router.get('/:id', resolveCadOwner, handle(async (req, res) => {
+  if (isStaff(req)) {
+    ApiResponseHelper.success(res, await CadService.getAny(req.params.id), 'CAD file returned');
+    return;
+  }
   ApiResponseHelper.success(res, await CadService.get(req.cadOwner!, req.params.id), 'CAD file returned');
 }));
 
@@ -32,7 +46,9 @@ router.get('/:id/dfm-report', resolveCadOwner, handle(async (req, res) => {
 }));
 
 router.get('/:id/download', resolveCadOwner, handle(async (req, res) => {
-  const { version, stream } = await CadService.download(req.cadOwner!, req.params.id);
+  const { version, stream } = isStaff(req)
+    ? await CadService.downloadAny(req.params.id)
+    : await CadService.download(req.cadOwner!, req.params.id);
   res.setHeader('Content-Type', version.mimeType);
   res.setHeader('Content-Length', version.byteSize);
   res.setHeader('Content-Disposition', `attachment; filename="${version.originalName.replace(/"/g, '')}"`);
@@ -41,12 +57,18 @@ router.get('/:id/download', resolveCadOwner, handle(async (req, res) => {
 
 router.get('/:id/geometry', resolveCadOwner, handle(async (req, res) => {
   const versionId = typeof req.query.versionId === 'string' ? req.query.versionId : undefined;
+  if (isStaff(req)) {
+    ApiResponseHelper.success(res, await CadService.geometryAny(req.params.id, versionId), 'CAD geometry metadata returned');
+    return;
+  }
   ApiResponseHelper.success(res, await CadService.geometry(req.cadOwner!, req.params.id, versionId), 'CAD geometry metadata returned');
 }));
 
 router.get('/:id/viewer-asset', resolveCadOwner, handle(async (req, res) => {
   const versionId = typeof req.query.versionId === 'string' ? req.query.versionId : undefined;
-  const { version, stream } = await CadService.viewerAsset(req.cadOwner!, req.params.id, versionId);
+  const { version, stream } = isStaff(req)
+    ? await CadService.viewerAssetAny(req.params.id, versionId)
+    : await CadService.viewerAsset(req.cadOwner!, req.params.id, versionId);
   res.setHeader('Content-Type', version.viewerAssetKey ? 'model/gltf-binary' : version.mimeType);
   res.setHeader('Content-Length', version.viewerAssetKey ? (version.viewerAssetSize || 0) : version.byteSize);
   res.setHeader('Cache-Control', 'private, no-store');

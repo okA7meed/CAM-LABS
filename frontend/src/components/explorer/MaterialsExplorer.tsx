@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { MaterialCard } from './MaterialCard';
 import { useMaterials } from '../../hooks/useMaterials';
+import { useStore } from '../../context/StoreContext';
 import { useTranslation } from 'react-i18next';
 import { SectionReveal } from '../ui/Reveal';
 import { Icon } from '../ui/Icon';
@@ -14,6 +15,19 @@ export const MaterialsExplorer: React.FC = () => {
   const [activeCat, setActiveCat] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
+  // Footer-driven filter presets (e.g. open the catalog on a technology).
+  // Applied once per request via nonce; user edits afterwards are untouched.
+  const { materialsPreset, consumeMaterialsPreset } = useStore();
+  const presetNonceRef = useRef(0);
+  useEffect(() => {
+    if (!materialsPreset || materialsPreset.nonce === presetNonceRef.current) return;
+    presetNonceRef.current = materialsPreset.nonce;
+    setActiveTech(materialsPreset.tech ?? 'ALL');
+    setActiveCat(materialsPreset.category ?? 'ALL');
+    setSearchQuery(materialsPreset.search ?? '');
+    setIsExpanded(true);
+    consumeMaterialsPreset();
+  }, [materialsPreset, consumeMaterialsPreset]);
 
   const techOptions: { label: string; value: string }[] = [
     { label: t('materials.allTech'), value: 'ALL' },

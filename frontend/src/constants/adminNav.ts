@@ -13,49 +13,58 @@ export interface AdminNavGroup {
   items: AdminNavItem[];
 }
 
+/**
+ * Admin sidebar information architecture. View keys are stable routing
+ * identifiers — labels and icons may evolve without touching navigation.
+ *
+ * Grouping mirrors the manufacturing operations flow:
+ * OVERVIEW → ORDERS & CUSTOMERS → MANUFACTURING → COMMERCE → SYSTEM.
+ */
 export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
   {
     id: 'overview',
     labelKey: 'admin.navGroup.overview',
-    items: [{ view: 'admin-dashboard', labelKey: 'admin.nav.dashboard', icon: 'layers' }],
+    items: [{ view: 'admin-dashboard', labelKey: 'admin.nav.dashboard', icon: 'home' }],
   },
   {
-    id: 'orders',
-    labelKey: 'admin.navGroup.orders',
+    id: 'orders-customers',
+    labelKey: 'admin.navGroup.ordersCustomers',
     items: [
-      { view: 'admin-orders', labelKey: 'admin.nav.orders', icon: 'layers3' },
+      { view: 'admin-orders', labelKey: 'admin.nav.orders', icon: 'package' },
       { view: 'admin-quotes', labelKey: 'admin.nav.quotes', icon: 'file' },
-      { view: 'admin-customers', labelKey: 'admin.nav.customers', icon: 'technology' },
+      { view: 'admin-deletion-requests', labelKey: 'admin.nav.deletionRequests', icon: 'trash' },
+      { view: 'admin-customers', labelKey: 'admin.nav.customers', icon: 'users' },
       { view: 'admin-cad-files', labelKey: 'admin.nav.cadFiles', icon: 'cube' },
     ],
   },
   {
-    id: 'supply',
-    labelKey: 'admin.navGroup.supplyChain',
+    id: 'manufacturing',
+    labelKey: 'admin.navGroup.manufacturing',
     items: [
-      { view: 'admin-manufacturers', labelKey: 'admin.nav.manufacturers', icon: 'precision' },
-      { view: 'admin-manufacturing-requests', labelKey: 'admin.nav.manufacturingRequests', icon: 'cpu' },
+      { view: 'admin-manufacturing-requests', labelKey: 'admin.nav.manufacturingRequests', icon: 'gear' },
+      { view: 'admin-manufacturers', labelKey: 'admin.nav.manufacturers', icon: 'factory' },
       { view: 'admin-materials', labelKey: 'admin.nav.materials', icon: 'database' },
+      { view: 'admin-shipping', labelKey: 'admin.nav.shipping', icon: 'truck' },
     ],
   },
   {
     id: 'commerce',
     labelKey: 'admin.navGroup.commerce',
     items: [
-      { view: 'admin-pricing', labelKey: 'admin.nav.pricing', icon: 'gear' },
-      { view: 'admin-payments', labelKey: 'admin.nav.payments', icon: 'clipboard' },
-      { view: 'admin-reports', labelKey: 'admin.nav.reports', icon: 'review' },
+      { view: 'admin-pricing', labelKey: 'admin.nav.pricing', icon: 'calculator' },
+      { view: 'admin-discount-codes', labelKey: 'admin.nav.discountCodes', icon: 'coupon' },
+      { view: 'admin-payments', labelKey: 'admin.nav.payments', icon: 'card' },
+      { view: 'admin-reports', labelKey: 'admin.nav.reports', icon: 'chart' },
     ],
   },
   {
     id: 'system',
     labelKey: 'admin.navGroup.system',
     items: [
-      { view: 'admin-notifications', labelKey: 'admin.nav.notifications', icon: 'alert' },
-      { view: 'admin-shipping', labelKey: 'admin.nav.shipping', icon: 'send' },
-      { view: 'admin-users', labelKey: 'admin.nav.adminUsers', icon: 'eye' },
-      { view: 'admin-audit-logs', labelKey: 'admin.nav.auditLogs', icon: 'clock' },
-      { view: 'admin-settings', labelKey: 'admin.nav.settings', icon: 'configure' },
+      { view: 'admin-notifications', labelKey: 'admin.nav.notifications', icon: 'bell' },
+      { view: 'admin-users', labelKey: 'admin.nav.adminUsers', icon: 'userGear' },
+      { view: 'admin-audit-logs', labelKey: 'admin.nav.auditLogs', icon: 'fileClock' },
+      { view: 'admin-settings', labelKey: 'admin.nav.settings', icon: 'sliders' },
     ],
   },
 ];

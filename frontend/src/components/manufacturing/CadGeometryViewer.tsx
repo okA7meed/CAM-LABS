@@ -23,7 +23,7 @@ export interface CadViewerSetup {
   triangleCount: number | null;
 }
 
-export const CadGeometryViewer: React.FC<{ file: CadFile; onGeometry: (geometry: CadGeometryData) => void; setup?: CadViewerSetup; onSetupChange?: (update: Partial<CadViewerSetup>) => void; thumbnail?: boolean; materialId?: string | null; colorId?: string | null }> = ({ file, onGeometry, setup, onSetupChange, thumbnail = false, materialId = null, colorId = null }) => {
+export const CadGeometryViewer: React.FC<{ file: CadFile; onGeometry: (geometry: CadGeometryData) => void; setup?: CadViewerSetup; onSetupChange?: (update: Partial<CadViewerSetup>) => void; thumbnail?: boolean; materialId?: string | null; colorId?: string | null; wireframe?: boolean; fitSignal?: number; dollySignal?: { dir: 1 | -1; nonce: number } | null; panMode?: boolean }> = ({ file, onGeometry, setup, onSetupChange, thumbnail = false, materialId = null, colorId = null, wireframe = false, fitSignal = 0, dollySignal = null, panMode = false }) => {
   const { t } = useTranslation();
   const mountRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -83,31 +83,74 @@ export const CadGeometryViewer: React.FC<{ file: CadFile; onGeometry: (geometry:
   };
 
   const fitModel = useCallback(() => {
-    const root = viewerRootRef.current; const camera = cameraRef.current; const controls = controlsRef.current;
+    const root = viewerRootRef.current;
+    const camera = cameraRef.current;
+    const controls = controlsRef.current;
     if (!root || !camera || !controls) return;
+
     root.position.set(0, 0, 0);
     root.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(root);
     if (box.isEmpty()) return;
+
     const center = box.getCenter(new THREE.Vector3());
     const sphere = box.getBoundingSphere(new THREE.Sphere());
     root.position.sub(center);
     root.updateMatrixWorld(true);
+
     const centeredBox = new THREE.Box3().setFromObject(root);
     const centeredCenter = centeredBox.getCenter(new THREE.Vector3());
     const radius = Math.max(sphere.radius, 0.001);
+
     camera.up.copy(is2D ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(0, 0, 1));
+    const direction = is2D ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(1, 0.7, 1).normalize();
+
     const verticalFov = THREE.MathUtils.degToRad(camera.fov);
     const horizontalFov = 2 * Math.atan(Math.tan(verticalFov / 2) * Math.max(camera.aspect, 0.1));
-    const limitingFov = Math.min(verticalFov, horizontalFov);
-    const padding = 1.45;
-    const distance = (radius * padding) / Math.tan(limitingFov / 2);
-    const direction = is2D ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(1, 0.7, 1).normalize();
+
+    // Target model coverage: approximately 68% of useful area (60-75% spec),
+    // maintaining comfortable padding on all sides without clipping or appearing tiny.
+    const targetCoverage = 0.68;
+    const tanHalfV = Math.tan(verticalFov / 2);
+    const tanHalfH = Math.tan(horizontalFov / 2);
+
+    const camUp = camera.up.clone();
+    const camRight = new THREE.Vector3().crossVectors(camUp, direction).normalize();
+    const camOrthoUp = new THREE.Vector3().crossVectors(direction, camRight).normalize();
+
+    const bMin = centeredBox.min;
+    const bMax = centeredBox.max;
+    const corners = [
+      new THREE.Vector3(bMin.x, bMin.y, bMin.z),
+      new THREE.Vector3(bMin.x, bMin.y, bMax.z),
+      new THREE.Vector3(bMin.x, bMax.y, bMin.z),
+      new THREE.Vector3(bMin.x, bMax.y, bMax.z),
+      new THREE.Vector3(bMax.x, bMin.y, bMin.z),
+      new THREE.Vector3(bMax.x, bMin.y, bMax.z),
+      new THREE.Vector3(bMax.x, bMax.y, bMin.z),
+      new THREE.Vector3(bMax.x, bMax.y, bMax.z),
+    ];
+
+    let maxDist = 0;
+    for (const pt of corners) {
+      const xCam = Math.abs(pt.dot(camRight));
+      const yCam = Math.abs(pt.dot(camOrthoUp));
+      const zOffset = -pt.dot(direction);
+
+      const dH = zOffset + xCam / (targetCoverage * tanHalfH);
+      const dV = zOffset + yCam / (targetCoverage * tanHalfV);
+      const dNeeded = Math.max(dH, dV);
+      if (dNeeded > maxDist) maxDist = dNeeded;
+    }
+
+    const distance = Math.max(maxDist, radius * 1.18);
+
     camera.position.copy(centeredCenter).addScaledVector(direction, distance);
-    camera.near = Math.max(radius / 10000, distance - radius * 4, 0.0001);
+    camera.near = Math.max(radius / 1000, distance - radius * 4, 0.001);
     camera.far = Math.max(distance + radius * 6, radius * 24, 100);
     camera.lookAt(centeredCenter);
     camera.updateProjectionMatrix();
+
     controls.target.copy(centeredCenter);
     controls.maxDistance = distance * 8;
     controls.minDistance = Math.min(radius / 50, distance / 12);
@@ -156,8 +199,9 @@ export const CadGeometryViewer: React.FC<{ file: CadFile; onGeometry: (geometry:
     const activeMaterialId = isPreviewMaterial(materialId) ? materialId : null;
     const hasVertexColors = (() => { let found = false; model.traverse((object) => { if (object instanceof THREE.Mesh && object.geometry.getAttribute('color')) found = true; }); return found; })();
     const shared = buildPreviewMaterial(activeMaterialId, colorId, { doubleSide: true });
+    shared.wireframe = wireframe === true;
     const vertexColored = hasVertexColors && shared !== null ? shared.clone() : null;
-    if (vertexColored) vertexColored.vertexColors = true;
+    if (vertexColored) { vertexColored.vertexColors = true; vertexColored.wireframe = wireframe === true; }
     const replaced: (THREE.Material | THREE.Material[])[] = [];
     model.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) return;
@@ -171,7 +215,7 @@ export const CadGeometryViewer: React.FC<{ file: CadFile; onGeometry: (geometry:
       shared.dispose();
       vertexColored?.dispose();
     };
-  }, [state, materialId, colorId]);
+  }, [state, materialId, colorId, wireframe]);
 
   /* Lightweight material colour transition: when the selected material / colour
      changes, glide the live material's base colour from the last committed hue
@@ -243,8 +287,19 @@ useEffect(() => {
       fitModel();
       const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       controls.autoRotate = thumbnail ? false : !is2D && !reducedMotion;
-      controls.autoRotateSpeed = 0.6;
-      const resize = () => { const rect = mount.getBoundingClientRect(); renderer!.setSize(rect.width, rect.height, false); camera!.aspect = rect.width / Math.max(rect.height, 1); camera!.updateProjectionMatrix(); };
+      let lastAspect = 0;
+      const resize = () => {
+        const rect = mount.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) return;
+        renderer!.setSize(rect.width, rect.height, false);
+        const aspect = rect.width / rect.height;
+        camera!.aspect = aspect;
+        camera!.updateProjectionMatrix();
+        if (Math.abs(aspect - lastAspect) > 0.05) {
+          lastAspect = aspect;
+          fitModel();
+        }
+      };
       const render = (now: number) => {
         const delta = Math.min(Math.max((now - previous) / 1000, 0), 0.05); previous = now;
         controls!.update(delta); renderer!.render(scene!, camera!); frame = requestAnimationFrame(render);
@@ -323,6 +378,44 @@ useEffect(() => {
     for (let i = 0; i < 3; i += 1) frames.push(window.requestAnimationFrame(() => { fitModel(); }));
     return () => { frames.forEach((id) => window.cancelAnimationFrame(id)); };
   }, [isFullscreen, state, thumbnail, fitModel]);
+
+  /* ── External workspace controls (all optional, default-off) ──────────
+   * The Quote Review Workspace drives the same viewer instance through
+   * these signals instead of mounting a second renderer. Every effect
+   * guards on live refs, so unset props change nothing for existing
+   * consumers (Manufacturing Workspace, Order Center, thumbnails). */
+
+  /** Reframe the model without reloading geometry (Fit button). */
+  useEffect(() => {
+    if (fitSignal > 0 && state === 'ready') fitModel();
+  }, [fitSignal, state, fitModel]);
+
+  /** Step dolly toward/away from the orbit target (Zoom buttons). */
+  useEffect(() => {
+    if (!dollySignal || dollySignal.nonce <= 0 || state !== 'ready') return;
+    const camera = cameraRef.current;
+    const controls = controlsRef.current;
+    if (!camera || !controls) return;
+    const offset = camera.position.clone().sub(controls.target);
+    const distance = Math.max(offset.length(), 1e-6);
+    const next = THREE.MathUtils.clamp(
+      distance * (dollySignal.dir === 1 ? 0.8 : 1.25),
+      controls.minDistance || distance * 0.1,
+      controls.maxDistance || distance * 10,
+    );
+    camera.position.copy(controls.target).addScaledVector(offset.normalize(), next);
+    camera.updateProjectionMatrix();
+    controls.update();
+  }, [dollySignal, state]);
+
+  /** Left-drag pans instead of rotating (Pan/Orbit mode toggle). */
+  useEffect(() => {
+    const controls = controlsRef.current;
+    if (!controls || state !== 'ready') return;
+    controls.mouseButtons.LEFT = panMode ? THREE.MOUSE.PAN : THREE.MOUSE.ROTATE;
+    controls.touches.ONE = panMode ? THREE.TOUCH.PAN : THREE.TOUCH.ROTATE;
+    controls.update();
+  }, [panMode, state]);
 
   const retry = async () => { setState('processing'); setMessage(''); await ApiService.retryCadProcessing(file.id); };
 
@@ -416,17 +509,47 @@ useEffect(() => {
           <AnimatePresence initial={false}>
             {(state === 'loading' || state === 'processing') && (
               <motion.div key="geometry-busy" className="geometry-state cam-motion" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.22, ease: CAM_EASE }}>
-                <span className="geometry-spinner" /><strong>{t('geometry.processing')}</strong><p>{t('geometry.processingDescription')}</p>
+                <span className="geometry-spinner" />
+                <strong>{t('orderdetail.previewProcessing', { defaultValue: t('geometry.processing') })}</strong>
+                <p>{t('geometry.processingDescription')}</p>
               </motion.div>
             )}
             {state === 'unavailable' && (
               <motion.div key="geometry-unavailable" className="geometry-state cam-motion" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.22, ease: CAM_EASE }}>
-                <strong>{t('geometry.unavailable')}</strong><p>{t('geometry.unavailableDescription', { format: geometry?.format || file.format })}</p>
+                <Icon name="cube" size={32} />
+                <strong>{t('orderdetail.previewError', { defaultValue: t('geometry.unavailable') })}</strong>
+                <p>{t('geometry.unavailableDescription', { format: geometry?.format || file.format })}</p>
+                <div className="geometry-state-actions" style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                  <button type="button" className="btn btn-outline btn-sm" onClick={() => void retry()}>
+                    <Icon name="reset" size={13} />
+                    {t('orderdetail.retryPreview', { defaultValue: t('geometry.retry') })}
+                  </button>
+                  {file.id && (
+                    <a href={ApiService.getCadDownloadUrl(file.id)} download className="btn btn-outline btn-sm" target="_blank" rel="noopener noreferrer">
+                      <Icon name="download" size={13} />
+                      {t('orderdetail.downloadFile', { defaultValue: 'Download File' })}
+                    </a>
+                  )}
+                </div>
               </motion.div>
             )}
             {state === 'error' && (
               <motion.div key="geometry-error" className="geometry-state geometry-error cam-motion" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.22, ease: CAM_EASE }}>
-                <strong>{t('geometry.error')}</strong><p>{message}</p><button className="btn btn-outline" onClick={() => void retry()}>{t('geometry.retry')}</button>
+                <Icon name="alert" size={32} />
+                <strong>{t('orderdetail.previewError', { defaultValue: t('geometry.error') })}</strong>
+                <p>{message}</p>
+                <div className="geometry-state-actions" style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                  <button type="button" className="btn btn-outline btn-sm" onClick={() => void retry()}>
+                    <Icon name="reset" size={13} />
+                    {t('orderdetail.retryPreview', { defaultValue: t('geometry.retry') })}
+                  </button>
+                  {file.id && (
+                    <a href={ApiService.getCadDownloadUrl(file.id)} download className="btn btn-outline btn-sm" target="_blank" rel="noopener noreferrer">
+                      <Icon name="download" size={13} />
+                      {t('orderdetail.downloadFile', { defaultValue: 'Download File' })}
+                    </a>
+                  )}
+                </div>
               </motion.div>
             )}
           </AnimatePresence>

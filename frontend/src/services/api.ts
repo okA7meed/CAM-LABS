@@ -1,6 +1,17 @@
-import { Material, Order, Quote, CadFile, CadUploadResult, User, AdminNotification, AdminNotificationList, AdminUnreadCount, TechnicalDocument } from '../types';
+import { Material, Order, Quote, CadFile, CadUploadResult, User, ProfileUpdate, AdminNotification, AdminNotificationList, AdminUnreadCount, TechnicalDocument, AddressBookEntry } from '../types';
 
 const API_BASE = '/api/v1';
+
+/** A signed-in session visible in the Account Settings security panel. */
+export interface AccountSession {
+  id: string;
+  /** Raw user-agent string (display metadata only, may be null). */
+  device: string | null;
+  ipAddress: string | null;
+  expiresAt: string;
+  createdAt: string;
+  current: boolean;
+}
 
 /** Real-time Admin notification stream (Server-Sent Events). */
 export const ADMIN_NOTIFICATIONS_STREAM = `${API_BASE}/admin/notifications/stream`;
@@ -101,7 +112,11 @@ export interface CadGeometryData {
 }
 
 export class ApiError extends Error {
-  constructor(public readonly status: number, message: string) {
+  constructor(
+    public readonly status: number,
+    message: string,
+    public readonly code?: string,
+  ) {
     super(message);
     this.name = 'ApiError';
   }
@@ -143,19 +158,42 @@ export class ApiService {
       });
 
       if (!response.ok) {
-        let message = `API error: ${response.statusText}`;
+        // Error contract: { code, message, status }. Proxies and gateways
+        // may return non-JSON bodies (or empty statusText over HTTP/2), so
+        // never surface a blank "API error:" — fall back to safe,
+        // status-derived messages that the UI can localize by code.
+        let message: string | undefined;
+        let code: string | undefined;
         try {
           const errorBody = await response.json();
-          message = errorBody.error?.message || message;
+          message = typeof errorBody?.error?.message === 'string' && errorBody.error.message.trim()
+            ? errorBody.error.message
+            : undefined;
+          code = typeof errorBody?.error?.code === 'string' ? errorBody.error.code : undefined;
         } catch {
-          // Preserve the HTTP status message when the server has no JSON body.
+          // Non-JSON body (proxy HTML page, empty body, connection reset
+          // mid-read). Fall through to status-derived handling below.
         }
-        throw new ApiError(response.status, message);
+        if (!message) {
+          if (response.status === 401) { code = code || 'UNAUTHENTICATED'; message = 'Authentication is required.'; }
+          else if (response.status === 403) { code = code || 'FORBIDDEN'; message = 'You do not have permission to perform this action.'; }
+          else if (response.status === 404) { code = code || 'NOT_FOUND'; message = 'The requested resource was not found.'; }
+          else if (response.status === 429) { code = code || 'RATE_LIMITED'; message = 'Too many requests. Please try again later.'; }
+          else if (response.status >= 500) { code = code || 'SERVER_ERROR'; message = 'The server is temporarily unavailable. Please try again later.'; }
+          else { code = code || 'REQUEST_FAILED'; message = `Request failed (HTTP ${response.status}).`; }
+        }
+        throw new ApiError(response.status, message, code);
       }
 
       const json = await response.json();
       return json.data as T;
     } catch (e) {
+      // Transport failure (DNS, refused connection, CORS block, offline):
+      // fetch throws a bare TypeError. Normalize it so the UI never shows
+      // "Failed to fetch" or "[object Object]" to users.
+      if (e instanceof TypeError) {
+        throw new ApiError(0, 'Unable to reach the CAM LABS servers. Please check your connection and try again.', 'NETWORK_ERROR');
+      }
       if (required) throw e;
       console.warn(`API call to ${endpoint} failed, falling back to local store:`, e);
       return null;
@@ -245,10 +283,122 @@ export class ApiService {
     });
   }
 
-  static async approveQuote(quoteId: string) {
-    return this.request<Order>(`/orders/convert-quote/${quoteId}`, {
+  // ─── Submit Quote (quote-first lifecycle; creates Quote ONLY) ──────────
+  static async getShippingRates() {
+    return this.request<{ rates: Array<{ id: string; label: string; description: string; eta: string; feeEgp: number }>; currency: string }>('/quotes/shipping-rates');
+  }
+
+  static async validateCoupon(params: { code: string; subtotalAmount: number; shippingAmount: number }) {
+    return this.requestRequired<{
+      code: string; discountType: string; discountValue: number;
+      eligibleAmount: number; discountAmount: number; amountAfterDiscount: number; currency: string;
+    }>('/quotes/validate-coupon', { method: 'POST', body: JSON.stringify(params) });
+  }
+
+  static async submitQuote(payload: Record<string, unknown>) {
+    return this.requestRequired<{ quote: Quote & Record<string, any>; pricing: { subtotal: number; shippingFee: number; discountAmount: number; estimatedTotal: number; currency: string } }>('/quotes/submit', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  static async getQuoteById(quoteId: string) {
+    return this.request<Quote & Record<string, any>>(`/quotes/${encodeURIComponent(quoteId)}`);
+  }
+
+  // ─── Admin coupons (SUPER_ADMIN for mutations) ─────────────────────────
+  static async adminListCoupons(includeArchived = false) {
+    return this.requestRequired<{ coupons: Array<Record<string, any>>; total: number }>(`/admin/coupons${includeArchived ? '?includeArchived=true' : ''}`);
+  }
+
+  static async adminGetCoupon(couponId: string) {
+    return this.requestRequired<Record<string, any>>(`/admin/coupons/${encodeURIComponent(couponId)}`);
+  }
+
+  static async adminCreateCoupon(payload: Record<string, unknown>) {
+    return this.requestRequired<Record<string, any>>('/admin/coupons', { method: 'POST', body: JSON.stringify(payload) });
+  }
+
+  static async adminUpdateCoupon(couponId: string, payload: Record<string, unknown>) {
+    return this.requestRequired<Record<string, any>>(`/admin/coupons/${encodeURIComponent(couponId)}`, { method: 'PUT', body: JSON.stringify(payload) });
+  }
+
+  static async adminEnableCoupon(couponId: string) {
+    return this.requestRequired<Record<string, any>>(`/admin/coupons/${encodeURIComponent(couponId)}/enable`, { method: 'POST' });
+  }
+
+  static async adminDisableCoupon(couponId: string) {
+    return this.requestRequired<Record<string, any>>(`/admin/coupons/${encodeURIComponent(couponId)}/disable`, { method: 'POST' });
+  }
+
+  static async adminArchiveCoupon(couponId: string) {
+    return this.requestRequired<Record<string, any>>(`/admin/coupons/${encodeURIComponent(couponId)}/archive`, { method: 'POST' });
+  }
+
+  // ─── Admin shipping methods (SUPER_ADMIN for mutations) ──────────────
+  static async adminListShippingMethods(includeArchived = false) {
+    return this.requestRequired<{ methods: Array<Record<string, any>>; total: number }>(`/admin/shipping/methods${includeArchived ? '?includeArchived=true' : ''}`);
+  }
+
+  static async adminCreateShippingMethod(payload: Record<string, unknown>) {
+    return this.requestRequired<Record<string, any>>('/admin/shipping/methods', { method: 'POST', body: JSON.stringify(payload) });
+  }
+
+  static async adminUpdateShippingMethod(methodId: string, payload: Record<string, unknown>) {
+    return this.requestRequired<Record<string, any>>(`/admin/shipping/methods/${encodeURIComponent(methodId)}`, { method: 'PUT', body: JSON.stringify(payload) });
+  }
+
+  static async adminEnableShippingMethod(methodId: string) {
+    return this.requestRequired<Record<string, any>>(`/admin/shipping/methods/${encodeURIComponent(methodId)}/enable`, { method: 'POST' });
+  }
+
+  static async adminDisableShippingMethod(methodId: string) {
+    return this.requestRequired<Record<string, any>>(`/admin/shipping/methods/${encodeURIComponent(methodId)}/disable`, { method: 'POST' });
+  }
+
+  static async adminArchiveShippingMethod(methodId: string) {
+    return this.requestRequired<Record<string, any>>(`/admin/shipping/methods/${encodeURIComponent(methodId)}/archive`, { method: 'POST' });
+  }
+
+  // ─── Admin quote workspace ────────────────────────────────────────────
+  // Sole quote→order conversion path. Customer-side conversion was removed;
+  // the backend rejects it with 403 for non-staff.
+  static async adminConvertQuote(quoteId: string) {
+    return this.requestRequired<Order>(`/admin/orders/from-quote/${encodeURIComponent(quoteId)}`, {
       method: 'POST',
     });
+  }
+
+  static async adminUpdateQuoteStatus(quoteId: string, status: string, reason?: string) {
+    return this.request(`/admin/quotes/${encodeURIComponent(quoteId)}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status, reason }),
+    });
+  }
+
+  static async adminUpdateQuotePrice(quoteId: string, price: number, reason: string) {
+    return this.request(`/admin/quotes/${encodeURIComponent(quoteId)}/price`, {
+      method: 'PUT',
+      body: JSON.stringify({ price, reason }),
+    });
+  }
+
+  static async adminUpdateQuoteNotes(quoteId: string, technicalNotes: string) {
+    return this.request(`/admin/quotes/${encodeURIComponent(quoteId)}/notes`, {
+      method: 'PUT',
+      body: JSON.stringify({ technicalNotes }),
+    });
+  }
+
+  static async adminSendQuoteMessage(quoteId: string, message: string, subject?: string) {
+    return this.requestRequired<{ id: string; message: string; subject: string | null; createdAt: string }>(`/admin/quotes/${encodeURIComponent(quoteId)}/message`, {
+      method: 'POST',
+      body: JSON.stringify({ message, subject }),
+    });
+  }
+
+  static async adminGetQuoteMessages(quoteId: string) {
+    return this.requestRequired<Array<{ id: string; message: string; subject: string | null; senderId: string | null; createdAt: string }>>(`/admin/quotes/${encodeURIComponent(quoteId)}/messages`);
   }
 
   // Orders
@@ -258,13 +408,6 @@ export class ApiService {
 
   static async getOrderById(orderId: string) {
     return this.request<Order>(`/orders/${encodeURIComponent(orderId)}`);
-  }
-
-  static async createOrder(orderData: Partial<Order>) {
-    return this.request<Order>('/orders', {
-      method: 'POST',
-      body: JSON.stringify(orderData),
-    });
   }
 
   // ─── Super Admin order management ─────────────────────────────────────────
@@ -289,6 +432,17 @@ export class ApiService {
     });
   }
 
+  static async adminSendCustomerMessage(orderId: string, message: string, subject?: string) {
+    return this.requestRequired<{ id: string; eventType: string; description: string; createdAt: string }>(`/admin/orders/${encodeURIComponent(orderId)}/message`, {
+      method: 'POST',
+      body: JSON.stringify({ message, subject }),
+    });
+  }
+
+  static getCadDownloadUrl(fileId: string): string {
+    return `${API_BASE}/cad-files/${encodeURIComponent(fileId)}/download`;
+  }
+
   // CAD Files & Pre-flight Validation
   static async validateCadFile(fileName: string, sizeBytes: number) {
     return this.request<{
@@ -305,6 +459,10 @@ export class ApiService {
 
   static async getCadFiles() {
     return this.request<CadFile[]>('/cad-files');
+  }
+
+  static async getCadFile(fileId: string) {
+    return this.request<CadFile>(`/cad-files/${encodeURIComponent(fileId)}`);
   }
 
   static async uploadCadFile(file: File, onProgress?: (percentage: number) => void) {
@@ -324,11 +482,11 @@ export class ApiService {
       xhr.upload.addEventListener('progress', (event) => {
         if (event.lengthComputable) onProgress(Math.min(100, Math.round((event.loaded / event.total) * 100)));
       });
-      xhr.addEventListener('error', () => reject(new ApiError(0, 'The CAD upload service is currently unavailable.')));
+      xhr.addEventListener('error', () => reject(new ApiError(0, 'The CAD upload service is currently unavailable.', 'NETWORK_ERROR')));
       xhr.addEventListener('load', () => {
         try {
           const json = JSON.parse(xhr.responseText) as { data?: CadUploadResult; error?: { message?: string } };
-          if (xhr.status < 200 || xhr.status >= 300) throw new ApiError(xhr.status, json.error?.message || `API error: ${xhr.statusText}`);
+          if (xhr.status < 200 || xhr.status >= 300) throw new ApiError(xhr.status, json.error?.message || `Upload failed (HTTP ${xhr.status}).`, 'UPLOAD_FAILED');
           onProgress(100);
           resolve(json.data || null);
         } catch (error) {
@@ -381,11 +539,11 @@ export class ApiService {
       xhr.upload.addEventListener('progress', (event) => {
         if (event.lengthComputable) onProgress(Math.min(100, Math.round((event.loaded / event.total) * 100)));
       });
-      xhr.addEventListener('error', () => reject(new ApiError(0, 'The technical document upload service is currently unavailable.')));
+      xhr.addEventListener('error', () => reject(new ApiError(0, 'The technical document upload service is currently unavailable.', 'NETWORK_ERROR')));
       xhr.addEventListener('load', () => {
         try {
           const json = JSON.parse(xhr.responseText) as { data?: TechnicalDocument; error?: { message?: string } };
-          if (xhr.status < 200 || xhr.status >= 300) throw new ApiError(xhr.status, json.error?.message || `API error: ${xhr.statusText}`);
+          if (xhr.status < 200 || xhr.status >= 300) throw new ApiError(xhr.status, json.error?.message || `Upload failed (HTTP ${xhr.status}).`, 'UPLOAD_FAILED');
           onProgress(100);
           resolve(json.data || null);
         } catch (error) {
@@ -405,10 +563,10 @@ export class ApiService {
   }
 
   // Auth / Profile
-  static async login(email: string, password: string) {
+  static async login(email: string, password: string, twoFactorCode?: string, rememberMe: boolean = true) {
     return this.requestRequired<{ user: User }>('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, ...(twoFactorCode ? { twoFactorCode } : {}), rememberMe }),
     });
   }
 
@@ -416,6 +574,40 @@ export class ApiService {
     return this.requestRequired<{ user: User }>('/auth/register', {
       method: 'POST',
       body: JSON.stringify(data),
+    });
+  }
+
+  /** GIS "Continue with Google": the credential is a Google-signed ID token
+   *  verified server-side. The client never treats the token as auth proof. */
+  static async loginWithGoogle(credential: string, twoFactorCode?: string) {
+    return this.requestRequired<{ user: User }>('/auth/google', {
+      method: 'POST',
+      body: JSON.stringify({ credential, ...(twoFactorCode ? { twoFactorCode } : {}) }),
+    });
+  }
+
+  // ─── Self-service password reset (6-digit email OTP) ────────────────────
+  /** Always resolves with the generic message (anti-enumeration). */
+  static async forgotPassword(email: string) {
+    return this.requestRequired<{ message: string }>('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  }
+
+  /** Verifies the OTP; resolves with a single-use opaque reset authorization. */
+  static async verifyResetCode(email: string, code: string) {
+    return this.requestRequired<{ resetToken: string; expiresInMinutes: number }>('/auth/verify-reset-code', {
+      method: 'POST',
+      body: JSON.stringify({ email, code }),
+    });
+  }
+
+  /** Consumes the reset authorization and sets the new password. */
+  static async resetPassword(resetToken: string, newPassword: string, confirmPassword: string) {
+    return this.requestRequired<null>('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ resetToken, newPassword, confirmPassword }),
     });
   }
 
@@ -469,10 +661,113 @@ export class ApiService {
     return this.requestRequired<{ adminUrl: string }>('/admin/settings/admin-url');
   }
 
-  static async updateProfile(profileData: Partial<User>) {
+  static async updateProfile(profileData: ProfileUpdate) {
     return this.request<User>('/auth/profile', {
       method: 'PUT',
       body: JSON.stringify(profileData),
+    });
+  }
+
+  // ─── Account Settings: security, sessions, address book ──────────────
+  static async changePassword(currentPassword: string, newPassword: string) {
+    return this.requestRequired<null>('/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
+  }
+
+  static async requestEmailChange(newEmail: string, password?: string) {
+    return this.requestRequired<{ obfuscatedEmail: string; expiresInMinutes: number }>('/auth/email/change-request', {
+      method: 'POST',
+      body: JSON.stringify({ newEmail, ...(password ? { password } : {}) }),
+    });
+  }
+
+  static async verifyEmailChange(code: string) {
+    return this.requestRequired<{ user: User }>('/auth/email/change-verify', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    });
+  }
+
+  static async deleteQuote(quoteId: string) {
+    return this.requestRequired<{ id: string }>(`/quotes/${encodeURIComponent(quoteId)}`, { method: 'DELETE' });
+  }
+
+  // ─── Quote deletion requests (deletion-by-approval) ───────────────────
+  // Customers file a request; the Quote stays visible until an admin acts.
+  static async requestQuoteDeletion(quoteId: string, reason?: string) {
+    return this.requestRequired<Record<string, any>>(`/quotes/${encodeURIComponent(quoteId)}/deletion-request`, {
+      method: 'POST',
+      body: JSON.stringify({ reason: reason || '' }),
+    });
+  }
+
+  static async getQuoteDeletionState(quoteId: string) {
+    return this.requestRequired<{ requests: Array<Record<string, any>> }>(`/quotes/${encodeURIComponent(quoteId)}/deletion-request`);
+  }
+
+  static async adminListDeletionRequests(status?: string) {
+    const qs = status ? `?status=${encodeURIComponent(status)}` : '';
+    return this.requestRequired<{ requests: Array<Record<string, any>>; total: number }>(`/admin/quote-deletion-requests${qs}`);
+  }
+
+  static async adminApproveDeletionRequest(requestId: string, adminNote?: string) {
+    return this.requestRequired<Record<string, any>>(`/admin/quote-deletion-requests/${encodeURIComponent(requestId)}/approve`, {
+      method: 'POST',
+      body: JSON.stringify({ adminNote: adminNote || '' }),
+    });
+  }
+
+  static async adminRejectDeletionRequest(requestId: string, adminNote?: string) {
+    return this.requestRequired<Record<string, any>>(`/admin/quote-deletion-requests/${encodeURIComponent(requestId)}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ adminNote: adminNote || '' }),
+    });
+  }
+
+  static async getTwoFactorStatus() {
+    return this.requestRequired<{ enabled: boolean }>('/auth/2fa/status');
+  }
+
+  static async setupTwoFactor() {
+    return this.requestRequired<{ secret: string; otpauthUrl: string }>('/auth/2fa/setup', { method: 'POST' });
+  }
+
+  static async enableTwoFactor(code: string) {
+    return this.requestRequired<{ backupCodes: string[] }>('/auth/2fa/enable', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    });
+  }
+
+  static async disableTwoFactor(password: string) {
+    return this.requestRequired<null>('/auth/2fa/disable', {
+      method: 'POST',
+      body: JSON.stringify({ password }),
+    });
+  }
+
+  static async getSessions() {
+    return this.requestRequired<{ sessions: AccountSession[] }>('/auth/sessions');
+  }
+
+  static async revokeSession(sessionId: string) {
+    return this.requestRequired<null>(`/auth/sessions/${encodeURIComponent(sessionId)}`, { method: 'DELETE' });
+  }
+
+  static async revokeOtherSessions() {
+    return this.requestRequired<{ revoked: number }>('/auth/sessions/revoke-others', { method: 'POST' });
+  }
+
+  static async getAddresses() {
+    return this.requestRequired<{ addresses: AddressBookEntry[]; defaultAddressId: string | null }>('/auth/addresses');
+  }
+
+  static async saveAddresses(addresses: AddressBookEntry[], defaultAddressId: string | null) {
+    return this.requestRequired<{ addresses: AddressBookEntry[]; defaultAddressId: string | null }>('/auth/addresses', {
+      method: 'PUT',
+      body: JSON.stringify({ addresses, defaultAddressId }),
     });
   }
 

@@ -56,7 +56,7 @@ const makeQuote = (overrides: Record<string, unknown> = {}) => ({
   totalPrice: '$15.00',
   leadTime: '24 - 48 Hours',
   validUntil: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-  status: 'Ready for Approval',
+  status: 'Approved',
   provider: 'CAM LABS',
   providerQuoteRef: 'CAM-QUOTE-1',
   isSimulated: false,
@@ -161,6 +161,18 @@ describe('Phase 04 order trust boundary', () => {
   it('rejects expired quotes before dispatch', async () => {
     state.quote = makeQuote({ validUntil: new Date(Date.now() - 1000).toISOString() });
     await expect(OrdersService.createOrder(orderRequest())).rejects.toThrow('expired or is invalid');
+    expect(state.dispatchOrder).not.toHaveBeenCalled();
+  });
+
+  it('rejects quotes that have not been approved before dispatch', async () => {
+    state.quote = makeQuote({ status: 'Ready for Approval' });
+    await expect(OrdersService.createOrder(orderRequest())).rejects.toThrow('not been approved');
+    expect(state.dispatchOrder).not.toHaveBeenCalled();
+  });
+
+  it('rejects rejected quotes before dispatch', async () => {
+    state.quote = makeQuote({ status: 'Rejected' });
+    await expect(OrdersService.createOrder(orderRequest())).rejects.toMatchObject({ code: 'QUOTE_NOT_APPROVED' });
     expect(state.dispatchOrder).not.toHaveBeenCalled();
   });
 

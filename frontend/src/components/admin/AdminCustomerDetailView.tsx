@@ -206,7 +206,7 @@ export const AdminCustomerDetailView: React.FC = () => {
                         <tbody>
                           {customer.quotes.map((quote: any) => (
                             <tr key={quote.id}>
-                              <td className="mono-primary">{quote.id}</td>
+                              <td className="mono-primary" title={quote.id}>{quote.reference || quote.id}</td>
                               <td>{quote.partName || '—'}</td>
                               <td><StatusBadge status={quote.status} tone={QUOTE_TONES[quote.status] ?? 'unknown'} /></td>
                             </tr>

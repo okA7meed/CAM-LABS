@@ -2,13 +2,28 @@ import React from 'react';
 import { useStore } from '../../context/StoreContext';
 import { useTranslation } from 'react-i18next';
 import { SectionReveal, StaggerReveal } from '../ui/Reveal';
+import { Icon } from '../ui/Icon';
 
 export const AboutSection: React.FC = () => {
   const { openComingSoon } = useStore();
   const { t } = useTranslation();
 
-  const valueProps = [
+  // Two-tone heading: leading words in icy white, remainder in technical
+  // blue. Word-based so Arabic RTL keeps natural word order (rendered
+  // inline there, stacked in LTR via CSS).
+  const titleWords = t('about.title').split(' ').filter(Boolean);
+  const titleLead = titleWords.slice(0, 2).join(' ') || t('about.title');
+  const titleRest = titleWords.slice(2).join(' ');
+
+  const valueProps: {
+    number: string;
+    title: string;
+    subtitle: string;
+    desc: string;
+    icon: React.ReactNode;
+  }[] = [
     {
+      number: '01',
       title: t('about.dfmTitle'), subtitle: t('about.dfmSubtitle'), desc: t('about.dfmDescription'),
       icon: (
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -17,6 +32,7 @@ export const AboutSection: React.FC = () => {
       ),
     },
     {
+      number: '02',
       title: t('about.ipTitle'), subtitle: t('about.ipSubtitle'), desc: t('about.ipDescription'),
       icon: (
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -25,6 +41,7 @@ export const AboutSection: React.FC = () => {
       ),
     },
     {
+      number: '03',
       title: t('about.nodesTitle'), subtitle: t('about.nodesSubtitle'), desc: t('about.nodesDescription'),
       icon: (
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -34,6 +51,7 @@ export const AboutSection: React.FC = () => {
       ),
     },
     {
+      number: '04',
       title: t('about.cmmTitle'), subtitle: t('about.cmmSubtitle'), desc: t('about.cmmDescription'),
       icon: (
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -43,6 +61,7 @@ export const AboutSection: React.FC = () => {
       ),
     },
     {
+      number: '05',
       title: t('about.rapidTitle'), subtitle: t('about.rapidSubtitle'), desc: t('about.rapidDescription'),
       icon: (
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -52,6 +71,7 @@ export const AboutSection: React.FC = () => {
       ),
     },
     {
+      number: '06',
       title: t('about.supportTitle'), subtitle: t('about.supportSubtitle'), desc: t('about.supportDescription'),
       icon: (
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -66,94 +86,78 @@ export const AboutSection: React.FC = () => {
 
   return (
     <SectionReveal
-      className="section-padding themed-section-band"
+      className="section-padding about-section"
       id="about"
     >
-      <div className="container">
+      <div className="about-overlay" aria-hidden="true" />
+      <span className="about-annotation about-annotation-left" aria-hidden="true">
+        {t('about.annotationLeft')}
+      </span>
+      <span className="about-annotation about-annotation-right" aria-hidden="true">
+        <strong>{t('about.annotationRightValue')}</strong>
+        <span>{t('about.annotationRightLabel')}</span>
+      </span>
+
+      <div className="container about-container">
         {/* Section Header */}
         <div className="section-header">
           <div className="section-badge">
             <span className="section-badge-dot"></span>
             <span>{t('about.kicker')}</span>
           </div>
-          <h2 className="section-title">{t('about.title')}</h2>
+          <h2 className="section-title about-title">
+            <span className="about-title-lead">{titleLead}</span>{' '}
+            {titleRest ? <span className="about-title-rest">{titleRest}</span> : null}
+          </h2>
           <p className="section-subtitle">
             {t('about.description')}
           </p>
         </div>
 
         {/* Value Proposition Grid */}
-        <StaggerReveal
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-            gap: 'var(--space-6)',
-            marginBottom: 'var(--space-10)',
-          }}
-        >
+        <StaggerReveal className="about-grid">
           {valueProps.map((vp) => (
-            <div key={vp.title} className="card" style={{ display: 'flex', flexDirection: 'column' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-3)' }}>
-                <div
-                  style={{
-                    width: '42px',
-                    height: '42px',
-                    borderRadius: 'var(--radius-sm)',
-                    background: 'rgba(0, 102, 255, 0.1)',
-                    border: '1px solid var(--cam-border-blue)',
-                    color: 'var(--cam-blue-primary)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                  }}
-                >
+            <article key={vp.number} className="about-card">
+              <div className="about-card-top">
+                <span className="about-icon-box">
                   {vp.icon}
-                </div>
-                <div>
-                  <h3 className="card-title" style={{ fontSize: '1.0625rem', marginBottom: '2px' }}>
-                    {vp.title}
-                  </h3>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--cam-cyan-tech)', fontFamily: 'var(--font-mono)' }}>
-                    {vp.subtitle}
-                  </div>
-                </div>
+                </span>
+                <span className="about-card-titles">
+                  <h3 className="about-card-title">{vp.title}</h3>
+                  <span className="about-card-subtitle">{vp.subtitle}</span>
+                </span>
+                <span className="about-card-number">{vp.number}</span>
               </div>
-              <p className="card-description" style={{ fontSize: '0.875rem', lineHeight: '1.6', marginTop: 'var(--space-2)' }}>
-                {vp.desc}
-              </p>
-            </div>
+              <p className="about-card-desc">{vp.desc}</p>
+              <span className="about-card-arrow" aria-hidden="true">
+                <Icon name="arrowRight" size={16} />
+              </span>
+            </article>
           ))}
         </StaggerReveal>
 
         {/* Company Mission Banner */}
-        <div
-          style={{
-            background: 'var(--cam-surface-2)',
-            border: '1px solid var(--cam-border-medium)',
-            borderRadius: 'var(--radius-md)',
-            padding: 'var(--space-8)',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: 'var(--space-6)',
-          }}
-        >
-          <div style={{ maxWidth: '720px' }}>
-            <div style={{ fontSize: '0.8125rem', color: 'var(--cam-blue-primary)', fontFamily: 'var(--font-mono)', fontWeight: 600, marginBottom: '6px' }}>
+        <div className="about-mission">
+          <div className="about-mission-copy">
+            <div className="about-mission-label">
               {t('about.missionLabel')}
             </div>
-            <h3 style={{ fontSize: '1.375rem', marginBottom: '8px' }}>
+            <h3 className="about-mission-title">
               {t('about.missionTitle')}
             </h3>
-            <p style={{ color: 'var(--cam-text-muted)', fontSize: '0.9375rem', lineHeight: '1.6' }}>
+            <p className="about-mission-desc">
               {t('about.missionDescription')}
             </p>
           </div>
-          <button className="btn btn-primary" onClick={() => openComingSoon()}>
-            {t('about.startRequest')}
-          </button>
+          <div className="about-mission-cta">
+            <button type="button" className="btn btn-primary about-mission-btn" onClick={() => openComingSoon()}>
+              {t('about.startRequest')}
+              <span className="about-mission-btn-arrow" aria-hidden="true">
+                <Icon name="arrowRight" size={16} />
+              </span>
+            </button>
+            <p className="about-mission-micro">{t('about.ctaMicrocopy')}</p>
+          </div>
         </div>
       </div>
     </SectionReveal>

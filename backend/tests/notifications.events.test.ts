@@ -95,13 +95,23 @@ const state = vi.hoisted(() => {
     adminNotification: {
       findMany: vi.fn(async () => notifications),
       count: vi.fn(async () => unreadCount),
+      groupBy: vi.fn(async () => []),
       create: vi.fn(async (args: any) => ({ id: 'notif-created', createdAt: new Date('2026-09-06T12:00:00.000Z'), ...args?.data })),
       updateMany: vi.fn(async () => getRunContext().updateManyResult),
       findUnique: vi.fn(async () => notifications[0] ?? null),
       findFirst: vi.fn(async () => notifications[0] ?? null),
     },
-    order: { count: vi.fn(async () => 0), findMany: vi.fn(async () => []) },
-    quote: { count: vi.fn(async () => 0), findMany: vi.fn(async () => []) },
+    order: {
+      count: vi.fn(async () => 0),
+      findMany: vi.fn(async () => []),
+      findUnique: vi.fn(async () => null),
+    },
+    quote: {
+      count: vi.fn(async () => 0),
+      findMany: vi.fn(async () => []),
+      findUnique: vi.fn(async () => null),
+      update: vi.fn(async ({ data }: any) => ({ ...data })),
+    },
     cadFile: { count: vi.fn(async () => 0), findMany: vi.fn(async () => []) },
     auditLog: { findMany: vi.fn(async () => []), count: vi.fn(async () => 0) },
     payment: { findMany: vi.fn(async () => []) },
@@ -341,10 +351,11 @@ describe('Admin notifications — events, real-time stream & access control', ()
     });
 
     it('creates an ORDER notification after an order is created', async () => {
+      state.setCurrentUser(state.adminUser);
       state.serviceMocks.orders.createOrder.mockResolvedValueOnce({ id: 'order-9', partName: 'Bracket.step' });
       const res = await request(app)
         .post('/api/v1/orders')
-        .set('Cookie', `${SESSION_COOKIE_NAME}=customertoken`)
+        .set('Cookie', `${SESSION_COOKIE_NAME}=admintoken`)
         .send({
           quoteId: 'quote-1',
           partName: 'Bracket.step',
@@ -365,21 +376,23 @@ describe('Admin notifications — events, real-time stream & access control', ()
     });
 
     it('does NOT create a notification when order creation fails', async () => {
+      state.setCurrentUser(state.adminUser);
       state.serviceMocks.orders.createOrder.mockRejectedValueOnce(new Error('boom'));
       const res = await request(app)
         .post('/api/v1/orders')
-        .set('Cookie', `${SESSION_COOKIE_NAME}=customertoken`)
+        .set('Cookie', `${SESSION_COOKIE_NAME}=admintoken`)
         .send({ quoteId: 'quote-1', partName: 'X', technology: 'SLS', material: 'PA 12', quantity: 1 });
       expect(res.status).not.toBe(201);
       expect(notifyCalls()).toHaveLength(0);
     });
 
     it('creates an ORDER notification after a quote is converted to an order', async () => {
+      state.setCurrentUser(state.adminUser);
       state.serviceMocks.quotes.getQuoteById.mockResolvedValue({ id: 'quote-1', userId: state.customerUser.id, partName: 'Bracket.step' });
       state.serviceMocks.orders.convertQuoteToOrder.mockResolvedValueOnce({ id: 'order-9' });
       const res = await request(app)
         .post('/api/v1/orders/convert-quote/quote-1')
-        .set('Cookie', `${SESSION_COOKIE_NAME}=customertoken`);
+        .set('Cookie', `${SESSION_COOKIE_NAME}=admintoken`);
       expect(res.status).toBe(201);
       const calls = notifyCalls();
       expect(calls).toHaveLength(1);
@@ -388,9 +401,10 @@ describe('Admin notifications — events, real-time stream & access control', ()
     });
 
     it('does NOT create a notification when converting an unknown quote', async () => {
+      state.setCurrentUser(state.adminUser);
       const res = await request(app)
         .post('/api/v1/orders/convert-quote/unknown')
-        .set('Cookie', `${SESSION_COOKIE_NAME}=customertoken`);
+        .set('Cookie', `${SESSION_COOKIE_NAME}=admintoken`);
       expect(res.status).toBe(404);
       expect(notifyCalls()).toHaveLength(0);
     });
@@ -554,6 +568,102 @@ describe('Admin notifications — events, real-time stream & access control', ()
       stream.destroy();
       server.close();
       NotificationEvents.clearClients();
+    });
+  });
+
+  describe('List aggregation — global counts and resolved references', () => {
+    const asAdmin = () => state.setCurrentUser(state.adminUser);
+
+    it('returns backward-compatible counts scoped to admin visibility', async () => {
+      asAdmin();
+      state.setNotifications([]);
+      state.setUnreadCount(0);
+      const res = await request(app)
+        .get('/api/v1/admin/notifications?limit=7')
+        .set('Cookie', `${SESSION_COOKIE_NAME}=admintoken`);
+      expect(res.status).toBe(200);
+      expect(res.body.data.counts).toMatchObject({
+        total: expect.any(Number),
+        unread: expect.any(Number),
+        quotes: expect.any(Number),
+        orders: expect.any(Number),
+        customers: expect.any(Number),
+        system: expect.any(Number),
+        quotesUnread: expect.any(Number),
+        ordersUnread: expect.any(Number),
+        customersUnread: expect.any(Number),
+        systemUnread: expect.any(Number),
+      });
+      // Every count query carries the same visibility scope.
+      for (const call of state.prisma.adminNotification.count.mock.calls) {
+        expect(call[0]?.where?.OR).toEqual(
+          expect.arrayContaining([{ userId: null }, { userId: state.adminUser.id }])
+        );
+      }
+    });
+
+    it('resolves the live quote reference for rows predating the unified model', async () => {
+      asAdmin();
+      state.setNotifications([
+        {
+          id: 'n-old', userId: null, type: 'QUOTE', title: 'New Quote Received',
+          message: 'A new quote has been submitted for Banana Ramp.STL.',
+          entityType: 'QUOTE', entityId: 'RFQ-2026-552132', isRead: true, priority: 'INFO',
+          createdAt: new Date('2026-09-10T10:00:00.000Z').toISOString(), readAt: null,
+          metadata: { quoteId: 'RFQ-2026-552132' },
+        },
+      ]);
+      state.prisma.quote.findMany.mockResolvedValueOnce([{ id: 'RFQ-2026-552132', reference: 'CAM-2026-409541' }]);
+      const res = await request(app)
+        .get('/api/v1/admin/notifications?limit=7')
+        .set('Cookie', `${SESSION_COOKIE_NAME}=admintoken`);
+      expect(res.status).toBe(200);
+      expect(res.body.data.notifications[0].resolvedReference).toBe('CAM-2026-409541');
+    });
+
+    it('resolves null when the related record is gone (UI falls back gracefully)', async () => {
+      asAdmin();
+      state.setNotifications([
+        {
+          id: 'n-gone', userId: null, type: 'QUOTE', title: 'New Quote Received',
+          message: 'Old.', entityType: 'QUOTE', entityId: 'RFQ-2026-000000', isRead: true, priority: 'INFO',
+          createdAt: new Date('2026-09-10T10:00:00.000Z').toISOString(), readAt: null,
+          metadata: { quoteId: 'RFQ-2026-000000' },
+        },
+      ]);
+      state.prisma.quote.findMany.mockResolvedValueOnce([]);
+      const res = await request(app)
+        .get('/api/v1/admin/notifications?limit=7')
+        .set('Cookie', `${SESSION_COOKIE_NAME}=admintoken`);
+      expect(res.status).toBe(200);
+      expect(res.body.data.notifications[0].resolvedReference).toBeNull();
+    });
+
+    it('legacy quote saves carry the unified reference into notification metadata', async () => {
+      asAdmin();
+      state.serviceMocks.quotes.saveMultiFileQuotation.mockResolvedValueOnce({
+        id: 'RFQ-2026-999999',
+        partName: 'Widget.step',
+      } as never);
+      const res = await request(app)
+        .post('/api/v1/quotes')
+        .set('Cookie', `${SESSION_COOKIE_NAME}=admintoken`)
+        .send({
+          partName: 'Widget.step',
+          technology: 'FDM',
+          material: 'PLA',
+          quantity: 1,
+          files: [{ fileId: 'file-a', materialId: 'PLA', technology: 'FDM', quantity: 1 }],
+        });
+      expect(res.status).toBe(201);
+      const notify = notifyCalls().at(-1) as any;
+      expect(notify?.type).toBe('QUOTE');
+      // Server-generated CAM reference (never the RFQ primary key).
+      expect(notify?.metadata?.reference).toMatch(/^CAM-2026-\d{6}$/);
+      // The quote row itself was stamped too (no referenceless business record).
+      const update = state.prisma.quote.update.mock.calls.at(-1)?.[0];
+      expect(update?.where).toMatchObject({ id: 'RFQ-2026-999999' });
+      expect(update?.data?.reference).toMatch(/^CAM-2026-\d{6}$/);
     });
   });
 

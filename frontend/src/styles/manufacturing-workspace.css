@@ -5,14 +5,18 @@
    No wizard / stepper / locks — progressive interaction via panel states.
    ========================================================================== */
 
-/* Viewport lock — applied to the app wrapper for this view only (see App.tsx). */
+/* Viewport lock — applied to the app wrapper for this view only (see App.tsx).
+   dvh follows mobile browser chrome where supported; legacy browsers keep vh. */
 .app-viewport {
   height: 100vh;
+  height: 100dvh;
   max-height: 100vh;
+  max-height: 100dvh;
   overflow: hidden;
 }
 
-.mw-workspace {
+.mw-workspace,
+.mw-mobile-notice-overlay {
   --mw-bg: #060A18;
   --mw-surface: #0B1120;
   --mw-surface-2: #0E1526;
@@ -34,6 +38,9 @@
   --mw-red: #F0484A;
   --mw-red-soft: rgba(240, 72, 74, 0.14);
 
+}
+
+.mw-workspace {
   display: flex;
   flex-direction: column;
   flex: 1 1 0;
@@ -46,7 +53,8 @@
 
 /* Light theme — remaps the workspace's dedicated industrial palette to the
    light surface system so it mirrors the rest of the platform. */
-[data-theme='light'] .mw-workspace {
+[data-theme='light'] .mw-workspace,
+[data-theme='light'] .mw-mobile-notice-overlay {
   --mw-bg: #f6f8fb;
   --mw-surface: #ffffff;
   --mw-surface-2: #f2f5f9;
@@ -3035,49 +3043,200 @@
   }
 }
 
-/* Tablet / mobile — stacked columns, primary target stays desktop */
+/* Tablet / mobile — the workspace becomes a normally scrolling page.
+   Desktop keeps the viewport-locked app (internal column scroll); on mobile
+   the document is the scroll owner so the full workflow (top → Submit Quote)
+   is reachable with no scroll trap. */
 @media (max-width: 920px) {
-  .mw-canvas {
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding: 8px;
+  .app-viewport {
     height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .mw-workspace {
+    overflow: visible;
+    flex: none;
+    min-height: 100dvh;
+    overflow-x: clip;
+  }
+
+  .mw-workspace > .mw-canvas {
+    overflow: visible;
+    flex: none;
+  }
+
+  .mw-canvas {
+    overflow: visible;
+    overflow-x: clip;
+    padding: 8px;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    height: auto;
+    min-height: 0;
+    flex: none;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: auto;
+    touch-action: pan-x pan-y;
   }
 
   .mw-workspace-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     height: auto;
+    min-height: 0;
     gap: 10px;
+    overflow: visible;
   }
 
   .mw-col {
-    overflow-y: visible;
+    overflow: visible;
+    overflow-x: clip;
     max-height: none;
+    min-width: 0;
+    max-width: 100%;
     gap: 10px;
   }
+
+  .mw-col-left,
+  .mw-col-center,
+  .mw-col-right {
+    overflow: visible;
+    overflow-x: clip;
+  }
+
+  /* Deliberate mobile workflow order matches the DOM: Technology → Process →
+     Material → Upload → Viewer → Configuration → Notes → Quote → Pricing →
+     Submit. Columns stack; nothing is reordered. */
+  .mw-col-left { order: 1; }
+  .mw-col-center { order: 2; }
+  .mw-col-right { order: 3; }
 
   .mw-col-right .mw-panel {
     flex: none;
     min-height: 0;
   }
 
-.mw-col-center .mw-panel-viewer {
+  .mw-col-center .mw-panel-viewer {
     flex: none;
     min-height: 0;
+  }
+
+  /* Entry choreography must never fly panels off-screen on narrow viewports:
+     constrain the travelling block to the viewport width. */
+  .mw-entry-left-block {
+    width: auto;
+    max-width: 100%;
+  }
+
+  .mw-workspace[data-entry='tech-focus'] .mw-entry-left-block,
+  .mw-workspace[data-entry='process-focus'] .mw-entry-left-block {
+    width: auto;
+    max-width: 100%;
   }
 
   .mw-center-dock {
     grid-template-columns: 1fr;
   }
 
+  .mw-panel {
+    max-width: 100%;
+    min-width: 0;
+  }
+
   .mw-panel-body {
     max-height: none;
     overflow-y: visible;
+    overflow-x: hidden;
   }
 
-  .mw-stage-upload-grid { grid-template-columns: 1fr; }
+  .mw-stage-upload-grid { grid-template-columns: minmax(0, 1fr); }
+  .mw-entry-left-block,
+  .mw-mw-material,
+  .mw-mw-upload,
+  .mw-mw-viewer,
+  .mw-mw-dock,
+  .mw-mw-right { inline-size: 100%; min-inline-size: 0; }
+  .mw-workspace .mw-entry-left-block { transition: none; }
+  .mw-col-center .mw-panel-notes { max-height: none; }
+  .mw-workspace .mw-mw-right,
+  .mw-workspace .mw-mw-viewer { flex: none; }
+  .mw-col-right .mw-panel-quote-main .mw-panel-body { flex: none; overflow: visible; }
+  .mw-col-center .mw-panel-viewer .mw-panel-body { flex: none; }
+  .mw-panel-upload .mw-panel-body { overflow: visible; }
+  .mw-stage-upload-list { height: auto; overflow: visible; overscroll-behavior: auto; padding-inline-end: 0; }
+  .mw-upload-empty { flex: none; padding: 12px; }
+  .mw-stage-upload-folder { width: 48px; height: 40px; }
+  .mw-center-dock { min-inline-size: 0; }
+  .mw-panel-header { flex-wrap: wrap; }
+
   .mw-stage-upload-zone { min-height: 120px; padding: 16px 14px; }
   .mw-stage-upload-hint { margin-top: 0; padding-top: 8px; }
+
+  /* The model gets a bounded viewport; its properties follow in normal flow. */
+  .mw-stage-viewer-wrap {
+    min-height: 0;
+    height: auto;
+    max-height: none;
+    container-type: normal;
+  }
+  .mw-stage-viewer-wrap .geometry-viewer-layout,
+  .mw-stage-viewer-wrap .geometry-module-body { height: auto; }
+  /* Mobile: inspect the full-width model first, then its properties below. */
+  .mw-stage-viewer-wrap .geometry-module-body {
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto;
+  }
+  .mw-stage-viewer-wrap .geometry-viewer-section {
+    order: -1;
+    height: clamp(260px, 45dvh, 400px);
+    contain: size;
+  }
+  .mw-stage-viewer-wrap .geometry-properties-panel {
+    padding: 12px;
+    gap: 8px;
+    border-inline-end: 0;
+    border-block-start: 1px solid var(--mw-border);
+  }
+  .mw-stage-viewer-wrap .geometry-properties-heading h3 { font-size: 14px; }
+  .mw-stage-viewer-wrap .geometry-properties-subtitle { font-size: 11px; }
+  .mw-stage-viewer-wrap .geometry-unit-label { font-size: 11px; }
+  .mw-stage-viewer-wrap .geometry-unit-selector button { min-width: 44px; min-height: 44px; font-size: 12px; }
+  .mw-stage-viewer-wrap .geometry-dimensions { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .mw-stage-viewer-wrap .geometry-dimension-sep { display: none; }
+  .mw-stage-viewer-wrap .geometry-dimension input { min-height: 44px; font-size: 16px; }
+  .mw-stage-viewer-wrap .geometry-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .mw-stage-viewer-wrap .geometry-section-label,
+  .mw-stage-viewer-wrap .geometry-dimension-axis b,
+  .mw-stage-viewer-wrap .geometry-uniform-text b,
+  .mw-stage-viewer-wrap .geometry-uniform-text > span,
+  .mw-stage-viewer-wrap .geometry-metric-title,
+  .mw-stage-viewer-wrap .geometry-mesh-subtitle,
+  .mw-stage-viewer-wrap .geometry-mesh-stat b { font-size: 11px; }
+  .mw-stage-viewer-wrap .geometry-metric strong,
+  .mw-stage-viewer-wrap .geometry-mesh-stat strong { font-size: 14px; }
+  .mw-stage-viewer-empty { min-height: min(240px, 40dvh); padding: 24px 16px; }
+
+  /* Touch-friendly targets */
+  .mw-stage-tech-item,
+  .mw-stage-process-chip,
+  .mw-stage-material-chip,
+  .mw-profile-item,
+  .mw-stage-btn,
+  .mw-stage-config-tab {
+    min-height: 44px;
+  }
+
+  .mw-color-swatch {
+    width: 28px;
+    height: 28px;
+  }
+
+  .mw-file-row,
+  .mw-doc-item,
+  .mw-qup-file-row {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
 }
 
 @media (max-width: 640px) {
@@ -3267,10 +3426,12 @@
 }
 
 /* Focused Technology & Process states */
+@media (min-width: 921px) {
 .mw-workspace[data-entry='tech-focus'] .mw-entry-left-block,
 .mw-workspace[data-entry='process-focus'] .mw-entry-left-block {
   width: min(520px, calc(100vw - 48px));
   max-width: 520px;
+}
 }
 
 .mw-workspace[data-entry='tech-focus'] .mw-panel-tech,
@@ -3371,7 +3532,7 @@
   justify-content: center;
   min-height: 100vh;
   padding: 24px;
-  background: var(--cam-bg, #08090b);
+  background: var(--cam-bg, #050B18);
 }
 .app-viewport > .mw-error-boundary {
   min-height: 100vh;
@@ -3401,4 +3562,143 @@
 .mw-error-boundary-inner .mw-btn {
   align-self: flex-start;
   margin-top: 6px;
+}
+
+/* ==========================================================================
+   Mobile desktop-experience recommendation (manufacturing workspace only)
+   Premium CAM LABS card: blue accent, restrained glow, clean border, subtle
+   backdrop. Non-blocking — dismissal returns immediately to a scrollable page.
+   ========================================================================== */
+.modal-overlay.mw-mobile-notice-overlay {
+  z-index: 1100;
+  align-items: center;
+  justify-content: center;
+  inset: auto;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100dvh;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  overscroll-behavior: contain;
+}
+.mw-mobile-notice-overlay .modal-card {
+  max-height: 100%;
+  overscroll-behavior: contain;
+}
+
+
+.mw-mobile-notice-overlay .modal-card,
+.mw-mobile-notice-card {
+  background: linear-gradient(180deg, rgba(16, 24, 43, 0.98) 0%, rgba(11, 17, 32, 0.99) 100%);
+  border: 1px solid rgba(22, 119, 255, 0.35);
+  border-radius: 16px;
+  box-shadow:
+    0 0 0 1px rgba(22, 119, 255, 0.12) inset,
+    0 0 32px rgba(22, 119, 255, 0.14),
+    0 24px 64px rgba(0, 0, 0, 0.55);
+  max-width: min(420px, calc(100vw - 48px));
+}
+
+.mw-mobile-notice {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  padding: 28px 24px 24px;
+}
+
+.mw-mobile-notice-close {
+  position: absolute;
+  top: 10px;
+  inset-inline-end: 10px;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--mw-text-muted);
+  cursor: pointer;
+}
+
+.mw-mobile-notice-close:hover {
+  background: var(--mw-surface-3);
+  color: var(--mw-text);
+}
+
+.mw-mobile-notice-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  color: var(--mw-blue);
+  background: var(--mw-blue-soft);
+  border: 1px solid rgba(22, 119, 255, 0.30);
+  box-shadow: 0 8px 24px rgba(22, 119, 255, 0.22);
+}
+
+.mw-mobile-notice-title {
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--mw-text);
+  margin: 0;
+}
+
+.mw-mobile-notice-body {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--mw-text-2);
+  margin: 0;
+}
+
+.mw-mobile-notice-cta {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 6px;
+}
+
+[data-theme='light'] .mw-mobile-notice-overlay .modal-card,
+[data-theme='light'] .mw-mobile-notice-card {
+  background: linear-gradient(180deg, #ffffff 0%, #f2f5f9 100%);
+  border-color: rgba(22, 119, 255, 0.30);
+}
+
+/* ==========================================================================
+   RTL correctness for the manufacturing workspace
+   Layout uses logical properties throughout; these rules cover the remaining
+   directional affordances. 3D interaction semantics, file formats, and
+   technical standards are never mirrored.
+   ========================================================================== */
+[dir='rtl'] .mw-file-expand svg {
+  transform: scaleX(-1);
+}
+
+[dir='rtl'] .mw-file-expand.is-open svg {
+  transform: scaleX(-1) rotate(90deg);
+}
+
+[dir='rtl'] .mw-stage-tech-mark svg {
+  transform: scaleX(-1);
+}
+
+[dir='rtl'] .mw-stage-viewer-wrap .geometry-toolbar {
+  left: auto;
+  right: 10px;
+}
+
+/* Keep numeric/technical values LTR inside RTL text so STEP/STL/ISO,
+   dimensions, and prices always read correctly. */
+[dir='rtl'] .mw-file-meta,
+[dir='rtl'] .mw-file-detail-text,
+[dir='rtl'] .mw-qup-file-meta,
+[dir='rtl'] .mw-qup-part-price-value,
+[dir='rtl'] .mw-qup-pricing-total-value,
+[dir='rtl'] .mw-config-delivery-fee {
+  direction: ltr;
+  unicode-bidi: embed;
 }

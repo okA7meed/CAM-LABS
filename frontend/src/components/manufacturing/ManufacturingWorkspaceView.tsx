@@ -16,7 +16,7 @@ import { useDraftPersistence, DraftData } from '../../hooks/useDraftPersistence'
 import { UploadItemStatus, UploadValidationState, areAllUploadsReady, hasUploadInFlight, hasViewerGeometry, isCadFileReady, isUploadItemReady } from './uploadState';
 import { AnimatePresence, motion } from 'motion/react';
 import { CAM_EASE } from '../ui/AnimatedModal';
-import { fdmParametersFor, hasOwn, panelStatusClass, priceWithPriority } from './workspace/helpers';
+import { hasOwn, panelStatusClass } from './workspace/helpers';
 import { MAX_TECHNICAL_DOCUMENTS, MAX_TECHNICAL_DOCUMENT_SIZE_BYTES, MAX_UPLOAD_FILES, MAX_UPLOAD_FILE_SIZE_BYTES, MAX_UPLOAD_TOTAL_BYTES, SUPPORTED_DOCUMENT_EXTENSIONS, initialState, panelIds } from './workspace/constants';
 import { FileConfiguration, FileSetupState, PanelStatus, QuoteData, RequestState, TechnicalDocumentItem, UploadItem } from './workspace/types';
 import { useCadThumbnails } from './workspace/useCadThumbnails';
@@ -28,6 +28,7 @@ import { ViewerPanel } from './workspace/panels/ViewerPanel';
 import { ConfigurationPanel } from './workspace/panels/ConfigurationPanel';
 import { NotesPanel } from './workspace/panels/NotesPanel';
 import { QuotePanel } from './workspace/panels/QuotePanel';
+import { MobileWorkspaceNotice } from './workspace/MobileWorkspaceNotice';
 
 // Progressive entry flow — the panels themselves ARE the workflow (never a
 // wizard): technology focus → process focus → Technology + Process physically
@@ -55,7 +56,8 @@ const entryPoses = (
   reduced: boolean,
   focusDelta: { x: number; y: number }
 ): EntryPoseSet => {
-  if (reduced) {
+  const narrow = typeof window !== 'undefined' && window.innerWidth <= 920;
+  if (reduced || narrow) {
     // Reduced motion: plain state-change hierarchy, fades only — the spatial
     // choreography (transforms) is disabled, the functional sequence is kept.
     const dim = stage !== 'reveal' && stage !== 'workspace';
@@ -70,8 +72,12 @@ const entryPoses = (
   }
   const focus = stage === 'tech-focus' || stage === 'process-focus';
   const settled = stage === 'reveal' || stage === 'workspace';
-  const targetX = focusDelta.x !== 0 ? focusDelta.x : `${dir * 165}%`;
-  const targetY = focusDelta.y;
+  // Use the measured centering delta as-is (0 is valid on single-column mobile
+  // where the block is already centered). The 165% fallback is only for the
+  // pre-measurement desktop frame; on narrow viewports it would fly the block
+  // off-screen and create horizontal overflow.
+  const targetX = focusDelta.x !== 0 ? focusDelta.x : narrow ? 0 : `${dir * 165}%`;
+  const targetY = narrow ? 0 : focusDelta.y;
 
   return {
     leftBlock: stage === 'tech-focus'
@@ -127,7 +133,7 @@ const entryTransition = (stage: EntryStage, key: keyof EntryPoseSet, reduced: bo
 export const ManufacturingRequestView: React.FC = () => {
   const { t } = useTranslation();
   useMaterials();
-  const { openAuthModal } = useStore();
+  const { openAuthModal, setActiveView } = useStore();
   const { isAuthenticated } = useAuth();
 
   const [configTouched, setConfigTouched] = useState(false);
@@ -137,7 +143,7 @@ export const ManufacturingRequestView: React.FC = () => {
   const [quote, setQuote] = useState<QuoteData | null>(null);
   const [isCalculatingQuote, setIsCalculatingQuote] = useState(false);
   const [quoteFailed, setQuoteFailed] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSubmitting] = useState(false);
 
   const [uploadItems, setUploadItems] = useState<UploadItem[]>([]);
   const [fileConfigurations, setFileConfigurations] = useState<Record<string, FileConfiguration>>({});
@@ -245,8 +251,8 @@ export const ManufacturingRequestView: React.FC = () => {
     el.classList.remove('mw-flash');
     void el.offsetWidth;
     el.classList.add('mw-flash');
-    setToast(`Next: ${label}`);
-  }, []);
+    setToast(`${t('request.next')}: ${label}`);
+  }, [t]);
 
   // ── Draft persistence (restore + autosave of notes/doc metadata) ─────────
   // Files themselves are never stored client-side — only server-issued document
@@ -275,8 +281,8 @@ export const ManufacturingRequestView: React.FC = () => {
       if (data.fileSetupStates) setFileSetupStates(data.fileSetupStates);
       if (typeof data.configTouched === 'boolean') setConfigTouched(data.configTouched);
       if (data.activeConfigTab === 'advanced') setActiveConfigTab('advanced');
-      setToast('Draft restored');
-    }, [setRequest, setNote, setTechnicalDocuments, setFileConfigurations, setFileSetupStates, setConfigTouched, setActiveConfigTab, setToast, setEntryStage]),
+      setToast(t('mw.draftRestored'));
+    }, [t, setRequest, setNote, setTechnicalDocuments, setFileConfigurations, setFileSetupStates, setConfigTouched, setActiveConfigTab, setToast, setEntryStage]),
   });
 
   useEffect(() => {
@@ -461,7 +467,7 @@ export const ManufacturingRequestView: React.FC = () => {
   }, [t, updateUploadItem, pollProcessing, request, setFileConfigurations]);
 
   const addFiles = useCallback((files: File[]) => {
-    if (!request.process) { setError('Select a manufacturing process first to enable uploads.'); focusSection(panelIds.process, 'Select Process'); return; }
+    if (!request.process) { setError(t('mw.selectProcessFirst')); focusSection(panelIds.process, t('mw.selectProcess')); return; }
     if (!files.length) return; setError(''); invalidateQuote(); setUploadBusy(true);
     const accepted = uploadItems.filter((i) => i.status !== 'unsupported');
     const curBytes = accepted.reduce((s, i) => s + i.sizeBytes, 0);
@@ -617,16 +623,13 @@ export const ManufacturingRequestView: React.FC = () => {
 
   const submit = useCallback(async () => {
     if (submissionInFlightRef.current || !request.cadFile || !request.process || !request.material || !areAllUploadsReady(uploadItems)) return;
+    // Quote-first lifecycle: NEVER create an Order here. Require auth, then
+    // continue to the dedicated Submit Quote page (draft is already persisted,
+    // so configuration survives login/register).
     if (!isAuthenticated) { setAuthGateOpen(true); openAuthModal('login'); return; }
-    submissionInFlightRef.current = true; setIsSubmitting(true);
-    const technicalDocumentIds = technicalDocuments.filter((d) => d.status === 'ready' && d.id).map((d) => d.id!);
-    try {
-      const savedQuote = await ApiService.createQuote({ partName: request.cadFile.name, technology: request.process.toUpperCase(), material: request.material, quantity: request.quantity, toleranceGrade: request.tolerance, surfaceFinish: request.finish, technicalNotes: note, technicalDocumentIds, cadFileIds: usableUploadItems.flatMap((i) => i.cadFile ? [i.cadFile.id] : []), files: usableUploadItems.map((i) => { const cfg = fileConfigurations[i.cadFile!.id] || { process: request.process, material: request.material, quantity: request.quantity, finish: request.finish, tolerance: request.tolerance, quality: request.quality, wallCount: request.wallCount }; const md = i.cadFile!.latestVersion?.metadata as any; const q = cfg.quality || request.quality; const w = cfg.wallCount ?? request.wallCount; return { fileId: i.cadFile!.id, fileName: i.cadFile!.name, format: i.cadFile!.format, materialId: cfg.material || request.material, technology: (cfg.process || request.process || 'fdm').toUpperCase(), surfaceFinish: cfg.finish || request.finish, toleranceGrade: cfg.tolerance === 'precision' ? 'precision' as const : 'standard' as const, quantity: cfg.quantity || request.quantity, volumeCm3: md?.volume, surfaceAreaCm2: md?.surfaceArea, triangleCount: md?.triangleCount, manufacturingParameters: fdmParametersFor(q, w, cfg.supportEnabled, (cfg as Partial<FileConfiguration>).infillPercent ?? null) }; }) });
-      if (!savedQuote) throw new Error('Could not save quote.');
-      const order = await ApiService.createOrder({ partName: request.cadFile.name, cadFileIds: uploadItems.filter(isUploadItemReady).flatMap((i) => i.cadFile ? [i.cadFile.id] : []), cadFileConfigs: uploadItems.filter(isUploadItemReady).flatMap((i) => { const cfg = fileConfigurations[i.cadFile!.id] || { process: request.process, technology: request.technology, material: request.material, quantity: request.quantity, quality: request.quality, color: request.color, finish: request.finish, tolerance: request.tolerance }; return [{ cadFileId: i.cadFile!.id, configuration: cfg, totalCost: quote?.formattedTotalPrice }]; }), technology: request.process.toUpperCase(), material: request.material, quantity: request.quantity, totalCost: quote ? priceWithPriority(quote.formattedTotalPrice, priorityShipping) : 'Pending', tolerance: request.tolerance, quoteId: savedQuote.id, technicalNotes: note, technicalDocumentIds, priorityShipping });
-      if (!order) throw new Error('Could not submit request.');
-    } catch (e) { setError(e instanceof Error ? e.message : 'Could not submit.'); } finally { submissionInFlightRef.current = false; setIsSubmitting(false); }
-  }, [request, uploadItems, isAuthenticated, openAuthModal, usableUploadItems, fileConfigurations, quote, technicalDocuments, note]);
+    setActiveView('submit-quote');
+    window.scrollTo({ top: 0 });
+  }, [request, uploadItems, isAuthenticated, openAuthModal, setActiveView]);
 
   useEffect(() => { if (!isAuthenticated || !authGateOpen) return; setAuthGateOpen(false); void submit(); }, [isAuthenticated, authGateOpen, submit]);
 
@@ -893,18 +896,18 @@ export const ManufacturingRequestView: React.FC = () => {
                     if (entryStage === 'reveal' && areAllUploadsReady(uploadItems)) setEntryStage('workspace');
                   }}
                 >
-                  <ErrorBoundary
-                    label="quote-panel"
-                    fallback={(error, retry) => (
-                      <div className="mw-panel mw-panel-quote" role="alert">
-                        <div className="mw-error-boundary-inner">
-                          <strong>Your quote could not be displayed.</strong>
-                          <p>{error.message || 'An unexpected error occurred.'}</p>
-                          <button type="button" className="mw-btn mw-btn-secondary" onClick={retry}>Retry quote</button>
+                    <ErrorBoundary
+                      label="quote-panel"
+                      fallback={(error, retry) => (
+                        <div className="mw-panel mw-panel-quote" role="alert">
+                          <div className="mw-error-boundary-inner">
+                            <strong>{t('mw.quoteFailedDisplay')}</strong>
+                            <p>{error.message || 'An unexpected error occurred.'}</p>
+                            <button type="button" className="mw-btn mw-btn-secondary" onClick={retry}>{t('mw.retryQuote')}</button>
+                          </div>
                         </div>
-                      </div>
-                    )}
-                  >
+                      )}
+                    >
                     <QuotePanel
                       request={request}
                       quote={quote}
@@ -936,6 +939,9 @@ export const ManufacturingRequestView: React.FC = () => {
           </aside>
         </div>
       </div>
+
+      {/* Mobile desktop-experience recommendation (non-blocking, once per session) */}
+      <MobileWorkspaceNotice />
 
       {/* Hidden file input */}
       <input ref={inputRef} hidden type="file" multiple accept=".step,.stp,.stl,.obj,.ply,.dxf,.svg,.pdf,.iges,.igs" onChange={(e) => addFiles(Array.from(e.target.files || []))} />
@@ -973,9 +979,9 @@ export const ManufacturingRequestView: React.FC = () => {
                   fallback={(error, retry) => (
                     <div className="mw-stage-viewer-empty" role="alert" style={{ minHeight: 420, justifyContent: 'center' }}>
                       <span className="mw-stage-viewer-empty-icon"><Icon name="cube" size={22} /></span>
-                      <span className="mw-stage-viewer-empty-text">The 3D preview could not start on this device.</span>
+                      <span className="mw-stage-viewer-empty-text">{t('mw.previewFailed')}</span>
                       <span className="mw-stage-viewer-empty-hint">{error.message || 'WebGL may be unavailable or a graphics driver failed.'}</span>
-                      <button type="button" className="mw-btn mw-btn-secondary" onClick={retry}>Retry preview</button>
+                      <button type="button" className="mw-btn mw-btn-secondary" onClick={retry}>{t('mw.retryPreview')}</button>
                     </div>
                   )}
                 >
@@ -1008,16 +1014,16 @@ export const ManufacturingRequestView: React.FC = () => {
               transition={{ duration: 0.22, ease: CAM_EASE }}
             >
               <div className="mw-modal-header">
-                <div className="mw-modal-title">Remove File</div>
-                <button className="mw-modal-close" disabled={isDeleting} onClick={() => setDeleteItem(null)}><Icon name="close" size={14} /></button>
+                <div className="mw-modal-title">{t('mw.removeFile')}</div>
+                <button className="mw-modal-close" disabled={isDeleting} onClick={() => setDeleteItem(null)} aria-label={t('request.close')}><Icon name="close" size={14} /></button>
               </div>
               <div className="mw-modal-body">
-                <div className="mw-delete-text">This will permanently remove the file from your quote.</div>
+                <div className="mw-delete-text">{t('mw.removeFileBody')}</div>
                 <div className="mw-delete-filename">{deleteItem.name}</div>
               </div>
               <div className="mw-modal-actions">
-                <button className="mw-btn mw-btn-secondary" style={{ width: 'auto' }} disabled={isDeleting} onClick={() => setDeleteItem(null)}>Cancel</button>
-                <button className="mw-btn mw-btn-danger" style={{ width: 'auto' }} disabled={isDeleting} onClick={() => void confirmDelete()}>{isDeleting ? 'Removing...' : 'Remove'}</button>
+                <button className="mw-btn mw-btn-secondary" style={{ width: 'auto' }} disabled={isDeleting} onClick={() => setDeleteItem(null)}>{t('mw.cancel')}</button>
+                <button className="mw-btn mw-btn-danger" style={{ width: 'auto' }} disabled={isDeleting} onClick={() => void confirmDelete()}>{isDeleting ? t('mw.removing') : t('mw.remove')}</button>
               </div>
             </motion.div>
           </motion.div>

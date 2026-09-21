@@ -1,9 +1,10 @@
+import { useTranslation } from 'react-i18next';
 import { Icon } from '../../../ui/Icon';
 import { PanelShell } from '../PanelShell';
 import { PROCESS_INFO, panelIds, processGroups } from '../constants';
 import { PanelStatus, ProcessId, RequestState } from '../types';
 
-export const ProcessPanel = ({ request, status, className, onSelectProcess, showNextButton, onNext, t }: {
+export const ProcessPanel = ({ request, status, className, onSelectProcess, showNextButton, onNext, t: tProp }: {
   request: RequestState;
   status: PanelStatus;
   className?: string;
@@ -12,6 +13,8 @@ export const ProcessPanel = ({ request, status, className, onSelectProcess, show
   onNext?: () => void;
   t?: any;
 }) => {
+  const { t: tHook } = useTranslation();
+  const t = tProp || tHook;
   const processOptions = request.technology
     ? (processGroups.find((g) => g.group === request.technology || (request.technology === 'sheet' && g.group === 'sheetMetal'))?.options ?? []).map((id) => ({ id, info: PROCESS_INFO[id] }))
     : [];
@@ -19,20 +22,20 @@ export const ProcessPanel = ({ request, status, className, onSelectProcess, show
     <PanelShell
       id={panelIds.process}
       icon="layers"
-      title="Select Process / Type"
-      subtitle="Available for the selected technology"
+      title={t('mw.selectProcess')}
+      subtitle={t('mw.selectProcessSub')}
       status={status}
       className={className}
     >
       {!request.technology ? (
         <div className="mw-panel-empty">
-          <span className="mw-panel-empty-hint">Select a manufacturing technology first.</span>
+          <span className="mw-panel-empty-hint">{t('mw.selectTechnologyFirst')}</span>
         </div>
       ) : processOptions.length === 0 ? (
         <div className="mw-panel-empty">
           <span className="mw-panel-empty-icon"><Icon name="configure" size={14} /></span>
-          <span className="mw-panel-empty-text">No processes yet</span>
-          <span className="mw-panel-empty-hint">Processes for this technology are coming soon</span>
+          <span className="mw-panel-empty-text">{t('mw.noProcesses')}</span>
+          <span className="mw-panel-empty-hint">{t('mw.noProcessesHint')}</span>
         </div>
       ) : (
         <>

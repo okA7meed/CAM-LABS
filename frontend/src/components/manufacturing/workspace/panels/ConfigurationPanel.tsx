@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { AnimatePresence, motion } from 'motion/react';
 import { Icon, IconName } from '../../../ui/Icon';
 import { RequiredMark } from '../../../ui/FieldLabel';
@@ -20,24 +21,26 @@ export const ConfigurationPanel = ({ request, isPrinting, activeConfigTab, confi
   onUpdate: (p: Partial<RequestState>) => void;
   onConfigUpdate: (u: Partial<FileConfiguration>) => void;
   onPriorityShippingChange: (v: boolean) => void;
-}) => (
+}) => {
+  const { t } = useTranslation();
+  return (
   <PanelShell
     id={panelIds.config}
     icon="configure"
-    title="Configuration"
-    subtitle="Set your manufacturing parameters"
+    title={t('mw.configuration')}
+    subtitle={t('mw.configurationSub')}
     status={status}
     className="mw-panel-config"
     action={(
-      <div className="mw-stage-config-tabs">
-        <button type="button" className={`mw-stage-config-tab ${activeConfigTab === 'basic' ? 'is-active' : ''}`} onClick={() => onTabChange('basic')}>Basic</button>
-        <button type="button" className={`mw-stage-config-tab ${activeConfigTab === 'advanced' ? 'is-active' : ''}`} onClick={() => onTabChange('advanced')}>Advanced</button>
+      <div className="mw-stage-config-tabs" role="tablist" aria-label={t('mw.configuration')}>
+        <button type="button" role="tab" aria-selected={activeConfigTab === 'basic'} className={`mw-stage-config-tab ${activeConfigTab === 'basic' ? 'is-active' : ''}`} onClick={() => onTabChange('basic')}>{t('mw.basic')}</button>
+        <button type="button" role="tab" aria-selected={activeConfigTab === 'advanced'} className={`mw-stage-config-tab ${activeConfigTab === 'advanced' ? 'is-active' : ''}`} onClick={() => onTabChange('advanced')}>{t('mw.advanced')}</button>
       </div>
     )}
   >
     {!configReady ? (
       <div className="mw-panel-empty">
-        <span className="mw-panel-empty-hint">Complete technology, process, upload and material to enable configuration settings.</span>
+        <span className="mw-panel-empty-hint">{t('mw.configEmpty')}</span>
       </div>
     ) : (
       <div className="mw-stage-config-content">
@@ -65,10 +68,10 @@ export const ConfigurationPanel = ({ request, isPrinting, activeConfigTab, confi
             so this switch and the total can never diverge. */}
         <div className="mw-stage-config-divider" aria-hidden="true" />
         <div className="mw-stage-config-field mw-config-delivery" data-delivery-priority>
-          <label className="mw-stage-config-label">Delivery Priority</label>
+          <label className="mw-stage-config-label">{t('mw.deliveryPriority')}</label>
           <div className="mw-config-delivery-row">
             <span className="mw-config-delivery-text">
-              <span className="mw-config-delivery-title">Faster delivery of your order</span>
+              <span className="mw-config-delivery-title">{t('mw.fasterDelivery')}</span>
               <span className="mw-config-delivery-fee">+{PRIORITY_SHIPPING_FEE_EGP} EGP</span>
             </span>
             <button
@@ -76,7 +79,7 @@ export const ConfigurationPanel = ({ request, isPrinting, activeConfigTab, confi
               className={`mw-toggle ${priorityShipping ? 'is-on' : ''}`}
               role="switch"
               aria-checked={priorityShipping}
-              aria-label="Delivery Priority"
+              aria-label={t('mw.deliveryPriority')}
               onClick={() => onPriorityShippingChange(!priorityShipping)}
             >
               <span className="mw-toggle-thumb" />
@@ -86,26 +89,29 @@ export const ConfigurationPanel = ({ request, isPrinting, activeConfigTab, confi
       </div>
     )}
   </PanelShell>
-);
+  );
+};
 
-const ConfigTabBasic = ({ request, isPrinting, onUpdate }: { request: RequestState; isPrinting: boolean; onUpdate: (p: Partial<RequestState>) => void }) => (
+const ConfigTabBasic = ({ request, isPrinting, onUpdate }: { request: RequestState; isPrinting: boolean; onUpdate: (p: Partial<RequestState>) => void }) => {
+  const { t } = useTranslation();
+  return (
   <div className="mw-stage-config-fields">
     {isPrinting && (
       <div className="mw-stage-config-field mw-profile-section">
-        <div className="mw-stage-config-section-title">Print Profile</div>
+        <div className="mw-stage-config-section-title">{t('mw.printProfile')}</div>
         <ConfigBasicProfiles request={request} onQualityChange={(q, tol, w) => onUpdate({ quality: q, tolerance: tol, wallCount: w, infillPercent: null })} />
       </div>
     )}
     {!isPrinting && (
       <>
         <div className="mw-stage-config-field">
-          <label className="mw-stage-config-label">Quality <RequiredMark /></label>
+          <label className="mw-stage-config-label">{t('mw.quality')} <RequiredMark /></label>
           <div className="mw-stage-btn-group">
             {['standard', 'high', 'premium'].map((v) => <button key={v} type="button" className={`mw-stage-btn ${request.quality === v ? 'is-active' : ''}`} onClick={() => onUpdate({ quality: v, infillPercent: null })}>{v}</button>)}
           </div>
         </div>
         <div className="mw-stage-config-field">
-          <label className="mw-stage-config-label">Surface Finish <RequiredMark /></label>
+          <label className="mw-stage-config-label">{t('mw.surfaceFinish')} <RequiredMark /></label>
           <div className="mw-stage-btn-group">
             {['standard', 'smooth'].map((v) => <button key={v} type="button" className={`mw-stage-btn ${request.finish === v ? 'is-active' : ''}`} onClick={() => onUpdate({ finish: v })}>{v}</button>)}
           </div>
@@ -113,9 +119,11 @@ const ConfigTabBasic = ({ request, isPrinting, onUpdate }: { request: RequestSta
       </>
     )}
   </div>
-);
+  );
+};
 
 const CustomInfillField = ({ value, presetInfill, onCommit }: { value: number | null | undefined; presetInfill: number; onCommit: (v: number) => void }) => {
+  const { t } = useTranslation();
   const [text, setText] = useState(value != null ? String(value) : String(presetInfill));
   useEffect(() => { if (value != null) setText(String(value)); }, [value]);
   const resetToCommitted = () => setText(value != null ? String(value) : String(presetInfill));
@@ -134,7 +142,7 @@ const CustomInfillField = ({ value, presetInfill, onCommit }: { value: number | 
         step={1}
         inputMode="numeric"
         value={text}
-        aria-label="Custom infill percentage"
+        aria-label={t('mw.customInfill')}
         onChange={(e) => {
           setText(e.target.value);
           const n = normalizeInfillInput(e.target.value);
@@ -155,43 +163,45 @@ const ConfigTabAdvanced = ({ request, isPrinting, selectedSupportEnabled, onUpda
   selectedSupportEnabled: boolean;
   onUpdate: (p: Partial<RequestState>) => void;
   onConfigUpdate: (u: Partial<FileConfiguration>) => void;
-}) => (
+}) => {
+  const { t } = useTranslation();
+  return (
   <div className="mw-stage-config-fields">
     {isPrinting && (
       <>
-        <div className="mw-stage-config-section-title">Infill &amp; Walls</div>
+        <div className="mw-stage-config-section-title">{t('mw.infillDensity')} &amp; {t('mw.wallCount')}</div>
         <div className="mw-stage-config-field">
-          <label className="mw-stage-config-label">Infill Density</label>
+          <label className="mw-stage-config-label">{t('mw.infillDensity')}</label>
           <div className="mw-stage-btn-group">
             {INFILL_OPTIONS.filter((o) => o.id !== 'heavyduty').map((o) => (
               <button key={o.id} type="button" data-infill-preset={o.infillPercent} className={`mw-stage-btn ${request.infillPercent == null && request.quality === o.id ? 'is-active' : ''}`} onClick={() => onUpdate({ quality: o.id, infillPercent: null })}>{o.infillPercent}%</button>
             ))}
             {request.infillPercent == null ? (
-              <button type="button" data-infill-custom className="mw-stage-btn" onClick={() => { onUpdate({ infillPercent: fdmParametersFor(request.quality, request.wallCount).infillPercent }); }}>Custom</button>
+              <button type="button" data-infill-custom className="mw-stage-btn" onClick={() => { onUpdate({ infillPercent: fdmParametersFor(request.quality, request.wallCount).infillPercent }); }}>{t('mw.custom')}</button>
             ) : (
               <CustomInfillField value={request.infillPercent ?? null} presetInfill={fdmParametersFor(request.quality, request.wallCount).infillPercent} onCommit={(v) => onUpdate({ infillPercent: v })} />
             )}
           </div>
         </div>
         <div className="mw-stage-config-field">
-          <label className="mw-stage-config-label">Wall Count</label>
+          <label className="mw-stage-config-label">{t('mw.wallCount')}</label>
           <div className="mw-stage-btn-group">
-            {WALL_OPTIONS.map((o) => <button key={o.walls} type="button" className={`mw-stage-btn ${request.wallCount === o.walls ? 'is-active' : ''}`} onClick={() => onUpdate({ wallCount: o.walls })}>{o.walls} wall{o.walls === 1 ? '' : 's'}</button>)}
+            {WALL_OPTIONS.map((o) => <button key={o.walls} type="button" className={`mw-stage-btn ${request.wallCount === o.walls ? 'is-active' : ''}`} onClick={() => onUpdate({ wallCount: o.walls })}>{o.walls} {o.walls === 1 ? t('mw.wall') : t('mw.walls')}</button>)}
           </div>
         </div>
         <div className="mw-stage-config-2col">
           <div className="mw-stage-config-field">
-            <label className="mw-stage-config-label">Layer Height</label>
+            <label className="mw-stage-config-label">{t('mw.layerHeight')}</label>
             <select className="form-control" value={request.quality} onChange={(e) => onUpdate({ quality: e.target.value, infillPercent: null })}>
               {INFILL_OPTIONS.filter((o) => o.id !== 'heavyduty').map((o) => <option key={o.id} value={o.id}>{o.layerHeightMm.toFixed(2)} mm</option>)}
               {request.quality === 'heavyduty' && <option value="heavyduty">0.10 mm</option>}
             </select>
           </div>
           <div className="mw-stage-config-field">
-            <label className="mw-stage-config-label">Support Structure</label>
+            <label className="mw-stage-config-label">{t('mw.supportStructure')}</label>
             <select className="form-control" value={selectedSupportEnabled ? 'yes' : 'no'} onChange={(e) => onConfigUpdate({ supportEnabled: e.target.value === 'yes' })}>
-              <option value="no">Off</option>
-              <option value="yes">On</option>
+              <option value="no">{t('mw.off')}</option>
+              <option value="yes">{t('mw.on')}</option>
             </select>
           </div>
         </div>
@@ -200,13 +210,13 @@ const ConfigTabAdvanced = ({ request, isPrinting, selectedSupportEnabled, onUpda
     {!isPrinting && (
       <>
         <div className="mw-stage-config-field">
-          <label className="mw-stage-config-label">Tolerance <RequiredMark /></label>
+          <label className="mw-stage-config-label">{t('mw.tolerance')} <RequiredMark /></label>
           <div className="mw-stage-btn-group">
             {['standard', 'precision'].map((v) => <button key={v} type="button" className={`mw-stage-btn ${request.tolerance === v ? 'is-active' : ''}`} onClick={() => onUpdate({ tolerance: v })}>{v}</button>)}
           </div>
         </div>
         <div className="mw-stage-config-field">
-          <label className="mw-stage-config-label">Surface Finish <RequiredMark /></label>
+          <label className="mw-stage-config-label">{t('mw.surfaceFinish')} <RequiredMark /></label>
           <div className="mw-stage-btn-group">
             {['standard', 'smooth'].map((v) => <button key={v} type="button" className={`mw-stage-btn ${request.finish === v ? 'is-active' : ''}`} onClick={() => onUpdate({ finish: v })}>{v}</button>)}
           </div>
@@ -214,7 +224,8 @@ const ConfigTabAdvanced = ({ request, isPrinting, selectedSupportEnabled, onUpda
       </>
     )}
   </div>
-);
+  );
+};
 
 const PROFILE_ICONS: Record<string, IconName> = {
   lightweight: 'layers3',
@@ -224,11 +235,12 @@ const PROFILE_ICONS: Record<string, IconName> = {
 };
 
 const ConfigBasicProfiles = ({ request, onQualityChange }: { request: RequestState; onQualityChange: (q: string, tolerance: string, wallCount: number) => void }) => {
+  const { t } = useTranslation();
   const profiles = [
-    { id: 'lightweight', quality: 'sparse', tolerance: 'standard', wallCount: 2, meta: '10% infill · 2 walls', description: 'Lightweight, decorative' },
-    { id: 'standard', quality: 'standard', tolerance: 'standard', wallCount: 3, meta: '15% infill · 3 walls', description: 'Standard daily prints', recommended: true },
-    { id: 'strong', quality: 'high', tolerance: 'precision', wallCount: 5, meta: '30% infill · 5 walls', description: 'Strong functional parts' },
-    { id: 'solid', quality: 'premium', tolerance: 'precision', wallCount: 5, meta: '100% infill · 5 walls', description: 'Maximum density parts' },
+    { id: 'lightweight', quality: 'sparse', tolerance: 'standard', wallCount: 2, nameKey: 'mw.profileLightweight', metaKey: 'mw.profileLightweightMeta', descKey: 'mw.profileLightweightDesc' },
+    { id: 'standard', quality: 'standard', tolerance: 'standard', wallCount: 3, nameKey: 'mw.profileStandard', metaKey: 'mw.profileStandardMeta', descKey: 'mw.profileStandardDesc', recommended: true },
+    { id: 'strong', quality: 'high', tolerance: 'precision', wallCount: 5, nameKey: 'mw.profileStrong', metaKey: 'mw.profileStrongMeta', descKey: 'mw.profileStrongDesc' },
+    { id: 'solid', quality: 'premium', tolerance: 'precision', wallCount: 5, nameKey: 'mw.profileSolid', metaKey: 'mw.profileSolidMeta', descKey: 'mw.profileSolidDesc' },
   ];
   const sel = profiles.find((p) => p.quality === request.quality && p.tolerance === request.tolerance && p.wallCount === request.wallCount) || profiles.find((p) => p.quality === request.quality && p.tolerance === request.tolerance) || profiles[1];
   return (
@@ -239,11 +251,11 @@ const ConfigBasicProfiles = ({ request, onQualityChange }: { request: RequestSta
           <button key={p.id} type="button" className={`mw-profile-item ${selected ? 'is-selected' : ''}`} aria-pressed={selected} onClick={() => onQualityChange(p.quality, p.tolerance, p.wallCount)}>
             <span className="mw-profile-head">
               <span className="mw-profile-icon" aria-hidden="true"><Icon name={PROFILE_ICONS[p.id]} size={14} /></span>
-              <span className="mw-profile-name">{p.id.charAt(0).toUpperCase() + p.id.slice(1)}</span>
+              <span className="mw-profile-name">{t(p.nameKey as any)}</span>
               {p.recommended && <span className="mw-profile-badge">REC</span>}
             </span>
-            <span className="mw-profile-tech">{p.meta}</span>
-            <span className="mw-profile-desc">{p.description}</span>
+            <span className="mw-profile-tech">{t(p.metaKey as any)}</span>
+            <span className="mw-profile-desc">{t(p.descKey as any)}</span>
             <span className={`mw-profile-check ${selected ? 'is-selected' : ''}`} aria-hidden="true">{selected && <Icon name="check" size={11} />}</span>
           </button>
         );

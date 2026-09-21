@@ -1,7 +1,16 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { Order, Quote, CadFile, ToastMessage, ViewType } from '../types';
+import React, { createContext, useContext, useRef, useState, useEffect, useCallback } from 'react';
+import { Order, Quote, CadFile, ToastMessage, ToastOptions, ToastType, ViewType } from '../types';
+import type { IconName } from '../components/ui/Icon';
 import { ApiService } from '../services/api';
 import { useAuth } from './AuthContext';
+import { AccountSection, isAccountSection, parseHash, writeHash } from '../routing/hashRouter';
+
+export interface SetViewOptions {
+  /** Account sub-section (only meaningful for the `profile` view). */
+  section?: AccountSection;
+  /** Replace the history entry instead of pushing (boot, redirects). */
+  replace?: boolean;
+}
 
 interface StoreContextType {
   orders: Order[];
@@ -12,7 +21,24 @@ interface StoreContextType {
   comparisonList: string[];
   toasts: ToastMessage[];
   activeView: ViewType;
-  setActiveView: (view: ViewType) => void;
+  setActiveView: (view: ViewType, options?: SetViewOptions) => void;
+  /** Account Settings sub-section (single source; synced with `#/account/*`). */
+  accountSection: AccountSection;
+  /** Deep-open a customer order detail inside the orders view. */
+  pendingOrderDetailId: string | null;
+  requestOrderDetail: (orderId: string) => void;
+  consumeOrderDetail: () => void;
+
+  // Footer-driven materials explorer preset (tech/category/search + nonce).
+  // Consumed once by MaterialsExplorer; never a URL param.
+  materialsPreset: { tech?: string; category?: string; search?: string; nonce: number } | null;
+  requestMaterialsPreset: (preset: { tech?: string; category?: string; search?: string }) => void;
+  consumeMaterialsPreset: () => void;
+
+  // Post-auth resume destination for auth-gated footer navigation.
+  // Set before opening the auth modal; AuthModal navigates here on success.
+  postAuthDestination: ViewType | null;
+  setPostAuthDestination: (view: ViewType | null) => void;
 
   // Modals state
   startManufacturingRequest: () => void;
@@ -51,20 +77,24 @@ interface StoreContextType {
   selectedAdminManufacturingRequestId: string | null;
   selectedAdminQuoteId: string | null;
   selectedAdminCadFileId: string | null;
+  selectedAdminCouponId: string | null;
   openAdminOrderDetail: (id: string) => void;
   openAdminCustomerDetail: (id: string) => void;
   openAdminManufacturerDetail: (id: string) => void;
   openAdminManufacturingRequestDetail: (id: string) => void;
   openAdminQuoteDetail: (id: string) => void;
+  openAdminDeletionRequests: () => void;
   openAdminCadFileDetail: (id: string) => void;
+  openAdminCouponDetail: (id: string) => void;
   closeAdminDetail: () => void;
+  submittedQuote: (Quote & Record<string, any>) | null;
+  setSubmittedQuote: (q: ((Quote & Record<string, any>) | null)) => void;
 
   // Actions
-  approveQuote: (quoteId: string) => void;
   addCadFile: (fileData: Partial<CadFile>) => CadFile;
   toggleComparison: (materialId: string) => void;
   clearComparison: () => void;
-  showToast: (title: string, message: string, type?: 'success' | 'error' | 'info' | 'warning') => void;
+  showToast: (title: string, message: string, type?: ToastType, options?: ToastOptions) => void;
   removeToast: (id: string) => void;
 }
 
@@ -72,7 +102,20 @@ const StoreContext = createContext<StoreContextType | undefined>(undefined);
 
 export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, currentUser } = useAuth();
-  const [activeView, setActiveView] = useState<ViewType>('home');
+  // Boot from the URL hash so refresh and direct links restore the view.
+  const [activeView, setActiveViewState] = useState<ViewType>(() => parseHash()?.view || 'home');
+  const [accountSection, setAccountSectionState] = useState<AccountSection>(() => parseHash()?.accountSection || 'personal');
+  const [pendingOrderDetailId, setPendingOrderDetailId] = useState<string | null>(null);
+
+  // Footer-driven navigation helpers (additive; existing flows untouched).
+  const [materialsPreset, setMaterialsPreset] = useState<{
+    tech?: string; category?: string; search?: string; nonce: number;
+  } | null>(null);
+  const requestMaterialsPreset = useCallback((preset: { tech?: string; category?: string; search?: string }) => {
+    setMaterialsPreset({ ...preset, nonce: Date.now() });
+  }, []);
+  const consumeMaterialsPreset = useCallback(() => setMaterialsPreset(null), []);
+  const [postAuthDestination, setPostAuthDestination] = useState<ViewType | null>(null);
 
   // Customer orders / quotes / CAD files are sourced from the database via the
   // API. They are NEVER seeded with demo data — empty until the user authenticates,
@@ -91,7 +134,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         ApiService.getCadFiles().catch(() => null),
       ]);
       if (freshOrders) setOrders(freshOrders);
-      if (freshQuotes) setQuotes(freshQuotes.filter((quote) => quote.status !== 'Approved'));
+      // Domain rule: converted Quotes have left the customer's active Quotes
+      // for Orders (`convertedOrderId IS NULL`). The API already scopes to
+      // active rows; this guards stale caches too. Approved-but-unconverted
+      // rows (if any) remain visible — only conversion moves a Quote out.
+      if (freshQuotes) setQuotes(freshQuotes.filter((quote) => !quote.convertedOrderId));
       if (freshFiles) setCadFiles(freshFiles);
     } finally {
       setIsCustomerDataLoading(false);
@@ -143,6 +190,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [selectedAdminManufacturingRequestId, setSelectedAdminManufacturingRequestId] = useState<string | null>(null);
   const [selectedAdminQuoteId, setSelectedAdminQuoteId] = useState<string | null>(null);
   const [selectedAdminCadFileId, setSelectedAdminCadFileId] = useState<string | null>(null);
+  const [selectedAdminCouponId, setSelectedAdminCouponId] = useState<string | null>(null);
+  const [submittedQuote, setSubmittedQuote] = useState<(Quote & Record<string, any>) | null>(null);
 
   // One-time cleanup: purge any legacy demo/localStorage order state written by
   // the previous dashboard implementation, so it can never resurface.
@@ -156,26 +205,140 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, []);
 
-  // Toast handler
-  const showToast = (title: string, message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
-    const id = `toast-${Date.now()}-${Math.random()}`;
-    const newToast: ToastMessage = { id, title, message, type };
-    setToasts((prev) => [...prev, newToast]);
+  // Toast handler — memoized so list-view data loaders that depend on it
+  // (useCallback + useEffect) keep a stable identity and do not refetch in
+  // a loop. It only uses refs plus the stable setToasts updater.
+  //
+  // Duplicate suppression: an identical visible toast (same type + title +
+  // message) never stacks — the existing instance is refreshed instead
+  // (timer + progress restart, no re-announcement storm). Distinct errors
+  // always produce their own toast; at most MAX_TOASTS are kept.
+  const toastTimers = useRef(new Map<string, number>());
+  const toastKeyById = useRef(new Map<string, string>());
+  const toastIdByKey = useRef(new Map<string, string>());
 
-    setTimeout(() => {
-      removeToast(id);
-    }, 4500);
-  };
+  const clearToastTimer = useCallback((id: string) => {
+    const timer = toastTimers.current.get(id);
+    if (timer !== undefined) {
+      clearTimeout(timer);
+      toastTimers.current.delete(id);
+    }
+  }, []);
 
-  const removeToast = (id: string) => {
+  const removeToast = useCallback((id: string) => {
+    clearToastTimer(id);
+    const key = toastKeyById.current.get(id);
+    if (key !== undefined) {
+      toastKeyById.current.delete(id);
+      if (toastIdByKey.current.get(key) === id) toastIdByKey.current.delete(key);
+    }
     setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, [clearToastTimer]);
+
+  // Timer hygiene for unmount (test harnesses, rare provider remounts).
+  useEffect(() => {
+    const timers = toastTimers.current;
+    return () => {
+      for (const timer of timers.values()) clearTimeout(timer);
+      timers.clear();
+    };
+  }, []);
+
+  const MAX_TOASTS = 6;
+  const DEFAULT_TOAST_DURATIONS: Record<ToastType, number> = {
+    success: 4500,
+    info: 4500,
+    warning: 6000,
+    error: 8000,
   };
+  const DEFAULT_TOAST_ICONS: Record<ToastType, IconName> = {
+    success: 'check',
+    error: 'alert',
+    warning: 'alert',
+    info: 'info',
+  };
+
+  const showToast = useCallback((
+    title: string,
+    message: string,
+    type: ToastType = 'info',
+    options?: ToastOptions,
+  ) => {
+    const durationMs = options?.durationMs ?? DEFAULT_TOAST_DURATIONS[type];
+    const key = `${type}|${title}|${message}`;
+    const now = Date.now();
+    const existingId = toastIdByKey.current.get(key);
+    if (existingId !== undefined) {
+      clearToastTimer(existingId);
+      const id = existingId;
+      toastTimers.current.set(id, window.setTimeout(() => removeToast(id), durationMs));
+      setToasts((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, durationMs, expiresAt: now + durationMs, repeat: t.repeat + 1 } : t))
+      );
+      return;
+    }
+    const id = `toast-${now}-${Math.random().toString(36).slice(2)}`;
+    const newToast: ToastMessage = {
+      id,
+      title,
+      message,
+      type,
+      icon: options?.icon ?? DEFAULT_TOAST_ICONS[type],
+      action: options?.action,
+      durationMs,
+      expiresAt: now + durationMs,
+      repeat: 0,
+    };
+    toastKeyById.current.set(id, key);
+    toastIdByKey.current.set(key, id);
+    toastTimers.current.set(id, window.setTimeout(() => removeToast(id), durationMs));
+    setToasts((prev) => [...prev, newToast].slice(-MAX_TOASTS));
+  }, [removeToast, clearToastTimer]);
+
+  // ── Hash-routed navigation ──────────────────────────────────────────
+  // Every view change writes a stable `#/...` hash (push → Back/Forward
+  // works); hash changes from Back/Forward/direct links map back to state.
+  const sectionRef = useRef<AccountSection>(accountSection);
+  sectionRef.current = accountSection;
+
+  const setActiveView = useCallback((view: ViewType, options?: SetViewOptions) => {
+    if (options?.section && isAccountSection(options.section)) {
+      setAccountSectionState(options.section);
+      sectionRef.current = options.section;
+    }
+    setActiveViewState(view);
+    writeHash(view, view === 'profile' ? options?.section || sectionRef.current : undefined, options?.replace);
+    window.scrollTo({ top: 0 });
+  }, []);
+
+  // Back/Forward buttons, direct links, and refresh restore.
+  useEffect(() => {
+    const onHashChange = () => {
+      const parsed = parseHash();
+      if (!parsed) return;
+      setActiveViewState(parsed.view);
+      if (parsed.view === 'profile') {
+        setAccountSectionState(parsed.accountSection);
+        sectionRef.current = parsed.accountSection;
+      }
+      window.scrollTo({ top: 0 });
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+
+  const requestOrderDetail = useCallback((orderId: string) => {
+    setPendingOrderDetailId(orderId);
+    setActiveViewState('orders');
+    writeHash('orders');
+    window.scrollTo({ top: 0 });
+  }, []);
+
+  const consumeOrderDetail = useCallback(() => setPendingOrderDetailId(null), []);
 
   // Modals controls
   const startManufacturingRequest = () => {
     if (activeView === 'manufacturing-request' || leavingToWorkspace) return;
-    if (window.location.pathname !== '/') window.history.pushState({}, '', '/');
-    window.scrollTo({ top: 0 });
     const fromLanding = activeView === 'home' && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (!fromLanding) {
       setActiveView('manufacturing-request');
@@ -186,9 +349,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const openComingSoon = () => {
-    if (window.location.pathname !== '/') {
-      window.history.pushState({}, '', '/');
-    }
     setActiveView('coming-soon');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -228,6 +388,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setSelectedAdminManufacturingRequestId(null);
     setSelectedAdminQuoteId(null);
     setSelectedAdminCadFileId(null);
+    setSelectedAdminCouponId(null);
   };
 
   const openAdminOrderDetail = (id: string) => {
@@ -260,45 +421,24 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setActiveView('admin-quote-detail');
   };
 
+  const openAdminDeletionRequests = () => {
+    closeAdminDetail();
+    setActiveView('admin-deletion-requests');
+  };
+
   const openAdminCadFileDetail = (id: string) => {
     closeAdminDetail();
     setSelectedAdminCadFileId(id);
     setActiveView('admin-cad-file-detail');
   };
 
-  // Data Actions
-  const approveQuote = async (quoteId: string) => {
-    const convert = async () => {
-      try {
-        const order = await ApiService.approveQuote(quoteId);
-        setQuotes((prev) => prev.filter((quote) => quote.id !== quoteId));
-        let ordersUpdated = false;
-        if (order && order.id) {
-          setOrders((prev) => [order, ...prev.filter((o) => o.id !== order.id)]);
-          ordersUpdated = true;
-        }
-        try {
-          const freshOrders = await ApiService.getOrders();
-          if (freshOrders) {
-            setOrders(freshOrders);
-            ordersUpdated = true;
-          }
-        } catch {
-          // Keep the converted order; the list refresh is best-effort.
-        }
-        return ordersUpdated;
-      } catch (error: any) {
-        showToast('Order Creation Failed', error?.message || 'Could not convert the quote to an order.', 'error');
-        return false;
-      }
-    };
-
-    const converted = await convert();
-    if (converted) {
-      showToast('Quote Converted to Order', `Quote ${quoteId} approved and transferred to automated manufacturing queue.`, 'success');
-    }
+  const openAdminCouponDetail = (id: string) => {
+    closeAdminDetail();
+    setSelectedAdminCouponId(id);
+    setActiveView('admin-discount-code-detail');
   };
 
+  // Data Actions
   const addCadFile = (fileData: Partial<CadFile>): CadFile => {
     const newFile: CadFile = {
       id: `file-${Date.now()}`,
@@ -343,6 +483,15 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         toasts,
         activeView,
         setActiveView,
+        accountSection,
+        pendingOrderDetailId,
+        requestOrderDetail,
+        consumeOrderDetail,
+        materialsPreset,
+        requestMaterialsPreset,
+        consumeMaterialsPreset,
+        postAuthDestination,
+        setPostAuthDestination,
 
         startManufacturingRequest,
         leavingToWorkspace,
@@ -383,10 +532,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         openAdminManufacturerDetail,
         openAdminManufacturingRequestDetail,
         openAdminQuoteDetail,
+        openAdminDeletionRequests,
         openAdminCadFileDetail,
+        openAdminCouponDetail,
         closeAdminDetail,
+        selectedAdminCouponId,
+        submittedQuote,
+        setSubmittedQuote,
 
-        approveQuote,
         addCadFile,
         toggleComparison,
         clearComparison,

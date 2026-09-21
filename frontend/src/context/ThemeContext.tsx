@@ -48,6 +48,17 @@ export const ThemeProvider: React.FC<React.PropsWithChildren> = ({ children }) =
     setPreference(nextPreference);
   };
 
+  // Cross-device sync: AuthProvider dispatches this event when the signed-in
+  // user's persisted theme preference differs from local storage.
+  useEffect(() => {
+    const sync = (event: Event) => {
+      const next = (event as CustomEvent<ThemePreference>).detail;
+      if (next === 'light' || next === 'dark' || next === 'system') handlePreference(next);
+    };
+    window.addEventListener('cam-labs-theme-preference', sync);
+    return () => window.removeEventListener('cam-labs-theme-preference', sync);
+  }, []);
+
   return (
     <ThemeContext.Provider value={{ preference, resolvedTheme, setPreference: handlePreference }}>
       {children}

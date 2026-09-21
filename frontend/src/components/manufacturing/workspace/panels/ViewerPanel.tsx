@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { CadGeometryData } from '../../../../services/api';
 import { Icon } from '../../../ui/Icon';
 import { ErrorBoundary } from '../../../ui/ErrorBoundary';
@@ -13,12 +14,14 @@ export const ViewerPanel = ({ status, activeItem, fileSetupStates, materialId, c
   materialId: string | null;
   colorId: string | null;
   onGeometry: (g: CadGeometryData, id: string) => void;
-}) => (
+}) => {
+  const { t } = useTranslation();
+  return (
   <PanelShell
     id={panelIds.viewer}
     icon="cube"
-    title="3D Model Viewer"
-    subtitle="Inspect your model before production"
+    title={t('mw.viewer')}
+    subtitle={t('mw.viewerSub')}
     status={status}
     className="mw-panel-viewer"
   >
@@ -29,9 +32,9 @@ export const ViewerPanel = ({ status, activeItem, fileSetupStates, materialId, c
           fallback={(error, retry) => (
             <div className="mw-stage-viewer-empty" role="alert">
               <span className="mw-stage-viewer-empty-icon"><Icon name="cube" size={22} /></span>
-              <span className="mw-stage-viewer-empty-text">The 3D viewer could not start on this device.</span>
+              <span className="mw-stage-viewer-empty-text">{t('mw.viewerFailed')}</span>
               <span className="mw-stage-viewer-empty-hint">{error.message || 'WebGL may be unavailable or a graphics driver failed.'}</span>
-              <button type="button" className="mw-btn mw-btn-secondary" onClick={retry}>Retry viewer</button>
+              <button type="button" className="mw-btn mw-btn-secondary" onClick={retry}>{t('mw.retryViewer')}</button>
             </div>
           )}
         >
@@ -48,9 +51,10 @@ export const ViewerPanel = ({ status, activeItem, fileSetupStates, materialId, c
     ) : (
       <div className="mw-stage-viewer-empty">
         <span className="mw-stage-viewer-empty-icon"><Icon name="cube" size={22} /></span>
-        <span className="mw-stage-viewer-empty-text">Upload a CAD file to preview your model.</span>
-        <span className="mw-stage-viewer-empty-hint">After uploading, rotate, pan, zoom and inspect your part in 3D.</span>
+        <span className="mw-stage-viewer-empty-text">{t('mw.viewerEmpty')}</span>
+        <span className="mw-stage-viewer-empty-hint">{t('mw.viewerEmptyHint')}</span>
       </div>
     )}
   </PanelShell>
-);
+  );
+};

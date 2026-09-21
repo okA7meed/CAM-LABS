@@ -1,0 +1,45 @@
+import { chromium } from 'playwright';
+const BASE = 'http://localhost:3000';
+const results = [];
+const check = (n, c, e = '') => results.push(`${c ? 'PASS' : 'FAIL'}  ${n}${e ? '  — ' + e : ''}`);
+const browser = await chromium.launch();
+const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, colorScheme: 'dark' });
+const page = await context.newPage();
+const errs = [];
+page.on('console', (msg) => { if (msg.type() === 'error' && !msg.text().includes('style property')) errs.push(msg.text().slice(0, 120)); });
+await page.goto(BASE, { waitUntil: 'networkidle' });
+await page.waitForTimeout(800);
+await page.click('.header-sign-in');
+await page.waitForSelector('#auth-title-login', { timeout: 10000 });
+await page.click(".auth-switch button");
+await page.waitForSelector('#auth-title-register', { timeout: 10000 });
+const stamp = Date.now();
+await page.getByLabel(/full name/i).fill('Ui Regtest');
+await page.getByLabel(/email/i).first().fill(`uireg-${stamp}@example.com`);
+await page.locator('#auth-register-phone').fill('1012345678');
+await page.getByLabel(/^password/i).fill('UiRegPass12');
+const confirm = page.getByLabel(/confirm/i);
+if ((await confirm.count()) > 0) await confirm.fill('UiRegPass12');
+const terms = page.locator(".auth-form input[type='checkbox']").first();
+if ((await terms.count()) > 0 && !(await terms.isChecked())) await terms.check({ force: true }).catch(() => {});
+await page.screenshot({ path: '/tmp/qa5-register.png' });
+await page.locator(".auth-form button[type='submit']").first().click();
+await page.waitForTimeout(2500);
+const logged = await page.isVisible('.user-profile-chip');
+check('UI registration with shared phone input logs in', logged);
+if (logged) {
+  const me = await (await context.request.get(`${BASE}/api/v1/auth/me`)).json();
+  check('registered phone stored E.164', me.data && me.data.phone === '+201012345678', me.data && me.data.phone);
+}
+// QR modal settled screenshot
+await page.click('.user-profile-chip');
+await page.waitForSelector('.account-settings-page', { timeout: 20000 });
+await page.click("button.account-nav-item:has-text('Security')");
+await page.click("button:has-text('Enable 2FA')");
+await page.waitForSelector('.account-2fa-qr img', { timeout: 15000 });
+await page.waitForTimeout(1800);
+await page.screenshot({ path: '/tmp/qa5-qr-settled.png' });
+await context.close();
+await browser.close();
+console.log(results.join('\n'));
+console.log('ERRORS:', errs.length ? errs : 'none');

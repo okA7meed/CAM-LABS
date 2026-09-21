@@ -1,0 +1,14 @@
+import { chromium } from 'playwright';
+const browser = await chromium.launch();
+const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, colorScheme: 'dark' });
+const page = await ctx.newPage();
+await ctx.request.post('http://localhost:3000/api/v1/auth/login', { data: { email: 'qamatrix1789997801861@example.com', password: 'TestPass123!' } });
+await page.goto('http://localhost:3000/#dashboard', { waitUntil: 'networkidle' });
+await page.waitForTimeout(2000);
+const base = await page.evaluate(() => document.documentElement.scrollWidth);
+await page.evaluate(() => { document.querySelector('.beta-announcement-bar')?.remove(); });
+await page.waitForTimeout(300);
+const noBeta = await page.evaluate(() => document.documentElement.scrollWidth);
+await page.evaluate(() => { document.querySelector('.order-center::before'); });
+console.log('scrollWidth with beta:', base, '| without beta:', noBeta);
+await browser.close();

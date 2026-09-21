@@ -185,15 +185,25 @@ export class QuotesService {
   }
 
   /**
-   * Get all quotations
+   * Get all quotations.
+   *
+   * Customer scope (userId set): only ACTIVE quotes — converted quotes
+   * (`convertedOrderId NOT NULL`) have left the customer's Quotes and live
+   * on as Orders. The row is preserved for audit/admin history, but the
+   * domain layer never returns it as an active customer Quote.
+   * Each row carries its PENDING deletion request (if any) so the client can
+   * render "Deletion Requested" without a second round-trip.
    */
   static async getAllQuotes(userId?: string): Promise<Quote[]> {
     const prisma = getPrismaClient();
     if (userId) {
-      return prisma.quote.findMany({
-        where: { userId },
+      return (prisma as any).quote.findMany({
+        where: { userId, convertedOrderId: null },
         orderBy: { createdAt: 'desc' },
-        include: { technicalDocuments: true },
+        include: {
+          technicalDocuments: true,
+          deletionRequests: { where: { status: 'PENDING' }, orderBy: { requestedAt: 'desc' }, take: 1 },
+        },
       });
     }
     return prisma.quote.findMany({ orderBy: { createdAt: 'desc' }, include: { technicalDocuments: true } });
@@ -204,7 +214,14 @@ export class QuotesService {
    */
   static async getQuoteById(id: string) {
     const prisma = getPrismaClient();
-    return prisma.quote.findUnique({ where: { id }, include: { technicalDocuments: true } });
+    return (prisma as any).quote.findUnique({
+      where: { id },
+      include: {
+        technicalDocuments: true,
+        messages: { orderBy: { createdAt: 'asc' } },
+        deletionRequests: { where: { status: 'PENDING' }, orderBy: { requestedAt: 'desc' }, take: 1 },
+      },
+    });
   }
 
   /**

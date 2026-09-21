@@ -255,7 +255,95 @@ export class AdminService {
       prisma.adminNotification.count({ where }),
     ]);
 
-    return { notifications, total };
+    // Backward-compatible per-category totals over the SAME visibility
+    // scope as the list, but independent of the list's own type/unreadOnly
+    // filters — tab badges and summary cards must reflect global truth.
+    // Category taxonomy mirrors the frontend mapping exactly:
+    // QUOTE → quotes, ORDER → orders, USER_* → customers,
+    // everything else → system. Payment rows are counted inside system
+    // because no dedicated payment tab exists.
+    const visibilityOR = where.OR;
+    const scoped = (extra: Prisma.AdminNotificationWhereInput) =>
+      prisma.adminNotification.count({ where: { OR: visibilityOR, ...extra } });
+    const foldUnread = (rows: Array<{ type: string; _count: { _all: number } }>) => {
+      const out = { quotes: 0, orders: 0, customers: 0 };
+      for (const row of rows) {
+        if (row.type === 'QUOTE') out.quotes += row._count._all;
+        else if (row.type === 'ORDER') out.orders += row._count._all;
+        else if (row.type === 'USER_REGISTERED' || row.type === 'USER_LOGIN') out.customers += row._count._all;
+      }
+      return out;
+    };
+    const [unread, quotes, orders, customers, unreadByType] = await Promise.all([
+      scoped({ isRead: false }),
+      scoped({ type: 'QUOTE' }),
+      scoped({ type: 'ORDER' }),
+      scoped({ type: { in: ['USER_REGISTERED', 'USER_LOGIN'] } }),
+      prisma.adminNotification.groupBy({
+        by: ['type'],
+        where: { OR: visibilityOR, isRead: false },
+        _count: { _all: true },
+      }),
+    ]);
+    const unreadFolded = foldUnread(unreadByType);
+    const system = Math.max(0, total - quotes - orders - customers);
+    const systemUnread = Math.max(0, unread - unreadFolded.quotes - unreadFolded.orders - unreadFolded.customers);
+
+    // Resolve canonical business references for quote/order notifications
+    // whose stored metadata predates the unified CAM reference model.
+    // Read-only enrichment: rows are never rewritten. Missing/deleted
+    // entities resolve to null and the UI falls back gracefully.
+    const withReferences = await AdminService.attachResolvedReferences(notifications);
+
+    return {
+      notifications: withReferences,
+      total,
+      counts: {
+        total,
+        unread,
+        quotes,
+        orders,
+        customers,
+        system,
+        quotesUnread: unreadFolded.quotes,
+        ordersUnread: unreadFolded.orders,
+        customersUnread: unreadFolded.customers,
+        systemUnread,
+      },
+    };
+  }
+
+  /**
+   * Attach the authoritative current business reference to quote/order
+   * notifications. Historical rows created before the unified CAM reference
+   * carry only the internal RFQ id — resolving against the live Quote/Order
+   * rows lets the UI display one stable reference without touching history.
+   */
+  static async attachResolvedReferences<T extends { type: string; entityId?: string | null; metadata?: any }>(
+    notifications: T[]
+  ): Promise<Array<T & { resolvedReference: string | null }>> {
+    const prisma = getPrismaClient();
+    const quoteIds = [...new Set(notifications.filter((n) => n.type === 'QUOTE' && n.entityId).map((n) => n.entityId as string))];
+    const orderIds = [...new Set(notifications.filter((n) => n.type === 'ORDER' && n.entityId).map((n) => n.entityId as string))];
+    const [quotes, orders] = await Promise.all([
+      quoteIds.length > 0
+        ? prisma.quote.findMany({ where: { id: { in: quoteIds } }, select: { id: true, reference: true } })
+        : Promise.resolve([] as Array<{ id: string; reference: string | null }>),
+      orderIds.length > 0
+        ? prisma.order.findMany({ where: { id: { in: orderIds } }, select: { id: true, reference: true } })
+        : Promise.resolve([] as Array<{ id: string; reference: string | null }>),
+    ]);
+    const quoteRefs = new Map(quotes.map((q) => [q.id, q.reference]));
+    const orderRefs = new Map(orders.map((o) => [o.id, o.reference]));
+    return notifications.map((n) => ({
+      ...n,
+      resolvedReference:
+        n.type === 'QUOTE' && n.entityId
+          ? quoteRefs.get(n.entityId) ?? null
+          : n.type === 'ORDER' && n.entityId
+            ? orderRefs.get(n.entityId) ?? (n.entityId as string)
+            : null,
+    }));
   }
 
   /** Fetch a single notification visible to the given admin (own or global). */

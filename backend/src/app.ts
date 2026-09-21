@@ -19,6 +19,8 @@ import pricingAdminRoutes from './routes/pricing-admin.routes';
 import adminRoutes from './routes/admin.routes';
 import adminReportsRoutes from './routes/admin-reports.routes';
 import adminSettingsRoutes from './routes/admin-settings.routes';
+import adminCouponsRoutes from './routes/admin-coupons.routes';
+import adminShippingRoutes from './routes/admin-shipping.routes';
 
 export const createApp = (): Application => {
   const app = express();
@@ -29,11 +31,14 @@ export const createApp = (): Application => {
     useDefaults: true,
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'"],
+      // Google Identity Services SDK + its relay frames. GIS is loaded
+      // lazily only when the user clicks "Continue with Google".
+      scriptSrc: ["'self'", 'https://accounts.google.com', 'https://apis.google.com'],
       styleSrc: ["'self'", "'unsafe-inline'"],
       imgSrc: ["'self'", "data:", "blob:", "https:"],
       fontSrc: ["'self'", "data:"],
-      connectSrc: ["'self'"],
+      connectSrc: ["'self'", 'https://accounts.google.com', 'https://oauth2.googleapis.com'],
+      frameSrc: ["'self'", 'https://accounts.google.com'],
       objectSrc: ["'none'"],
       frameAncestors: ["'self'"],
       baseUri: ["'self'"],
@@ -87,6 +92,38 @@ if (process.env.NODE_ENV === 'production') {
   });
   app.use('/api/v1/auth/login', authLimiter);
   app.use('/api/v1/auth/register', authLimiter);
+  app.use('/api/v1/auth/google', authLimiter);
+
+  // Password-reset endpoints carry their own budgets on top of the
+  // service-level protections (per-email cooldown, 5-attempt OTP lock):
+  // forgot-password is the email-bombing surface, verify is brute-force
+  // bounded per challenge, reset is the credential-changing surface.
+  const forgotPasswordLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { success: false, error: { code: 'AUTH_RATE_LIMIT', message: 'Too many reset requests. Please try again later.' } },
+  });
+  app.use('/api/v1/auth/forgot-password', forgotPasswordLimiter);
+
+  const verifyCodeLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 60,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { success: false, error: { code: 'AUTH_RATE_LIMIT', message: 'Too many verification attempts. Please try again later.' } },
+  });
+  app.use('/api/v1/auth/verify-reset-code', verifyCodeLimiter);
+
+  const resetPasswordLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { success: false, error: { code: 'AUTH_RATE_LIMIT', message: 'Too many password changes. Please try again later.' } },
+  });
+  app.use('/api/v1/auth/reset-password', resetPasswordLimiter);
 
   // ─── Request Logging ──────────────────────────────────────────────
   app.use((req, _res, next) => {
@@ -104,6 +141,8 @@ if (process.env.NODE_ENV === 'production') {
   app.use('/api/v1/technical-documents', technicalDocumentsRoutes);
   app.use('/api/v1/manufacturing', manufacturingRoutes);
   app.use('/api/v1/admin/pricing', pricingAdminRoutes);
+  app.use('/api/v1/admin/coupons', adminCouponsRoutes);
+  app.use('/api/v1/admin/shipping', adminShippingRoutes);
   app.use('/api/v1/admin', adminRoutes);
   app.use('/api/v1/admin/reports', adminReportsRoutes);
   app.use('/api/v1/admin/settings', adminSettingsRoutes);

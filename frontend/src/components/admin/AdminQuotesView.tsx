@@ -43,12 +43,13 @@ const QUOTE_TONES: Record<string, StatusTone> = {
 
 export const AdminQuotesView: React.FC = () => {
   const { t } = useTranslation();
-  const { showToast, openAdminQuoteDetail } = useStore();
+  const { openAdminQuoteDetail, openAdminDeletionRequests } = useStore();
 
   const [quotes, setQuotes] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [stats, setStats] = useState<QuoteStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [initialized, setInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [status, setStatus] = useState('');
@@ -75,13 +76,16 @@ export const AdminQuotesView: React.FC = () => {
       setQuotes(data.data.quotes ?? []);
       setTotal(data.data.total ?? 0);
       if (data.data.stats) setStats(data.data.stats);
+      setInitialized(true);
     } catch (err: any) {
+      // Inline ErrorState with Retry is the single error surface for list
+      // loading — no per-failure toast, so repeated failures can never stack
+      // into a toast storm.
       setError(err.message || String(err));
-      showToast('Error', err.message || t('admin.lists.failedToLoad'), 'error');
     } finally {
       setLoading(false);
     }
-  }, [page, status, search, t, showToast]);
+  }, [page, status, search, t]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -113,7 +117,7 @@ export const AdminQuotesView: React.FC = () => {
   const tableCols = 12;
 
   return (
-    <AdminLayout title={t('admin.quotes.title')} subtitle={t('admin.quotes.subtitle', { total })}>
+    <AdminLayout title={t('admin.quotes.title')} subtitle={t('admin.quotes.subtitle', { total: initialized ? total : '…' })}>
       <div className="admin-section">
         {stats && (
           <div className="admin-kpi-grid">
@@ -144,6 +148,9 @@ export const AdminQuotesView: React.FC = () => {
               {t('admin.lists.clearFilters')}
             </Button>
           )}
+          <Button variant="outline" size="sm" icon="trash" onClick={() => openAdminDeletionRequests()}>
+            Deletion Requests
+          </Button>
         </div>
 
         {hasActiveFilters && (
@@ -181,7 +188,7 @@ export const AdminQuotesView: React.FC = () => {
                     ) : (
                       quotes.map((q: any) => (
                         <tr key={q.id}>
-                          <td className="mono-primary">{q.id}</td>
+                          <td className="mono-primary" title={q.id}>{q.reference || q.id}</td>
                           <td>{q.user?.name || '—'}</td>
                           <td>{q.partName}</td>
                           <td><TechBadge label={q.technology} /></td>

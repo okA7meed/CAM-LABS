@@ -25,7 +25,9 @@
     "express": "^4.18.2",
     "express-rate-limit": "^7.1.5",
     "helmet": "^7.1.0",
+    "libphonenumber-js": "^1.13.13",
     "opencascade.js": "^2.0.0-beta.b5ff984",
+    "resend": "^6.28.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {

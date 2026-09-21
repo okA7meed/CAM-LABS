@@ -13,6 +13,9 @@ export interface AuthenticatedUser {
   address: string | null;
   taxId: string | null;
   preferences: unknown;
+  twoFactorEnabled: boolean;
+  /** Whether a password credential exists (false for OAuth-only accounts). */
+  hasPassword: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -31,15 +34,36 @@ declare global {
 }
 
 export const toSafeUser = (
-  user: Omit<AuthenticatedUser, 'role'> & { role: string; passwordHash?: string | null; isAdmin?: boolean }
+  user: Omit<AuthenticatedUser, 'role' | 'hasPassword'> & {
+    role: string;
+    passwordHash?: string | null;
+    isAdmin?: boolean;
+    // Stable Google subject — server-only identity linkage, never exposed.
+    googleSub?: string | null;
+    // Server-only 2FA material — stripped from every API response.
+    twoFactorSecret?: string | null;
+    twoFactorPendingSecret?: string | null;
+    twoFactorPendingExpiresAt?: Date | null;
+    twoFactorBackupCodes?: unknown;
+  }
 ): AuthenticatedUser => {
-  const { passwordHash: _passwordHash, ...safeUser } = user;
+  const {
+    passwordHash,
+    googleSub: _googleSub,
+    twoFactorSecret: _twoFactorSecret,
+    twoFactorPendingSecret: _twoFactorPendingSecret,
+    twoFactorPendingExpiresAt: _twoFactorPendingExpiresAt,
+    twoFactorBackupCodes: _twoFactorBackupCodes,
+    ...safeUser
+  } = user;
   let role = normalizeRoleForResponse(user.role);
   if (role === 'CUSTOMER' && user.isAdmin) {
     role = 'ADMIN';
   }
   return {
     ...safeUser,
+    twoFactorEnabled: Boolean((user as { twoFactorEnabled?: boolean }).twoFactorEnabled),
+    hasPassword: Boolean(passwordHash),
     role,
   };
 };

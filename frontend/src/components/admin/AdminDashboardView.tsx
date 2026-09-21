@@ -20,7 +20,7 @@ const RANGES: Array<{ key: DashboardRange; labelKey: string }> = [
 
 const KpiSkeleton: React.FC = () => (
   <div className="kpi-grid" aria-hidden="true">
-    {Array.from({ length: 6 }).map((_, i) => (
+    {Array.from({ length: 5 }).map((_, i) => (
       <div key={i} className="kpi-card skeleton-block" />
     ))}
   </div>
@@ -107,14 +107,6 @@ export const AdminDashboardView: React.FC = () => {
             icon="file"
             tone="cyan"
             spark={s!.trends.quotes}
-          />
-          <StatCard
-            title={t('admin.dashboard.cadFiles')}
-            value={s!.cadFiles.total.toLocaleString()}
-            subtitle={t('admin.dashboard.cadSub')}
-            icon="cube"
-            tone="purple"
-            spark={s!.trends.cadFiles}
           />
           <StatCard
             title={t('admin.dashboard.manufacturers')}

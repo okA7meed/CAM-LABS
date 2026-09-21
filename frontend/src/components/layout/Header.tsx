@@ -1,15 +1,19 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useStore } from '../../context/StoreContext';
+import { useMarketplace } from '../../context/MarketplaceContext';
 import { ViewType } from '../../types';
 import { Logo } from './Logo';
 import { HeaderPreferences } from './HeaderPreferences';
 import { UserAvatar, getUserAvatarColor } from '../ui/UserAvatar';
+import { Icon } from '../ui/Icon';
 import { useTranslation } from 'react-i18next';
 import { isRequestFlowView } from '../../constants/navigation';
+import { enterAdminPath, resetPathname } from '../../routing/hashRouter';
 
 interface HeaderProps {
   onToggleMobileNav: () => void;
+  mobileNavOpen: boolean;
 }
 
 // Sections tracked on the landing page for scroll-aware nav highlighting
@@ -21,14 +25,29 @@ const SCROLL_SECTIONS: Array<{ id: string; view: ViewType }> = [
   { id: 'about', view: 'about' },
 ];
 
-const NON_LANDING_VIEWS: ViewType[] = ['dashboard', 'profile', 'marketplace', 'manufacturing-request', 'coming-soon', 'equation-builder'];
+const NON_LANDING_VIEWS: ViewType[] = ['dashboard', 'orders', 'profile', 'marketplace', 'manufacturing-request', 'coming-soon', 'equation-builder'];
 
-export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav }) => {
+export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav, mobileNavOpen }) => {
   const { currentUser, isAuthenticated, logout } = useAuth();
   const { activeView, setActiveView, startManufacturingRequest, openAuthModal } = useStore();
+  const {
+    subView,
+    goToListing,
+    openFavorites,
+    openCart,
+    favorites,
+    itemCount,
+    searchQuery,
+    setSearchQuery,
+  } = useMarketplace();
   const { t } = useTranslation();
   const [scrolled, setScrolled] = useState(false);
   const navRef = useRef<HTMLElement | null>(null);
+
+  // Marketplace navigation mode: same Navbar shell, marketplace content.
+  // Active while the user is inside listing, product, favorites, cart, or
+  // marketplace search — restored to normal content on exit.
+  const isMarketplace = activeView === 'marketplace';
 
   useEffect(() => {
     const handleScroll = () => {
@@ -93,15 +112,25 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav }) => {
 
   const isAdmin = isAuthenticated && Boolean(currentUser?.role?.includes('ADMIN'));
 
+  const handleMarketplaceSearch = (query: string) => {
+    // Searching always targets the listing; move there if the user is in a
+    // product, cart, or favorites sub-view.
+    if (subView !== 'listing') goToListing();
+    setSearchQuery(query);
+  };
+
   const handleNavClick = (view: ViewType, sectionId?: string) => {
     if (view === 'admin-dashboard' || (view === 'dashboard' && isAdmin)) {
-      window.history.pushState({}, '', '/admin');
+      // Real `/admin` pathname is server-routed; preserve the view hash.
+      if (window.location.pathname !== '/admin') {
+        enterAdminPath();
+      }
       setActiveView('admin-dashboard');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
     if (window.location.pathname !== '/') {
-      window.history.pushState({}, '', '/');
+      resetPathname();
     }
     setActiveView(view);
     if (view === 'dashboard' || view === 'profile') {
@@ -134,6 +163,14 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav }) => {
     },
   ];
 
+  // Marketplace mode keeps the identical shell (brand, actions, CTA, prefs)
+  // and only swaps the navigation content: Marketplace root, Manufacturing
+  // destination, Favorites, Cart, and product search.
+  const marketplaceNavItems: Array<{ label: string; view: ViewType; sectionId?: string; onSelect?: () => void }> = [
+    { label: t('nav.marketplace'), view: 'marketplace', onSelect: goToListing },
+    { label: t('nav.manufacturing'), view: 'materials', sectionId: 'materials-section' },
+  ];
+
   return (
     <header className={`cam-header ${scrolled ? 'scrolled' : ''}${isInsideRequestFlow ? ' cam-header--compact' : ''}`}>
       <div className="container header-container">
@@ -149,23 +186,85 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav }) => {
         </a>
 
         <nav className="desktop-nav" aria-label={t('nav.main')} ref={navRef}>
-          {navigationItems.map(({ label, view, sectionId }) => (
-            <a
-              key={view}
-              href={`#${sectionId || view}`}
-              className="nav-link"
-              aria-current={activeView === view ? 'page' : undefined}
-              onClick={(event) => {
-                event.preventDefault();
-                handleNavClick(view, sectionId);
-              }}
-            >
-              {label}
-            </a>
-          ))}
+          {isMarketplace
+            ? marketplaceNavItems.map(({ label, view, sectionId, onSelect }) => (
+              <a
+                key={view}
+                href={`#${sectionId || view}`}
+                className="nav-link"
+                aria-current={activeView === view ? 'page' : undefined}
+                onClick={(event) => {
+                  event.preventDefault();
+                  if (onSelect) {
+                    resetPathname();
+                    setActiveView('marketplace');
+                    onSelect();
+                  } else {
+                    handleNavClick(view, sectionId);
+                  }
+                }}
+              >
+                {label}
+              </a>
+            ))
+            : navigationItems.map(({ label, view, sectionId }) => (
+              <a
+                key={view}
+                href={`#${sectionId || view}`}
+                className="nav-link"
+                aria-current={activeView === view ? 'page' : undefined}
+                onClick={(event) => {
+                  event.preventDefault();
+                  handleNavClick(view, sectionId);
+                }}
+              >
+                {label}
+              </a>
+            ))}
         </nav>
 
         <div className="header-actions">
+          {isMarketplace && (
+            <>
+              <div className="mk-nav-search" role="search">
+                <Icon name="search" size={16} className="mk-nav-search-icon" />
+                <label className="mk-search-label" htmlFor="mk-nav-search-input">{t('market.searchLabel')}</label>
+                <input
+                  id="mk-nav-search-input"
+                  className="mk-nav-search-input"
+                  type="search"
+                  value={searchQuery}
+                  onChange={(event) => handleMarketplaceSearch(event.target.value)}
+                  placeholder={t('market.searchPlaceholder')}
+                  aria-label={t('market.searchLabel')}
+                />
+              </div>
+              <button
+                type="button"
+                className={`nav-icon-button mk-nav-btn${subView === 'favorites' ? ' active' : ''}`}
+                onClick={openFavorites}
+                aria-label={favorites.size > 0 ? `${t('market.favorites')} (${favorites.size})` : t('market.favorites')}
+                title={t('market.favorites')}
+              >
+                <Icon name="heart" size={18} />
+                {favorites.size > 0 && (
+                  <span className="mk-count-badge" aria-hidden="true">{favorites.size}</span>
+                )}
+              </button>
+              <button
+                type="button"
+                className={`nav-icon-button mk-nav-btn${subView === 'cart' ? ' active' : ''}`}
+                onClick={openCart}
+                aria-label={itemCount > 0 ? `${t('market.cart')} (${itemCount})` : t('market.cart')}
+                title={t('market.cart')}
+              >
+                <Icon name="cart" size={18} />
+                {itemCount > 0 && (
+                  <span className="mk-count-badge" aria-hidden="true">{itemCount}</span>
+                )}
+              </button>
+            </>
+          )}
           <HeaderPreferences />
           {isAuthenticated && currentUser && (
             <button
@@ -218,6 +317,8 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav }) => {
             className="mobile-nav-toggle"
             onClick={onToggleMobileNav}
             aria-label={t('nav.openMenu')}
+            aria-expanded={mobileNavOpen}
+            aria-controls="mobile-nav-drawer"
           >
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <line x1="3" y1="12" x2="21" y2="12" />

@@ -20,7 +20,17 @@ model User {
   address       String?
   taxId         String?
   passwordHash  String?
+  // Stable Google Identity Services subject. Lets email changes stay safe
+  // for OAuth users: Google sign-in matches by sub first, email second.
+  googleSub     String?   @unique
   preferences   Json?     // { units: "mm", toleranceStandard: "ISO 2768-fine", ... }
+  // Two-factor authentication (TOTP). Secrets are server-only and never
+  // exposed via toSafeUser; only twoFactorEnabled is visible to clients.
+  twoFactorEnabled          Boolean   @default(false)
+  twoFactorSecret           String?
+  twoFactorPendingSecret    String?
+  twoFactorPendingExpiresAt DateTime?
+  twoFactorBackupCodes      Json?     // sha256 hashes of single-use backup codes
   lastActivityAt DateTime?
   // Admin-specific fields
   isAdmin       Boolean   @default(false)
@@ -29,6 +39,12 @@ model User {
   lastLoginAt   DateTime?
   failedLoginAttempts Int @default(0)
   lockedUntil   DateTime?
+  governorate   String?
+  city          String?
+  addressLine1  String?
+  addressLine2  String?
+  postalCode    String?
+  country       String?   @default("Egypt")
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -37,9 +53,12 @@ model User {
   cadFiles      CadFile[]
   technicalDocuments TechnicalDocument[]
   sessions      Session[]
+  passwordResetChallenges PasswordResetChallenge[]
+  emailChangeChallenges EmailChangeChallenge[]
   auditLogs     AuditLog[]
   notifications AdminNotification[]
   payments      Payment[]
+  couponUsages  CouponUsage[]
 
   @@index([role])
   @@index([accountStatus])
@@ -52,6 +71,10 @@ model Session {
   tokenHash String   @unique
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Device metadata captured at creation for the account security panel.
+  // Nullable so pre-existing rows remain valid; never trusted for auth.
+  userAgent String?
+  ipAddress String?
   expiresAt DateTime
   createdAt DateTime @default(now())
 
@@ -60,6 +83,44 @@ model Session {
   @@map("sessions")
 }
 
+model PasswordResetChallenge {
+  id                  String    @id @default(uuid())
+  userId              String
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  codeDigest          String
+  expiresAt           DateTime
+  attempts            Int       @default(0)
+  verifiedAt          DateTime?
+  resetTokenDigest    String?
+  resetTokenExpiresAt DateTime?
+  usedAt              DateTime?
+  createdAt           DateTime  @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("password_reset_challenges")
+}
+
+// Verified email-change flow (Account Settings → Work Email → Change).
+// Mirrors the password-reset security model: the 6-digit OTP is stored only
+// as an HMAC digest, single-use transitions use conditional writes, and the
+// target address is bound into the challenge so a code cannot be replayed
+// against a different address.
+model EmailChangeChallenge {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  newEmail    String
+  codeDigest  String
+  expiresAt   DateTime
+  attempts    Int       @default(0)
+  usedAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("email_change_challenges")
+}
 model Material {
   id                 String    @id
   name               String
@@ -91,6 +152,7 @@ model Material {
 
 model Order {
   id                String   @id // e.g. CAM-2026-8894 (CAM LABS Internal ID)
+  reference         String?  @unique // Unified business reference CAM-2026-XXXXXX, shared with source Quote
   userId            String?
   user              User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   quoteId           String?
@@ -112,13 +174,25 @@ model Order {
   trackingNum       String?  // Historical external tracking field; active orders use CAM LABS tracking
   history           Json     // Array of { step, date, done, desc }
   paymentStatus     String   @default("Pending")
+  preferredPaymentMethod String? // CUSTOMER_PREFERRED: KASHIER | COD (stored at quote, carried to order)
   manufacturingStatus String @default("Pending")
   shippingStatus    String   @default("Pending")
   shippingAddress   String?
   shippingMethod    String?
   shippingCost      String?
+  shippingCostAmount Float?  @default(0)
   carrier           String?
   actualDelivery    String?
+  shippingAddressSnapshot Json?
+  billingAddressSnapshot  Json?
+  contactSnapshot         Json?
+  couponId          String?
+  coupon            Coupon?  @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  couponCodeSnapshot String?
+  couponDiscountTypeSnapshot String?
+  couponDiscountValueSnapshot Float?
+  couponEligibleAmountSnapshot Float?
+  couponDiscountAmountApplied Float? @default(0)
   manufacturerId    String?
   manufacturer      Manufacturer? @relation(fields: [manufacturerId], references: [id], onDelete: SetNull)
   pricingEquationVersionId String?
@@ -154,6 +228,7 @@ model OrderCadFile {
 
 model Quote {
   id                String   @id // e.g. RFQ-2026-7741 (CAM LABS Internal Quote ID)
+  reference         String?  @unique // Unified immutable business reference CAM-2026-XXXXXX, shared with future Order
   userId            String?
   user              User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   partName          String
@@ -177,10 +252,49 @@ model Quote {
   pricingEquationVersionId String?
   pricingEquationVersion   PricingEquationVersion? @relation(fields: [pricingEquationVersionId], references: [id], onDelete: SetNull)
   convertedOrderId  String?
+  // ── Submit Quote snapshots (immutable per-quote) ──
+  contactName       String?
+  contactEmail      String?
+  contactPhone      String?
+  contactSnapshot   Json?
+  country           String?  @default("Egypt")
+  governorate       String?
+  city              String?
+  addressLine1      String?
+  addressLine2      String?
+  postalCode        String?
+  shippingAddressSnapshot Json?
+  shippingMethod    String?  @default("STANDARD")
+  shippingCostAmount Float?  @default(0)
+  preferredPaymentMethod String? // KASHIER | COD (preference only — no charge at quote stage)
+  billingSameAsShipping Boolean @default(true)
+  billingAddressSnapshot  Json?
+  couponId          String?
+  coupon            Coupon?  @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  couponCodeSnapshot String?
+  couponDiscountTypeSnapshot String? // PERCENTAGE | FIXED
+  couponDiscountValueSnapshot Float?
+  couponEligibleAmountSnapshot Float?
+  couponDiscountAmountApplied Float? @default(0)
+  couponShippingDiscountApplied Float? @default(0)
+  estimatedTotalAmount Float?
+  couponAppliedAt   DateTime?
+  couponUsages      CouponUsage[]
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
   technicalNotes    String   @default("")   // Customer technical notes at quotation time
   technicalDocuments TechnicalDocument[]
+  messages          QuoteMessage[]
+  deletionRequests  QuoteDeletionRequest[]
+  // Manual price override (engine snapshot in pricingBreakdown is never mutated)
+  systemTotalPrice  String?   // Engine-calculated total at first override time
+  priceOverrideReason String? // Required admin justification
+  priceOverriddenBy String?   // Admin user id
+  priceOverriddenAt DateTime?
+  // Status change audit (Quote has no event stream; AuditLog is the record)
+  statusReason      String?
+  statusUpdatedAt   DateTime?
+  statusUpdatedBy   String?
 
   @@index([userId])
   @@index([pricingEquationVersionId])
@@ -538,6 +652,25 @@ model SystemSetting {
   @@map("system_settings")
 }
 
+model ShippingMethod {
+  id          String    @id @default(uuid())
+  code        String    @unique // e.g. STANDARD, PRIORITY (client submits the code; server resolves the price)
+  name        String    // e.g. Standard Shipping
+  description String    @default("")
+  eta         String    @default("") // delivery estimate label, e.g. 2–5 Days
+  priceEgp    Float
+  currency    String    @default("EGP")
+  isEnabled   Boolean   @default(true)
+  sortOrder   Int       @default(0)
+  archivedAt  DateTime? // soft-delete; historical quote snapshots are preserved
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([isEnabled])
+  @@index([sortOrder])
+  @@map("shipping_methods")
+}
+
 model TechnicalDocument {
   id         String   @id @default(uuid())
   userId     String?
@@ -560,5 +693,101 @@ model TechnicalDocument {
   @@index([quoteId])
   @@index([orderId])
   @@map("technical_documents")
+}
+
+model QuoteMessage {
+  id        String   @id @default(uuid())
+  quoteId   String
+  quote     Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  senderId  String?
+  subject   String?
+  message   String
+  createdAt DateTime @default(now())
+
+  @@index([quoteId])
+  @@map("quote_messages")
+}
+
+// Customer Quote deletion requests (Phase: deletion-by-approval).
+// Customers can never delete a Quote directly — they file a request that an
+// authorized admin reviews (APPROVE deletes the Quote transactionally,
+// REJECT keeps it active). At most one PENDING request per Quote (enforced
+// by a partial unique index in the migration + server-side check).
+model QuoteDeletionRequest {
+  id                String    @id @default(uuid())
+  quoteId           String?
+  quote             Quote?    @relation(fields: [quoteId], references: [id], onDelete: SetNull)
+  requestedByUserId String
+  status            String    @default("PENDING") // PENDING | APPROVED | REJECTED
+  reason            String?
+  // Immutable snapshots for audit history (survive Quote removal on approve).
+  quoteReference    String?
+  quotePartName     String?
+  customerName      String?
+  customerEmail     String?
+  requestedAt       DateTime  @default(now())
+  reviewedAt        DateTime?
+  reviewedByAdminId String?
+  adminNote         String?
+
+  @@index([quoteId])
+  @@index([requestedByUserId])
+  @@index([status])
+  @@map("quote_deletion_requests")
+}
+
+model Coupon {
+  id                   String   @id @default(uuid())
+  code                 String   @unique // e.g. CAM20 (stored upper-cased, trimmed)
+  discountType         String   // PERCENTAGE | FIXED
+  discountValue        Float    // percent (0-100) or fixed EGP amount
+  maxDiscountAmount    Float?   // cap for percentage discounts (EGP)
+  minQuoteAmount       Float?   // minimum eligible subtotal (EGP)
+  maxTotalUses         Int?     // null = unlimited
+  usageLimitPerCustomer Int?    // null = unlimited
+  startAt              DateTime?
+  expiresAt            DateTime?
+  isEnabled            Boolean  @default(true)
+  discountScope        String   @default("SUBTOTAL_ONLY") // SUBTOTAL_ONLY | INCLUDING_SHIPPING
+  appliesToShipping    Boolean  @default(false)
+  totalUses            Int      @default(0) // atomic counter for concurrency-safe limits
+  createdBy            String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  archivedAt           DateTime? // soft-delete / archival, preserves history
+
+  quotes               Quote[]
+  orders               Order[]
+  usages               CouponUsage[]
+
+  @@index([code])
+  @@index([isEnabled])
+  @@index([expiresAt])
+  @@map("coupons")
+}
+
+model CouponUsage {
+  id                          String   @id @default(uuid())
+  couponId                    String
+  coupon                      Coupon   @relation(fields: [couponId], references: [id], onDelete: Restrict)
+  userId                      String?
+  user                        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  quoteId                     String?
+  quote                       Quote?   @relation(fields: [quoteId], references: [id], onDelete: SetNull)
+  couponCodeSnapshot          String
+  discountTypeSnapshot        String
+  discountValueSnapshot       Float
+  eligibleAmountSnapshot      Float
+  discountAmountApplied       Float
+  amountAfterDiscount         Float
+  shippingDiscountApplied     Float    @default(0)
+  quoteReference              String?
+  createdAt                   DateTime @default(now())
+
+  @@index([couponId])
+  @@index([userId])
+  @@index([quoteId])
+  @@index([createdAt])
+  @@map("coupon_usages")
 }
 

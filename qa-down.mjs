@@ -1,0 +1,18 @@
+import { chromium } from 'playwright';
+const FE = 'http://localhost:3000';
+const browser = await chromium.launch();
+const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, colorScheme: 'dark' });
+const page = await ctx.newPage();
+await ctx.route('**/api/**', (route) => route.abort('failed'));
+await page.goto(FE + '/', { waitUntil: 'domcontentloaded' }).catch(() => {});
+await page.waitForTimeout(2500);
+await page.getByRole('button', { name: 'Sign In' }).click().catch(() => console.log('no signin btn'));
+await page.waitForTimeout(800);
+await page.getByLabel(/work email/i).fill('user@example.com').catch(() => console.log('no email field'));
+await page.getByLabel(/^password/i).first().fill('Whatever1!').catch(() => {});
+await page.getByRole('button', { name: /sign in to cam labs/i }).click().catch(() => {});
+await page.waitForTimeout(2000);
+const msgs = await page.locator('.auth-form-error, [role="alert"]').allInnerTexts().catch(() => []);
+console.log('DOWN-MSG:', JSON.stringify(msgs.join(' | ').slice(0, 200)));
+await page.screenshot({ path: '/tmp/qa-down2.png' });
+await browser.close();

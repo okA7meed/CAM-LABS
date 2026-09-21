@@ -1,0 +1,632 @@
+/* --------------------------------------------------------------------------
+   Legal / trust / support pages (Privacy, Terms, NDA, Security, FAQ,
+   Shipping, Contact) and the customer My Quotes view.
+   Dark-navy hero + readable article on the existing CAM LABS shell.
+   -------------------------------------------------------------------------- */
+.legal-page {
+  flex: 1 1 auto;
+  background: var(--cam-bg);
+  color: var(--cam-text-primary);
+}
+
+.legal-hero {
+  background:
+    radial-gradient(900px 200px at 50% -40px, rgba(0, 102, 255, 0.14), transparent 70%),
+    linear-gradient(180deg, rgba(9, 18, 38, 0.95), var(--cam-bg));
+  border-bottom: 1px solid var(--cam-border-subtle);
+  padding: clamp(2rem, 5vw, 3.5rem) 0 clamp(1.5rem, 4vw, 2.5rem);
+}
+
+.legal-crumb {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  color: var(--cam-text-faint);
+  margin-bottom: 1.25rem;
+}
+
+.legal-crumb button {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--cam-text-muted);
+  cursor: pointer;
+}
+
+.legal-crumb button:hover {
+  color: var(--cam-blue-primary);
+}
+
+.legal-eyebrow {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--cam-blue-primary);
+  margin: 0 0 0.75rem;
+}
+
+.legal-title {
+  font-size: clamp(1.9rem, 4.5vw, 2.9rem);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  margin: 0 0 0.9rem;
+  color: var(--cam-text-primary);
+}
+
+.legal-statement {
+  font-size: clamp(1rem, 2vw, 1.2rem);
+  color: var(--cam-text-muted);
+  max-width: 44rem;
+  margin: 0;
+  line-height: 1.6;
+}
+
+.legal-updated {
+  margin: 1rem 0 0;
+  font-size: 0.82rem;
+  color: var(--cam-text-faint);
+}
+
+.legal-body {
+  display: grid;
+  grid-template-columns: minmax(0, 240px) minmax(0, 1fr);
+  gap: clamp(1.5rem, 4vw, 3rem);
+  padding-top: clamp(1.75rem, 4vw, 2.75rem);
+  padding-bottom: clamp(1.75rem, 4vw, 2.75rem);
+  align-items: start;
+}
+
+.legal-toc {
+  position: sticky;
+  top: 96px;
+  border: 1px solid var(--cam-border-subtle);
+  border-radius: var(--radius-lg, 12px);
+  background: var(--cam-surface-1);
+  padding: 1.1rem 1.2rem;
+}
+
+.legal-toc-heading {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--cam-text-faint);
+  margin: 0 0 0.6rem;
+}
+
+.legal-toc ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.legal-toc button {
+  display: block;
+  width: 100%;
+  text-align: start;
+  background: none;
+  border: 0;
+  padding: 0.45rem 0;
+  font: inherit;
+  font-size: 0.88rem;
+  color: var(--cam-text-muted);
+  cursor: pointer;
+  border-inline-start: 2px solid transparent;
+  padding-inline-start: 0.6rem;
+  margin-inline-start: -0.6rem;
+}
+
+.legal-toc button:hover {
+  color: var(--cam-blue-primary);
+  border-inline-start-color: var(--cam-blue-primary);
+}
+
+.legal-article {
+  min-width: 0;
+  font-size: 0.98rem;
+  line-height: 1.75;
+  color: var(--cam-text-muted);
+}
+
+.legal-lead {
+  font-size: 1.06rem;
+  color: var(--cam-text-primary);
+  line-height: 1.7;
+}
+
+.legal-section {
+  margin-top: 2.25rem;
+  scroll-margin-top: 96px;
+}
+
+.legal-section > h2 {
+  font-size: 1.3rem;
+  font-weight: 750;
+  color: var(--cam-text-primary);
+  margin: 0 0 0.9rem;
+  padding-bottom: 0.55rem;
+  border-bottom: 1px solid var(--cam-border-subtle);
+}
+
+.legal-section h3 {
+  font-size: 1.02rem;
+  font-weight: 700;
+  color: var(--cam-text-primary);
+  margin: 1.25rem 0 0.5rem;
+}
+
+.legal-section p {
+  margin: 0 0 0.9rem;
+}
+
+.legal-section ul {
+  margin: 0 0 1rem;
+  padding-inline-start: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.legal-section li::marker {
+  color: var(--cam-blue-primary);
+}
+
+.legal-note {
+  border: 1px solid var(--cam-border-subtle);
+  border-inline-start: 3px solid var(--cam-blue-primary);
+  border-radius: 8px;
+  background: var(--cam-surface-1);
+  padding: 0.9rem 1.1rem;
+}
+
+.legal-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin: 1rem 0;
+}
+
+.legal-skeleton span {
+  display: block;
+  height: 3.25rem;
+  border-radius: 10px;
+  background: linear-gradient(90deg, var(--cam-surface-1), var(--cam-surface-2, var(--cam-surface-1)));
+  border: 1px solid var(--cam-border-subtle);
+}
+
+.legal-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.legal-tag {
+  font-size: 0.82rem;
+  color: var(--cam-text-muted);
+  border: 1px solid var(--cam-border-subtle);
+  background: var(--cam-surface-1);
+  border-radius: 999px;
+  padding: 0.3rem 0.8rem;
+}
+
+/* FAQ accordion */
+.faq-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.faq-item {
+  border: 1px solid var(--cam-border-subtle);
+  border-radius: 12px;
+  background: var(--cam-surface-1);
+  overflow: hidden;
+}
+
+.faq-item.is-open {
+  border-color: rgba(0, 102, 255, 0.45);
+}
+
+.faq-question {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  background: none;
+  border: 0;
+  padding: 1rem 1.2rem;
+  font: inherit;
+  font-weight: 650;
+  font-size: 0.98rem;
+  color: var(--cam-text-primary);
+  cursor: pointer;
+  text-align: start;
+}
+
+.faq-chevron {
+  flex: 0 0 auto;
+  color: var(--cam-text-faint);
+  transition: transform 0.2s ease;
+}
+
+.faq-chevron.is-open {
+  transform: rotate(180deg);
+  color: var(--cam-blue-primary);
+}
+
+.faq-answer {
+  padding: 0 1.2rem 1.1rem;
+  color: var(--cam-text-muted);
+  font-size: 0.94rem;
+  line-height: 1.7;
+}
+
+.faq-answer p {
+  margin: 0 0 0.7rem;
+}
+
+.faq-answer p:last-child {
+  margin-bottom: 0;
+}
+
+/* Shipping rates (live) */
+.shipping-rates {
+  list-style: none;
+  margin: 1rem 0 1.25rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.shipping-rate {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  border: 1px solid var(--cam-border-subtle);
+  border-radius: 12px;
+  background: var(--cam-surface-1);
+  padding: 0.95rem 1.1rem;
+}
+
+.shipping-rate-icon {
+  display: inline-flex;
+  color: var(--cam-blue-primary);
+  flex: 0 0 auto;
+}
+
+.shipping-rate-body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.shipping-rate-body strong {
+  color: var(--cam-text-primary);
+  font-size: 0.95rem;
+}
+
+.shipping-rate-desc {
+  font-size: 0.85rem;
+}
+
+.shipping-rate-eta {
+  font-size: 0.82rem;
+  color: var(--cam-text-faint);
+}
+
+.shipping-rate-fee {
+  flex: 0 0 auto;
+  font-weight: 750;
+  color: var(--cam-text-primary);
+  white-space: nowrap;
+}
+
+/* Contact cards */
+.contact-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.9rem;
+  margin: 1rem 0 0.5rem;
+}
+
+.contact-card {
+  border: 1px solid var(--cam-border-subtle);
+  border-radius: 12px;
+  background: var(--cam-surface-1);
+  padding: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.contact-card-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cam-blue-primary);
+  background: rgba(0, 102, 255, 0.1);
+  border: 1px solid rgba(0, 102, 255, 0.25);
+}
+
+.contact-card h3 {
+  margin: 0 0 0.3rem;
+  font-size: 1rem;
+  color: var(--cam-text-primary);
+}
+
+.contact-card p {
+  margin: 0 0 0.8rem;
+  font-size: 0.88rem;
+}
+
+.contact-email-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.contact-email {
+  font-weight: 700;
+  color: var(--cam-blue-primary);
+  overflow-wrap: anywhere;
+}
+
+/* CTA band */
+.legal-cta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+  border: 1px solid rgba(0, 102, 255, 0.3);
+  border-radius: 14px;
+  background:
+    radial-gradient(600px 160px at 20% 0%, rgba(0, 102, 255, 0.14), transparent 70%),
+    var(--cam-surface-1);
+  padding: clamp(1.25rem, 3vw, 1.75rem) clamp(1.25rem, 3vw, 2rem);
+  margin-bottom: clamp(2rem, 5vw, 3rem);
+}
+
+.legal-cta h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.2rem;
+  color: var(--cam-text-primary);
+}
+
+.legal-cta p {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.legal-cta-actions {
+  display: flex;
+  gap: 0.7rem;
+  flex: 0 0 auto;
+}
+
+.legal-cta-actions .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* My Quotes */
+.quotes-gate,
+.quotes-empty {
+  border: 1px solid var(--cam-border-subtle);
+  border-radius: 14px;
+  background: var(--cam-surface-1);
+  padding: clamp(1.75rem, 5vw, 2.75rem);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.8rem;
+  margin-top: 1.5rem;
+}
+
+.quotes-gate h2,
+.quotes-empty h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: var(--cam-text-primary);
+}
+
+.quotes-gate p,
+.quotes-empty p {
+  margin: 0 0 0.5rem;
+  max-width: 30rem;
+}
+
+.quotes-gate-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cam-blue-primary);
+  background: rgba(0, 102, 255, 0.1);
+  border: 1px solid rgba(0, 102, 255, 0.25);
+}
+
+.quotes-list {
+  list-style: none;
+  margin: 1.25rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.quote-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border: 1px solid var(--cam-border-subtle);
+  border-radius: 12px;
+  background: var(--cam-surface-1);
+  padding: 1rem 1.2rem;
+}
+
+.quote-card-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.quote-card-ref {
+  color: var(--cam-blue-primary);
+  font-size: 0.95rem;
+}
+
+.quote-card-part {
+  color: var(--cam-text-primary);
+  font-weight: 650;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quote-card-meta {
+  font-size: 0.83rem;
+  color: var(--cam-text-faint);
+}
+
+.quote-card-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.4rem;
+  flex: 0 0 auto;
+}
+
+.quote-card-total {
+  font-weight: 750;
+  color: var(--cam-text-primary);
+}
+
+.quote-status {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  border-radius: 999px;
+  padding: 0.2rem 0.7rem;
+  border: 1px solid var(--cam-border-subtle);
+  color: var(--cam-text-muted);
+  white-space: nowrap;
+}
+
+.quote-status.is-ready-for-approval {
+  color: #7cc4ff;
+  border-color: rgba(0, 102, 255, 0.45);
+  background: rgba(0, 102, 255, 0.08);
+}
+
+.quote-status.is-approved {
+  color: #5fd68a;
+  border-color: rgba(46, 160, 90, 0.45);
+  background: rgba(46, 160, 90, 0.08);
+}
+
+.quote-status.is-expired {
+  color: var(--cam-text-faint);
+}
+
+.quote-status.is-draft {
+  color: #e3b341;
+  border-color: rgba(227, 179, 65, 0.4);
+  background: rgba(227, 179, 65, 0.08);
+}
+
+.quotes-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  margin-top: 1.5rem;
+}
+
+.quotes-actions .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+  .legal-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .legal-toc {
+    position: static;
+  }
+  .legal-toc ul {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.4rem 1rem;
+  }
+  .legal-toc button {
+    border-inline-start: 0;
+    padding-inline-start: 0;
+    margin-inline-start: 0;
+    padding: 0.25rem 0;
+    width: auto;
+  }
+  .contact-cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .legal-cta {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 560px) {
+  .quote-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .quote-card-side {
+    align-items: flex-start;
+    flex-direction: row;
+    width: 100%;
+    justify-content: space-between;
+  }
+  .quote-card-part {
+    white-space: normal;
+  }
+}
+
+/* My Quotes row actions (View Details + Delete share Dashboard policy). */
+.quote-card-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.quote-card-actions .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.quote-status.is-pending-deletion {
+  color: #e3b341;
+  border-color: rgba(227, 179, 65, 0.45);
+  background: rgba(227, 179, 65, 0.1);
+}

@@ -9,7 +9,10 @@ type AnimatedModalProps = {
   children: React.ReactNode;
   /** Extra class for the modal card (e.g. "modal-lg"). */
   cardClassName?: string;
+  /** Extra class for the overlay (e.g. "auth-overlay"). */
+  overlayClassName?: string;
   cardStyle?: React.CSSProperties;
+  overlayStyle?: React.CSSProperties;
   role?: 'dialog' | 'alertdialog';
   ariaLabel?: string;
   onOverlayMouseDown?: React.MouseEventHandler<HTMLDivElement>;
@@ -25,7 +28,9 @@ export const AnimatedModal: React.FC<AnimatedModalProps> = ({
   open,
   children,
   cardClassName,
+  overlayClassName,
   cardStyle,
+  overlayStyle,
   role,
   ariaLabel,
   onOverlayMouseDown,
@@ -33,7 +38,8 @@ export const AnimatedModal: React.FC<AnimatedModalProps> = ({
   <AnimatePresence>
     {open && (
 <motion.div
-          className="modal-overlay active cam-motion"
+          className={`modal-overlay active cam-motion${overlayClassName ? ` ${overlayClassName}` : ''}`}
+          style={overlayStyle}
           role={role}
           aria-modal={role ? 'true' : undefined}
           aria-label={ariaLabel}

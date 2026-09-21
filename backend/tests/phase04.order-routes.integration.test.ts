@@ -3,7 +3,7 @@ import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const state = vi.hoisted(() => ({
-  authUser: { id: 'user-a', role: 'CUSTOMER' },
+  authUser: { id: 'user-a', role: 'OPERATIONS_ADMIN' },
   quote: null as any,
   dispatchOrder: vi.fn(),
   orderCreate: vi.fn(),
@@ -47,7 +47,7 @@ const makeQuote = (overrides: Record<string, unknown> = {}) => ({
   id: 'quote-1', userId: 'user-a', partName: 'part.stl', technology: 'FDM', material: 'PLA', quantity: 1,
   toleranceGrade: 'standard', surfaceFinish: 'standard', manufacturingCost: '$15.00', serviceFee: null,
   unitPrice: '$15.00', totalPrice: '$15.00', leadTime: '24 - 48 Hours',
-  validUntil: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(), status: 'Ready for Approval',
+  validUntil: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(), status: 'Approved',
   provider: 'CAM LABS', providerQuoteRef: 'CAM-QUOTE-1', isSimulated: false, cadFileIds: ['file-a'], ...overrides,
 });
 
@@ -70,7 +70,7 @@ const createApp = () => { const app = express(); app.use(express.json()); app.us
 
 describe('Phase 04 order HTTP trust boundary', () => {
   beforeEach(() => {
-    state.authUser = { id: 'user-a', role: 'CUSTOMER' };
+    state.authUser = { id: 'user-a', role: 'OPERATIONS_ADMIN' };
     state.quote = makeQuote();
     state.dispatchOrder.mockReset();
     state.dispatchOrder.mockResolvedValue({ engineName: 'CAM LABS', trackingId: 'CAM-TRK-1', internalOrderRef: 'CAM-ORD-1', dispatchedAt: new Date().toISOString(), status: 'Queued', estimatedCompletion: '2026-08-22' });
@@ -85,6 +85,13 @@ describe('Phase 04 order HTTP trust boundary', () => {
     expect(response.status).toBe(201);
     expect(response.body.data.totalCost).toBe('$15.00');
     expect(state.dispatchOrder).toHaveBeenCalledOnce();
+  });
+
+  it('rejects customers from creating orders (order creation is staff-only)', async () => {
+    state.authUser = { id: 'user-a', role: 'CUSTOMER' };
+    const response = await request(createApp()).post('/api/v1/orders').send(orderBody());
+    expect(response.status).toBe(403);
+    expect(state.dispatchOrder).not.toHaveBeenCalled();
   });
 
   it('rejects expired quotes over HTTP before dispatch', async () => {

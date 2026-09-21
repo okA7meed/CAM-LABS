@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from
 import { useStore } from '../../context/StoreContext';
 import { useTranslation } from 'react-i18next';
 import { SectionReveal, ScrollReveal, StaggerReveal } from '../ui/Reveal';
+import { Icon } from '../ui/Icon';
 
 interface ServiceDefinition {
   id: string;
@@ -9,6 +10,8 @@ interface ServiceDefinition {
   title: string;
   category: string;
   description: string;
+  /** Short CTA label — never repeats the full card title inside the button. */
+  ctaShort: string;
   materialRef?: string;
   techTags: string[];
   specs: {
@@ -26,6 +29,7 @@ const SERVICES_CATALOG: ServiceDefinition[] = [
     id: '3d-printing-industrial',
     translationId: 'industrial3d',
     title: 'Industrial 3D Printing',
+    ctaShort: '3D Printing',
     category: 'Additive Manufacturing',
     description: 'High-density laser sintering (SLS) and high-resolution stereolithography (SLA) for production-grade polymers and isotropic mechanical strength.',
     materialRef: 'pa12-sls',
@@ -49,6 +53,7 @@ const SERVICES_CATALOG: ServiceDefinition[] = [
     id: 'fdm-high-performance',
     translationId: 'fdm',
     title: 'High-Performance FDM',
+    ctaShort: 'FDM',
     category: 'Industrial Thermoplastics',
     description: 'Industrial extrusion of aerospace-grade thermoplastics including PEEK, ULTEM™ 9085, and carbon-fiber composites for extreme operating environments.',
     materialRef: 'peek-fdm',
@@ -72,6 +77,7 @@ const SERVICES_CATALOG: ServiceDefinition[] = [
     id: 'cnc-machining-precision',
     translationId: 'cnc',
     title: 'Precision CNC Machining',
+    ctaShort: 'CNC Machining',
     category: 'Subtractive Manufacturing',
     description: '3-axis, 4-axis, and 5-axis CNC milling along with live-tooling turning for aerospace alloys, stainless steels, and engineered polymers.',
     materialRef: 'alu-6061-cnc',
@@ -94,6 +100,7 @@ const SERVICES_CATALOG: ServiceDefinition[] = [
     id: 'sheet-metal-laser',
     translationId: 'sheet',
     title: 'Sheet Metal & Laser Cutting',
+    ctaShort: 'Sheet Metal',
     category: 'Forming & Fabrication',
     description: 'Precision fiber laser cutting, CNC press brake forming, hardware insertion (PEM studs/standoffs), and robotic TIG/MIG welding.',
     materialRef: 'sheet-alu-5052',
@@ -117,6 +124,7 @@ const SERVICES_CATALOG: ServiceDefinition[] = [
     id: 'digital-fabrication-tooling',
     translationId: 'tooling',
     title: 'Digital Fabrication & Rapid Tooling',
+    ctaShort: 'Tooling',
     category: 'Bridge & Volume Tooling',
     description: 'Rapid aluminum injection mold tooling and vacuum urethane casting for bridge production, pre-series qualification, and rapid scaling.',
     materialRef: 'pa12-sls',
@@ -151,13 +159,18 @@ const SERVICE_ACCENTS = [
 const N_CARDS = SERVICES_CATALOG.length;
 const RAIL_SLOT_COUNT = N_CARDS * 2;
 const RAIL_DURATION_MS = 26000;
-// Fallback geometry used only before the first DOM measurement. PITCH is
-// derived from the same relationship the live geometry uses (the CSS token
-// --cam-svc-gap): PITCH = CARD_W + GAP, LOOP = N_CARDS * PITCH.
-const RAIL_FALLBACK_CARD_W = 266.4;
-const RAIL_FALLBACK_GAP = 17;
+// Desktop shows EXACTLY four full cards in a full-bleed viewport. The header
+// stays in the centered container; only .services-bleed escapes it. Card width
+// is responsive — clamp(280px, (100vw - 200px) / 4, 380px) — so 4 × card + 3 ×
+// gap fits the viewport with room for the widened navy edge fade, while a 5th
+// card can only ever peek partially. Additional cards live on the moving track
+// and appear through carousel movement — never by squeezing extra full cards
+// into the viewport. PITCH = CARD_W + GAP, LOOP = N_CARDS * PITCH (same
+// relationship the live geometry uses).
+const RAIL_FALLBACK_CARD_W = 330;
+const RAIL_FALLBACK_GAP = 20;
 const RAIL_FALLBACK_PITCH = RAIL_FALLBACK_CARD_W + RAIL_FALLBACK_GAP;
-const RAIL_FALLBACK_VIEWPORT_W = 1396;
+const RAIL_FALLBACK_VIEWPORT_W = 1440;
 
 interface RailGeometry {
   viewportW: number;
@@ -200,7 +213,12 @@ interface ServiceCardProps {
   tabIndex?: number;
   onFocus?: () => void;
   onBlur?: () => void;
+  /** Deep-link anchor. Set only on the primary instance — the conveyor
+   *  renders an aria-hidden echo clone that must not duplicate the id. */
+  anchorId?: string;
 }
+
+const VISIBLE_CHIPS = 3;
 
 const ServiceCard: React.FC<ServiceCardProps> = ({
   service,
@@ -210,9 +228,15 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
   tabIndex,
   onFocus,
   onBlur,
+  anchorId,
 }) => {
   const { startManufacturingRequest } = useStore();
   const { t } = useTranslation();
+  // Capability overflow stays in the DOM (no data loss); the row shows a
+  // controlled number of chips with "+N more" expanding inline.
+  const [chipsExpanded, setChipsExpanded] = useState(false);
+  const hiddenCount = service.techTags.length - VISIBLE_CHIPS;
+  const visibleTags = chipsExpanded ? service.techTags : service.techTags.slice(0, VISIBLE_CHIPS);
 
   const cardClass = [
     active ? 'svc-active-card' : null,
@@ -221,30 +245,33 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
     .filter(Boolean)
     .join(' ');
 
+  const handleExpandChips = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setChipsExpanded(true);
+    // Row heights are unified by measurement; notify the rail to re-sync.
+    window.setTimeout(() => window.dispatchEvent(new Event('resize')), 0);
+  };
+
   return (
     <div
+      id={anchorId}
       className={cardClass}
       onClick={interactive ? () => startManufacturingRequest() : undefined}
       onFocus={interactive ? onFocus : undefined}
       onBlur={interactive ? onBlur : undefined}
+      style={{ '--service-accent': SERVICE_ACCENTS[index % SERVICE_ACCENTS.length] } as React.CSSProperties}
     >
-      <div
-        className="service-card-image"
-        aria-hidden="true"
-        style={{ '--service-accent': SERVICE_ACCENTS[index % SERVICE_ACCENTS.length] } as React.CSSProperties}
-      >
-        <span className="service-card-image-icon">{service.iconSvg}</span>
-      </div>
-
       <div className="service-card-body">
-        <div className="service-card-header">
-          <span className="service-category-badge">
-            {t(`service.${service.translationId}.category`)}
-          </span>
+        <div className="service-card-top">
+          <span className="service-card-icon" aria-hidden="true">{service.iconSvg}</span>
           <span className="service-index">
             {String(index + 1).padStart(2, '0')}
           </span>
         </div>
+
+        <span className="service-category-badge">
+          {t(`service.${service.translationId}.category`)}
+        </span>
 
         <h3 className="card-title">
           {t(`service.${service.translationId}.title`)}
@@ -255,29 +282,39 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
         </p>
 
         <div className="service-tech-tags">
-          {service.techTags.map((tag) => (
+          {visibleTags.map((tag) => (
             <span key={tag} className="badge badge-neutral">
               {tag}
             </span>
           ))}
+          {!chipsExpanded && hiddenCount > 0 && (
+            <button
+              type="button"
+              className="badge badge-more"
+              onClick={handleExpandChips}
+              aria-label={t('service.showMoreCapabilities', { count: hiddenCount })}
+            >
+              +{hiddenCount} {t('service.more')}
+            </button>
+          )}
         </div>
 
         <div className="service-spec-matrix">
           <div className="spec-entry">
-            <span className="spec-key">{t('service.tolerance')}</span>
-            <span className="spec-val" style={{ color: 'var(--cam-cyan-tech)' }}>{service.specs.tolerance}</span>
+            <span className="spec-key"><Icon name="target" size={12} />{t('service.tolerance')}</span>
+            <span className="spec-val spec-val--cyan">{service.specs.tolerance}</span>
           </div>
           <div className="spec-entry">
-            <span className="spec-key">{t('service.leadTime')}</span>
-            <span className="spec-val" style={{ color: 'var(--cam-success)' }}>{service.specs.leadTime}</span>
+            <span className="spec-key"><Icon name="clock" size={12} />{t('service.leadTime')}</span>
+            <span className="spec-val spec-val--green">{service.specs.leadTime}</span>
           </div>
           <div className="spec-entry">
-            <span className="spec-key">{service.specs.keyMetricLabel}</span>
-            <span className="spec-val">{service.specs.keyMetricValue}</span>
+            <span className="spec-key"><Icon name="cube" size={12} />{service.specs.keyMetricLabel}</span>
+            <span className="spec-val spec-val--cyan">{service.specs.keyMetricValue}</span>
           </div>
           <div className="spec-entry">
-            <span className="spec-key">{t('service.standard')}</span>
-            <span className="spec-val">{service.specs.standard}</span>
+            <span className="spec-key"><Icon name="shieldCheck" size={12} />{t('service.standard')}</span>
+            <span className="spec-val spec-val--cyan">{service.specs.standard}</span>
           </div>
         </div>
 
@@ -293,11 +330,11 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
               onFocus={onFocus}
               onBlur={onBlur}
             >
-              {t('actions.configure')} {t(`service.${service.translationId}.title`)}
+              {t('actions.configure')} {t(`service.${service.translationId}.short`, { defaultValue: service.ctaShort })} <span aria-hidden="true">→</span>
             </button>
           ) : (
             <span className="btn btn-sm btn-primary" aria-hidden="true">
-              {t('actions.configure')} {t(`service.${service.translationId}.title`)}
+              {t('actions.configure')} {t(`service.${service.translationId}.short`, { defaultValue: service.ctaShort })} <span aria-hidden="true">→</span>
             </span>
           )}
         </div>
@@ -558,7 +595,9 @@ export const ServicesSection: React.FC = () => {
             {t('sections.servicesDescription')}
           </p>
         </div>
+      </div>
 
+      <div className="services-bleed">
         {railEnabled ? (
           <ScrollReveal
             className="services-scroller services-scroller--conveyor"
@@ -598,6 +637,7 @@ export const ServicesSection: React.FC = () => {
                           interactive
                           active={isActive}
                           tabIndex={isEcho ? -1 : undefined}
+                          anchorId={isEcho ? undefined : `service-${service.id}`}
                           onFocus={() => focusCard(label)}
                           onBlur={handleCardBlur}
                         />
@@ -609,11 +649,13 @@ export const ServicesSection: React.FC = () => {
             </div>
           </ScrollReveal>
         ) : (
-          <StaggerReveal className="services-grid">
-            {SERVICES_CATALOG.map((service, index) => (
-              <ServiceCard key={service.id} service={service} index={index} interactive />
-            ))}
-          </StaggerReveal>
+          <div className="container">
+            <StaggerReveal className="services-grid">
+              {SERVICES_CATALOG.map((service, index) => (
+                <ServiceCard key={service.id} service={service} index={index} interactive anchorId={`service-${service.id}`} />
+              ))}
+            </StaggerReveal>
+          </div>
         )}
       </div>
     </SectionReveal>

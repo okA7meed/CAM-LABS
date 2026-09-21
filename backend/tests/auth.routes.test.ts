@@ -144,6 +144,43 @@ describe('authentication foundation', () => {
     expect(invalid.body.error.code).toBe('INVALID_CREDENTIALS');
   });
 
+  it('rejects unknown emails exactly like wrong passwords (no enumeration oracle)', async () => {
+    const response = await request(createTestApp()).post('/api/v1/auth/login').send({ email: 'ghost@example.com', password: 'ValidPass1' });
+    expect(response.status).toBe(401);
+    expect(response.body.error.code).toBe('INVALID_CREDENTIALS');
+    expect(response.body.error.message).toBe('Invalid email or password.');
+  });
+
+  it('rejects malformed login payloads without touching persistence', async () => {
+    const response = await request(createTestApp()).post('/api/v1/auth/login').send({ email: 'not-an-email' });
+    expect(response.status).toBe(400);
+    expect(state.prisma.user.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('honors Remember Me: long session by default, short session when unchecked', async () => {
+    const app = createTestApp();
+    const HOUR_MS = 60 * 60 * 1000;
+    // NOTE: .env.test sets SESSION_TTL_DAYS=1, so the "long" policy here is
+    // ~24h and the short policy (~12h) stays distinguishable in every env.
+
+    await request(app).post('/api/v1/auth/login').send({ email: state.user.email, password: 'ValidPass1' });
+    const longCall = state.prisma.session.create.mock.calls.at(-1)?.[0];
+    const longDelta = new Date(longCall.data.expiresAt).getTime() - Date.now();
+    expect(longDelta).toBeGreaterThan(20 * HOUR_MS);
+
+    await request(app).post('/api/v1/auth/login').send({ email: state.user.email, password: 'ValidPass1', rememberMe: true });
+    const explicitLongCall = state.prisma.session.create.mock.calls.at(-1)?.[0];
+    const explicitLongDelta = new Date(explicitLongCall.data.expiresAt).getTime() - Date.now();
+    expect(explicitLongDelta).toBeGreaterThan(20 * HOUR_MS);
+
+    await request(app).post('/api/v1/auth/login').send({ email: state.user.email, password: 'ValidPass1', rememberMe: false });
+    const shortCall = state.prisma.session.create.mock.calls.at(-1)?.[0];
+    const shortDelta = new Date(shortCall.data.expiresAt).getTime() - Date.now();
+    expect(shortDelta).toBeGreaterThan(10 * HOUR_MS);
+    expect(shortDelta).toBeLessThan(14 * HOUR_MS);
+    expect(shortDelta).toBeLessThan(longDelta);
+  });
+
   it('lets admin accounts log in through the SAME single login endpoint and keeps their admin role', async () => {
     state.user.role = 'ADMIN';
     state.user.isAdmin = true;
@@ -211,5 +248,133 @@ describe('authentication foundation', () => {
     expect(hasRole('ENGINEER', ['ENGINEER'])).toBe(true);
     expect(hasRole('ADMIN', ['ADMIN'])).toBe(true);
     expect(hasRole('SUPER_ADMIN', ['SUPER_ADMIN'])).toBe(true);
+  });
+
+  describe('Google Identity Services sign-in (POST /auth/google)', () => {
+    const googleModule = () => import('../src/config/env').then((m) => m.ENV);
+    const validCredential = 'google-id-token-credential-value';
+
+    const stubTokeninfo = (body: Record<string, unknown>, ok = true) => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () =>
+          ok
+            ? { ok: true, json: async () => body }
+            : { ok: false, json: async () => ({ error: 'invalid_token' }) },
+        ),
+      );
+    };
+
+    it('rejects Google sign-in with 501 when no client ID is configured', async () => {
+      const ENV = await googleModule();
+      const previous = ENV.GOOGLE_CLIENT_ID;
+      ENV.GOOGLE_CLIENT_ID = '';
+      try {
+        const response = await request(createTestApp())
+          .post('/api/v1/auth/google')
+          .send({ credential: validCredential });
+        expect(response.status).toBe(501);
+        expect(response.body.error.code).toBe('GOOGLE_NOT_CONFIGURED');
+      } finally {
+        ENV.GOOGLE_CLIENT_ID = previous;
+        vi.unstubAllGlobals();
+      }
+    });
+
+    it('rejects malformed Google requests without contacting Google', async () => {
+      const fetchSpy = vi.fn();
+      vi.stubGlobal('fetch', fetchSpy);
+      try {
+        const response = await request(createTestApp()).post('/api/v1/auth/google').send({});
+        expect(response.status).toBe(400);
+        expect(fetchSpy).not.toHaveBeenCalled();
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    });
+
+    it('authenticates the existing account for a verified Google identity (no duplicate user)', async () => {
+      const ENV = await googleModule();
+      const previous = ENV.GOOGLE_CLIENT_ID;
+      ENV.GOOGLE_CLIENT_ID = 'test-google-client-id';
+      state.prisma.user.create.mockClear();
+      stubTokeninfo({
+        aud: 'test-google-client-id',
+        exp: String(Math.floor(Date.now() / 1000) + 3600),
+        email: state.user.email,
+        email_verified: 'true',
+        sub: 'google-sub-123',
+        name: 'Test Engineer',
+      });
+      try {
+        const response = await request(createTestApp())
+          .post('/api/v1/auth/google')
+          .send({ credential: validCredential });
+        expect(response.status).toBe(200);
+        expect(response.headers['set-cookie'][0]).toContain('HttpOnly');
+        expect(response.body.data.user.passwordHash).toBeUndefined();
+        expect(state.prisma.user.create).not.toHaveBeenCalled();
+      } finally {
+        ENV.GOOGLE_CLIENT_ID = previous;
+        vi.unstubAllGlobals();
+      }
+    });
+
+    it('creates a customer account for a new Google identity without fabricating profile fields', async () => {
+      const ENV = await googleModule();
+      const previous = ENV.GOOGLE_CLIENT_ID;
+      ENV.GOOGLE_CLIENT_ID = 'test-google-client-id';
+      state.prisma.user.create.mockClear();
+      stubTokeninfo({
+        aud: 'test-google-client-id',
+        exp: String(Math.floor(Date.now() / 1000) + 3600),
+        email: 'new-google-user@example.com',
+        email_verified: 'true',
+        sub: 'google-sub-456',
+        name: 'Google Engineer',
+      });
+      try {
+        const response = await request(createTestApp())
+          .post('/api/v1/auth/google')
+          .send({ credential: validCredential });
+        expect(response.status).toBe(201);
+        expect(state.prisma.user.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              email: 'new-google-user@example.com',
+              company: 'Independent',
+              phone: null,
+              passwordHash: null,
+              role: 'CUSTOMER',
+            }),
+          }),
+        );
+      } finally {
+        ENV.GOOGLE_CLIENT_ID = previous;
+        vi.unstubAllGlobals();
+      }
+    });
+
+    it('rejects Google tokens issued for a different audience', async () => {
+      const ENV = await googleModule();
+      const previous = ENV.GOOGLE_CLIENT_ID;
+      ENV.GOOGLE_CLIENT_ID = 'test-google-client-id';
+      stubTokeninfo({
+        aud: 'some-other-client',
+        exp: String(Math.floor(Date.now() / 1000) + 3600),
+        email: 'attacker@example.com',
+        email_verified: 'true',
+        sub: 'google-sub-789',
+      });
+      try {
+        const response = await request(createTestApp())
+          .post('/api/v1/auth/google')
+          .send({ credential: validCredential });
+        expect(response.status).toBe(401);
+      } finally {
+        ENV.GOOGLE_CLIENT_ID = previous;
+        vi.unstubAllGlobals();
+      }
+    });
   });
 });

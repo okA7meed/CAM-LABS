@@ -1,10 +1,11 @@
+import { useTranslation } from 'react-i18next';
 import { Icon } from '../../../ui/Icon';
 import { MATERIAL_COLORS, materialColor } from '../../materialPreview';
 import { PanelShell } from '../PanelShell';
 import { MATERIAL_PROPERTIES, MATERIAL_SWATCHES, panelIds } from '../constants';
 import { PanelStatus, RequestState } from '../types';
 
-export const MaterialPanel = ({ request, materialOptions, selectedColor, status, className, t, onSelectMaterial, onColorChange }: {
+export const MaterialPanel = ({ request, materialOptions, selectedColor, status, className, t: tProp, onSelectMaterial, onColorChange }: {
   request: RequestState;
   materialOptions: string[];
   selectedColor: string;
@@ -14,27 +15,29 @@ export const MaterialPanel = ({ request, materialOptions, selectedColor, status,
   onSelectMaterial: (m: string) => void;
   onColorChange: (c: string) => void;
 }) => {
+  const { t: tHook } = useTranslation();
+  const t = tProp || tHook;
   const selectedProps = request.material ? MATERIAL_PROPERTIES[request.material] || [] : [];
   const isInactive = status === 'inactive';
   return (
     <PanelShell
       id={panelIds.material}
       icon="layers3"
-      title="Select Material"
-      subtitle="Only compatible materials for your process"
+      title={t('mw.selectMaterial')}
+      subtitle={t('mw.selectMaterialSub')}
       status={status}
       className={className}
     >
       {isInactive && (
         <div className="mw-panel-empty">
-          <span className="mw-panel-empty-hint">Select a process and upload a design first.</span>
+          <span className="mw-panel-empty-hint">{t('mw.selectProcessUploadFirst')}</span>
         </div>
       )}
 
       {materialOptions.length === 0 ? (
         !isInactive && (
           <div className="mw-panel-empty">
-            <span className="mw-panel-empty-hint">No materials configured for this process.</span>
+            <span className="mw-panel-empty-hint">{t('mw.noMaterials')}</span>
           </div>
         )
       ) : (
@@ -61,7 +64,7 @@ export const MaterialPanel = ({ request, materialOptions, selectedColor, status,
 
           {request.material && selectedProps.length > 0 && (
             <div className="mw-stage-material-props">
-              <div className="mw-stage-section-label">Material Properties</div>
+              <div className="mw-stage-section-label">{t('mw.materialProperties')}</div>
               <div className="mw-stage-material-props-list">
                 {selectedProps.map((p) => (
                   <span key={p.label} className="mw-stage-material-prop">
@@ -74,7 +77,7 @@ export const MaterialPanel = ({ request, materialOptions, selectedColor, status,
 
           {request.material && (
             <div className="mw-stage-color-row">
-              <span className="mw-stage-section-label">Color</span>
+              <span className="mw-stage-section-label">{t('mw.color')}</span>
               <div className="mw-color-grid">
                 {MATERIAL_COLORS.map((c) => (
                   <button

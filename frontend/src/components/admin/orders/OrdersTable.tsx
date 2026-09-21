@@ -195,7 +195,7 @@ export const OrdersTable: React.FC<OrdersTableProps> = ({
                   </td>
                   <td>
                     <button type="button" className="admin-id" onClick={() => onView(order)} title={order.id}>
-                      <span className="admin-id-primary">{order.id}</span>
+                      <span className="admin-id-primary">{order.reference || order.id}</span>
                       <span className="admin-id-date">{formatDate(order.createdAt)}</span>
                     </button>
                   </td>

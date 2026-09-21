@@ -7,10 +7,13 @@ import { ManufacturingDispatchResult } from '../providers/manufacturing/IManufac
 import { AppError } from '../utils/errors';
 import { randomInt } from 'crypto';
 import { TechnicalDocumentsService } from './technicalDocuments.service';
+import { BusinessReferenceService } from './businessReference.service';
 
 interface CreateOrderInternalOptions {
   /** Server-issued order id reserved atomically against the source quote. */
   reservedOrderId?: string;
+  /** Unified reference already reserved on the quote (avoids extra DB round-trips). */
+  reservedReference?: string;
 }
 
 /** Surcharge applied by the server when priority shipping is requested. */
@@ -94,8 +97,35 @@ export class OrdersService {
     if (quote.convertedOrderId && quote.convertedOrderId !== internal.reservedOrderId) {
       throw new AppError('This quote has already been converted to an order.', 409, 'QUOTE_ALREADY_CONVERTED');
     }
+    // Deletion-request vs conversion race: never create an Order from a Quote
+    // with an open PENDING deletion request (applies to both the direct and
+    // the canonical conversion paths).
+    if (!internal.reservedOrderId) {
+      let pendingDeletion: unknown = null;
+      try {
+        pendingDeletion = await (prisma as any).quoteDeletionRequest?.findFirst?.({
+          where: { quoteId: orderData.quoteId, status: 'PENDING' },
+        });
+      } catch {
+        pendingDeletion = null;
+      }
+      if (pendingDeletion) {
+        throw new AppError(
+          'This quote has a pending deletion request. Resolve the request before creating an order.',
+          409,
+          'DELETION_REQUEST_PENDING',
+        );
+      }
+    }
     if (!(await this.validateQuoteValidity(orderData.quoteId))) {
       throw new AppError(`Quote ${orderData.quoteId} has expired or is invalid. Please request a fresh quotation.`, 400, 'QUOTE_EXPIRED');
+    }
+    // Only an admin-approved quote may become an order. This preserves the
+    // lifecycle: submit → quote (Ready for Approval) → admin approves via
+    // convertQuoteToOrder → exactly ONE order. A direct creation attempt
+    // against a pending/rejected quote is refused before any write.
+    if (quote.status !== 'Approved') {
+      throw new AppError('This quote has not been approved yet. Please contact CAM LABS support before creating an order.', 400, 'QUOTE_NOT_APPROVED');
     }
     if (quote.technology !== (orderData.technology || '') || quote.material !== (orderData.material || '') || quote.quantity !== (orderData.quantity || 1)) {
       throw new AppError('The submitted manufacturing configuration does not match the quoted configuration.', 400, 'CONFIG_MISMATCH');
@@ -168,6 +198,13 @@ export class OrdersService {
     const shippingAddress = orderData.shippingAddress?.trim() || profileAddress || 'To be confirmed with customer';
 
     const orderId = internal.reservedOrderId || this.generateOrderId();
+    // Unified reference: reuse the Quote's reference when present (new submit flow),
+    // otherwise generate once here. The reservation below carries it atomically
+    // so no extra DB round-trip is needed (preserves single-claim semantics).
+    const unifiedFromQuote = typeof (quote as any).reference === 'string' && (quote as any).reference
+      ? (quote as any).reference as string
+      : null;
+    const unifiedReference: string = internal.reservedReference || unifiedFromQuote || await BusinessReferenceService.generateUniqueReference();
 
     // Direct submissions (POST /orders) must claim the quote atomically — the
     // pre-check above is read-then-act, so two concurrent requests could
@@ -175,10 +212,10 @@ export class OrdersService {
     // convertQuoteToOrder performs its own reservation before calling in.
     let claimedHere = false;
     if (!internal.reservedOrderId) {
-      // Check if the quote is already claimed
+      // Check if the quote is already claimed (single atomic claim incl. reference).
       const claimed = await prisma.quote.updateMany({
         where: { id: orderData.quoteId, convertedOrderId: null },
-        data: { convertedOrderId: orderId },
+        data: unifiedFromQuote ? { convertedOrderId: orderId } : { convertedOrderId: orderId, reference: unifiedReference },
       });
       if (claimed.count !== 1) {
         throw new AppError('This quote has already been converted to an order.', 409, 'QUOTE_ALREADY_CONVERTED');
@@ -235,9 +272,12 @@ export class OrdersService {
     ];
 
     newOrder = await prisma.$transaction(async (tx) => {
+      // Unified business reference already resolved above (no extra quote write here).
+      const q: any = quote as any;
       const created = await tx.order.create({
         data: {
           id: orderId,
+          reference: unifiedReference,
           userId: orderData.userId,
           quoteId: orderData.quoteId,
           partName: orderData.partName || 'Custom_Component.step',
@@ -255,6 +295,17 @@ export class OrdersService {
           shippingAddress,
           shippingCost,
           shippingMethod,
+          shippingCostAmount: (q.shippingCostAmount as number | null) ?? (shippingFee > 0 ? shippingFee : 0),
+          shippingAddressSnapshot: (q.shippingAddressSnapshot as any) ?? undefined,
+          billingAddressSnapshot: (q.billingAddressSnapshot as any) ?? undefined,
+          contactSnapshot: (q.contactSnapshot as any) ?? undefined,
+          preferredPaymentMethod: (q.preferredPaymentMethod as string | null) ?? undefined,
+          couponId: (q.couponId as string | null) ?? undefined,
+          couponCodeSnapshot: (q.couponCodeSnapshot as string | null) ?? undefined,
+          couponDiscountTypeSnapshot: (q.couponDiscountTypeSnapshot as string | null) ?? undefined,
+          couponDiscountValueSnapshot: (q.couponDiscountValueSnapshot as number | null) ?? undefined,
+          couponEligibleAmountSnapshot: (q.couponEligibleAmountSnapshot as number | null) ?? undefined,
+          couponDiscountAmountApplied: (q.couponDiscountAmountApplied as number | null) ?? 0,
           carrier: 'CAM LABS Express',
           tolerance: orderData.tolerance || '±0.15 mm (ISO 2768-m)',
           provider: dispatchResult.engineName,
@@ -355,20 +406,41 @@ export class OrdersService {
    * order row is written, so a quote can only ever produce one order.
    */
   static async convertQuoteToOrder(quoteId: string): Promise<Order | null> {
-    const prisma = getPrismaClient();
+    const prisma = getPrismaClient() as any;
     const quote = await QuotesService.getQuoteById(quoteId);
     if (!quote) throw new AppError('Quote not found.', 404, 'QUOTE_NOT_FOUND');
     if (quote.convertedOrderId) {
       throw new AppError('This quote has already been converted to an order.', 409, 'QUOTE_ALREADY_CONVERTED');
+    }
+    // A Quote with a PENDING deletion request must never silently convert:
+    // the admin must first Reject the request (then convert) or Approve the
+    // deletion (Quote removed). Checked before the atomic reservation so no
+    // conversion row is written while a request is open.
+    const pendingDeletion = await prisma.quoteDeletionRequest?.findFirst?.({
+      where: { quoteId, status: 'PENDING' },
+    });
+    if (pendingDeletion) {
+      throw new AppError(
+        'This quote has a pending deletion request. Resolve the request (approve deletion or reject it) before converting to an order.',
+        409,
+        'DELETION_REQUEST_PENDING',
+      );
     }
     if (!(await this.validateQuoteValidity(quoteId))) {
       throw new AppError(`Quote ${quoteId} has expired or is invalid. Please request a fresh quotation.`, 400, 'QUOTE_EXPIRED');
     }
 
     const orderId = this.generateOrderId();
+    // Unified reference in the SAME atomic reservation (no extra DB call):
+    // reuse existing quote reference when present, else reserve a fresh one.
+    const existingRef = typeof (quote as any).reference === 'string' && (quote as any).reference
+      ? ((quote as any).reference as string)
+      : await BusinessReferenceService.generateUniqueReference();
     const reserved = await prisma.quote.updateMany({
       where: { id: quoteId, convertedOrderId: null },
-      data: { status: 'Approved', convertedOrderId: orderId },
+      data: (quote as any).reference
+        ? { status: 'Approved', convertedOrderId: orderId }
+        : { status: 'Approved', convertedOrderId: orderId, reference: existingRef },
     });
     if (reserved.count !== 1) {
       throw new AppError('This quote has already been converted to an order.', 409, 'QUOTE_ALREADY_CONVERTED');
@@ -393,7 +465,7 @@ export class OrdersService {
           cadFileIds: quoteCadFileIds,
           cadFileConfigs: quoteCadFileIds.map((cadFileId) => ({ cadFileId })),
         },
-        { reservedOrderId: orderId }
+        { reservedOrderId: orderId, reservedReference: existingRef }
       );
 
       Logger.info(`[OrdersService] Converted quote ${quote.id} to order ${newOrder.id}.`);

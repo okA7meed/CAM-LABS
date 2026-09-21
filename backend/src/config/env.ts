@@ -7,6 +7,14 @@ export const ENV = {
   DATABASE_URL: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/cam_labs_db?schema=public',
   CORS_ORIGIN: process.env.CORS_ORIGIN || 'http://localhost:3000',
   SESSION_TTL_DAYS: parseInt(process.env.SESSION_TTL_DAYS || '30', 10),
+  GOOGLE_CLIENT_ID: (process.env.GOOGLE_CLIENT_ID || '').trim(),
+  RESEND_API_KEY: (process.env.RESEND_API_KEY || '').trim(),
+  RESEND_FROM: (process.env.RESEND_FROM || 'CAM LABS <onboarding@resend.dev>').trim(),
+  PASSWORD_RESET_PEPPER: (process.env.PASSWORD_RESET_PEPPER || '').trim(),
+  PASSWORD_RESET_OTP_TTL_MINUTES: parseInt(process.env.PASSWORD_RESET_OTP_TTL_MINUTES || '10', 10),
+  PASSWORD_RESET_MAX_ATTEMPTS: parseInt(process.env.PASSWORD_RESET_MAX_ATTEMPTS || '5', 10),
+  PASSWORD_RESET_RESEND_COOLDOWN_SECONDS: parseInt(process.env.PASSWORD_RESET_RESEND_COOLDOWN_SECONDS || '60', 10),
+  PASSWORD_RESET_TOKEN_TTL_MINUTES: parseInt(process.env.PASSWORD_RESET_TOKEN_TTL_MINUTES || '15', 10),
   CAD_STORAGE_ROOT: process.env.CAD_STORAGE_ROOT || '.data/cad-files',
   CAD_MAX_FILE_SIZE_BYTES: parseInt(process.env.CAD_MAX_FILE_SIZE_BYTES || String(150 * 1024 * 1024), 10),
   TECHNICAL_MAX_FILE_SIZE_BYTES: parseInt(process.env.TECHNICAL_MAX_FILE_SIZE_BYTES || String(10 * 1024 * 1024), 10),
@@ -45,6 +53,22 @@ export const getEnvironmentIssues = (): string[] => {
 
   if (ENV.NODE_ENV === 'production' && ENV.CAD_SCANNER_MODE === 'local') {
     issues.push('CAD_SCANNER_MODE must select a production scanner in production.');
+  }
+
+  if (!Number.isInteger(ENV.PASSWORD_RESET_OTP_TTL_MINUTES) || ENV.PASSWORD_RESET_OTP_TTL_MINUTES < 1 || ENV.PASSWORD_RESET_OTP_TTL_MINUTES > 60) {
+    issues.push('PASSWORD_RESET_OTP_TTL_MINUTES must be an integer between 1 and 60.');
+  }
+
+  if (!Number.isInteger(ENV.PASSWORD_RESET_MAX_ATTEMPTS) || ENV.PASSWORD_RESET_MAX_ATTEMPTS < 1 || ENV.PASSWORD_RESET_MAX_ATTEMPTS > 10) {
+    issues.push('PASSWORD_RESET_MAX_ATTEMPTS must be an integer between 1 and 10.');
+  }
+
+  if (!Number.isInteger(ENV.PASSWORD_RESET_RESEND_COOLDOWN_SECONDS) || ENV.PASSWORD_RESET_RESEND_COOLDOWN_SECONDS < 10 || ENV.PASSWORD_RESET_RESEND_COOLDOWN_SECONDS > 600) {
+    issues.push('PASSWORD_RESET_RESEND_COOLDOWN_SECONDS must be an integer between 10 and 600.');
+  }
+
+  if (!Number.isInteger(ENV.PASSWORD_RESET_TOKEN_TTL_MINUTES) || ENV.PASSWORD_RESET_TOKEN_TTL_MINUTES < 5 || ENV.PASSWORD_RESET_TOKEN_TTL_MINUTES > 60) {
+    issues.push('PASSWORD_RESET_TOKEN_TTL_MINUTES must be an integer between 5 and 60.');
   }
 
   return issues;

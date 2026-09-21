@@ -171,6 +171,23 @@ export class CadService {
     return { version, stream: storage.stream(key), isViewerAsset: Boolean(version.viewerAssetKey) };
   }
 
+  /** Staff read path: operations admins inspect customer geometry from the
+   *  admin order workspace. Authorization is enforced by the route layer
+   *  (requireOperationsAdmin); this only removes the per-owner filter. */
+  static async downloadAny(id: string) {
+    const file = await prisma.cadFile.findFirst({ where: { id }, include: { versions: { orderBy: { version: 'desc' }, take: 1 } } });
+    const version = file?.versions[0];
+    if (!version) throw new NotFoundError('CAD file');
+    const key = version.viewerAssetKey || version.storageKey;
+    return { version, stream: storage.stream(key), isViewerAsset: Boolean(version.viewerAssetKey) };
+  }
+
+  static async getAny(id: string) {
+    const file = await prisma.cadFile.findFirst({ where: { id }, include: { versions: { orderBy: { version: 'desc' }, include: versionInclude } } });
+    if (!file) throw new NotFoundError('CAD file');
+    return { ...this.toCadFile(file), versions: file.versions.map(publicVersion) };
+  }
+
   static async geometry(owner: CadOwner, id: string, versionId?: string) {
     const file = await prisma.cadFile.findFirst({ where: { id, ...ownerWhere(owner) }, include: { versions: { where: versionId ? { id: versionId } : undefined, orderBy: { version: 'desc' }, take: 1, include: versionInclude } } });
     const version = file?.versions[0];
@@ -180,6 +197,26 @@ export class CadService {
 
   static async viewerAsset(owner: CadOwner, id: string, versionId?: string) {
     const file = await prisma.cadFile.findFirst({ where: { id, ...ownerWhere(owner) }, include: { versions: { where: versionId ? { id: versionId } : undefined, orderBy: { version: 'desc' }, take: 1 } } });
+    const version = file?.versions[0];
+    const metadata = version?.metadata as { geometryStatus?: string; viewerAsset?: { available?: boolean } } | null;
+    if (!file || !version) throw new NotFoundError('CAD file');
+    if (version.processingStatus !== 'COMPLETE' || metadata?.geometryStatus !== 'READY' || !metadata.viewerAsset?.available) {
+      throw new AppError('A browser viewer asset is not available for this CAD version.', 409, 'VIEWER_ASSET_NOT_READY');
+    }
+    return { version, stream: storage.stream(version.viewerAssetKey || version.storageKey), isViewerAsset: Boolean(version.viewerAssetKey) };
+  }
+
+  /** Staff read path for geometry metadata (admin order workspace). */
+  static async geometryAny(id: string, versionId?: string) {
+    const file = await prisma.cadFile.findFirst({ where: { id }, include: { versions: { where: versionId ? { id: versionId } : undefined, orderBy: { version: 'desc' }, take: 1, include: versionInclude } } });
+    const version = file?.versions[0];
+    if (!file || !version) throw new NotFoundError('CAD file');
+    return { fileId: file.id, version: version.version, format: version.format, status: version.processingStatus, scanStatus: version.scanStatus, metadata: version.metadata, dimensions: version.dimensions, volume: version.volume, meshTriangles: version.meshTriangles, jobs: version.jobs.map((job) => ({ operation: job.operation, status: job.status, lastError: job.status === 'FAILED' ? 'CAD processing failed.' : null })) };
+  }
+
+  /** Staff read path for the browser viewer asset (admin order workspace). */
+  static async viewerAssetAny(id: string, versionId?: string) {
+    const file = await prisma.cadFile.findFirst({ where: { id }, include: { versions: { where: versionId ? { id: versionId } : undefined, orderBy: { version: 'desc' }, take: 1 } } });
     const version = file?.versions[0];
     const metadata = version?.metadata as { geometryStatus?: string; viewerAsset?: { available?: boolean } } | null;
     if (!file || !version) throw new NotFoundError('CAD file');

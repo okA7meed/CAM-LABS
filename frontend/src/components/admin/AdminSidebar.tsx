@@ -5,6 +5,7 @@ import { useStore } from '../../context/StoreContext';
 import { ADMIN_NAV_GROUPS } from '../../constants/adminNav';
 import { Icon, IconName } from '../ui/Icon';
 import { UserAvatar, getUserAvatarColor } from '../ui/UserAvatar';
+import { Logo } from '../layout/Logo';
 import { ViewType } from '../../types';
 
 interface AdminSidebarProps {
@@ -19,7 +20,16 @@ const CollapseGlyph = () => (
   </svg>
 );
 
-export const AdminSidebar: React.FC<AdminSidebarProps> = ({ onNavigate, onToggle }) => {
+/** Display label for the authenticated admin role (live data, never hardcoded). */
+const roleLabel = (role?: string, fallback?: string): string => {
+  if (!role) return fallback ?? 'Admin';
+  return role
+    .split('_')
+    .map((part) => (part ? part.charAt(0) + part.slice(1).toLowerCase() : part))
+    .join(' ');
+};
+
+export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed, onNavigate, onToggle }) => {
   const { t } = useTranslation();
   const { currentUser } = useAuth();
   const { activeView } = useStore();
@@ -46,25 +56,27 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ onNavigate, onToggle
   const renderItem = (view: ViewType, labelKey: string, icon: IconName) => {
     const isActive = view === activeView;
     const showDot = view === 'admin-notifications' && unread > 0;
+    const label = t(labelKey);
     return (
       <button
         key={view}
         type="button"
         className={`cam-nav-item ${isActive ? 'active' : ''}`}
         aria-current={isActive ? 'page' : undefined}
+        title={collapsed ? label : undefined}
+        aria-label={collapsed ? label : undefined}
         onClick={() => onNavigate(view)}
       >
         <span className="cam-nav-ic" aria-hidden="true">
-          <Icon name={icon} size={20} />
+          <Icon name={icon} size={19} />
         </span>
-        <span className="cam-nav-label">{t(labelKey)}</span>
+        <span className="cam-nav-label">{label}</span>
         {showDot ? (
           <span className="cam-nav-dot" aria-label={t('admin.notificationsUnread', { count: unread })} />
-        ) : (
-          <span className="cam-nav-chev" aria-hidden="true">
-            <Icon name="chevronRight" size={14} />
-          </span>
-        )}
+        ) : null}
+        <span className="cam-nav-chev" aria-hidden="true">
+          <Icon name="chevronRight" size={14} />
+        </span>
       </button>
     );
   };
@@ -73,10 +85,8 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ onNavigate, onToggle
     <aside className="cam-sidebar" aria-label={t('admin.panel')}>
       <div className="cam-brand">
         <div className="cam-brand-row">
-          <span className="cam-brand-mark" role="img" aria-label={t('admin.logoAlt')}>C</span>
-          <span className="cam-brand-text-wrap">
-            <span className="cam-brand-text">{t('admin.brand')}</span>
-            <span className="cam-brand-sub">{t('admin.panel')}</span>
+          <span className="cam-brand-logo">
+            <Logo />
           </span>
           {onToggle && (
             <button
@@ -85,11 +95,13 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ onNavigate, onToggle
               onClick={onToggle}
               aria-label={t('admin.toggleNav')}
               title={t('admin.toggleNav')}
+              aria-expanded={!collapsed}
             >
               <CollapseGlyph />
             </button>
           )}
         </div>
+        <div className="cam-brand-subline" aria-hidden="true">{t('admin.panel')}</div>
       </div>
 
       <nav className="cam-sidebar-nav" aria-label={t('admin.panel')} id="admin-sidebar-nav">
@@ -105,7 +117,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ onNavigate, onToggle
         <UserAvatar name={userName} color={getUserAvatarColor(currentUser)} size="sm" />
         <span className="cam-profile-meta">
           <span className="cam-profile-name">{userName}</span>
-          <span className="cam-profile-role">{t('admin.roleAdmin')}</span>
+          <span className="cam-profile-role">{roleLabel(currentUser?.role, t('admin.roleAdmin'))}</span>
         </span>
         <span className="cam-profile-chev" aria-hidden="true">
           <Icon name="chevronRight" size={14} />

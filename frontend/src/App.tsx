@@ -1,5 +1,6 @@
 import React, { lazy, Suspense, useEffect, useState } from 'react';
 import { Header } from './components/layout/Header';
+import { BetaAnnouncementBar } from './components/layout/BetaAnnouncementBar';
 import { Footer } from './components/layout/Footer';
 import { MobileNav } from './components/layout/MobileNav';
 import { ToastContainer } from './components/layout/ToastContainer';
@@ -33,11 +34,22 @@ import { useTranslation } from 'react-i18next';
  * only downloaded when the user actually reaches those surfaces.
  */
 const NotFoundView = lazy(() => import('./components/common/NotFoundView').then((m) => ({ default: m.NotFoundView })));
+const DashboardView = lazy(() => import('./components/dashboard/DashboardView').then((m) => ({ default: m.DashboardView })));
 const OrderCenter = lazy(() => import('./components/orders/OrderCenter').then((m) => ({ default: m.OrderCenter })));
 const ProfileView = lazy(() => import('./components/profile/ProfileView').then((m) => ({ default: m.ProfileView })));
 const MarketplaceView = lazy(() => import('./components/marketplace/MarketplaceView').then((m) => ({ default: m.MarketplaceView })));
 const ManufacturingRequestView = lazy(() => import('./components/manufacturing/ManufacturingWorkspaceView').then((m) => ({ default: m.ManufacturingRequestView })));
+const SubmitQuoteView = lazy(() => import('./components/quote/SubmitQuoteView').then((m) => ({ default: m.SubmitQuoteView })));
+const QuoteSuccessView = lazy(() => import('./components/quote/QuoteSuccessView').then((m) => ({ default: m.QuoteSuccessView })));
 const ComingSoonView = lazy(() => import('./components/coming-soon/ComingSoonView').then((m) => ({ default: m.ComingSoonView })));
+const PrivacyView = lazy(() => import('./components/legal/PrivacyView').then((m) => ({ default: m.PrivacyView })));
+const TermsView = lazy(() => import('./components/legal/TermsView').then((m) => ({ default: m.TermsView })));
+const NdaView = lazy(() => import('./components/legal/NdaView').then((m) => ({ default: m.NdaView })));
+const SecurityView = lazy(() => import('./components/legal/SecurityView').then((m) => ({ default: m.SecurityView })));
+const FaqView = lazy(() => import('./components/legal/FaqView').then((m) => ({ default: m.FaqView })));
+const ShippingView = lazy(() => import('./components/legal/ShippingView').then((m) => ({ default: m.ShippingView })));
+const ContactView = lazy(() => import('./components/legal/ContactView').then((m) => ({ default: m.ContactView })));
+const CustomerQuotesView = lazy(() => import('./components/customer/CustomerQuotesView').then((m) => ({ default: m.CustomerQuotesView })));
 const EquationBuilderView = lazy(() => import('./components/admin/EquationBuilderView').then((m) => ({ default: m.EquationBuilderView })));
 const AdminDashboardView = lazy(() => import('./components/admin/AdminDashboardView').then((m) => ({ default: m.AdminDashboardView })));
 const AdminOrdersView = lazy(() => import('./components/admin/AdminOrdersView').then((m) => ({ default: m.AdminOrdersView })));
@@ -46,12 +58,15 @@ const AdminManufacturersView = lazy(() => import('./components/admin/AdminManufa
 const AdminManufacturingRequestsView = lazy(() => import('./components/admin/AdminManufacturingRequestsView').then((m) => ({ default: m.AdminManufacturingRequestsView })));
 const AdminMaterialsView = lazy(() => import('./components/admin/AdminMaterialsView').then((m) => ({ default: m.AdminMaterialsView })));
 const AdminQuotesView = lazy(() => import('./components/admin/AdminQuotesView').then((m) => ({ default: m.AdminQuotesView })));
+const AdminDiscountCodesView = lazy(() => import('./components/admin/AdminDiscountCodesView').then((m) => ({ default: m.AdminDiscountCodesView })));
+const AdminDiscountCodeDetailView = lazy(() => import('./components/admin/AdminDiscountCodeDetailView').then((m) => ({ default: m.AdminDiscountCodeDetailView })));
 const AdminCadFilesView = lazy(() => import('./components/admin/AdminCadFilesView').then((m) => ({ default: m.AdminCadFilesView })));
 const AdminOrderDetailView = lazy(() => import('./components/admin/AdminOrderDetailView').then((m) => ({ default: m.AdminOrderDetailView })));
 const AdminCustomerDetailView = lazy(() => import('./components/admin/AdminCustomerDetailView').then((m) => ({ default: m.AdminCustomerDetailView })));
 const AdminManufacturerDetailView = lazy(() => import('./components/admin/AdminManufacturerDetailView').then((m) => ({ default: m.AdminManufacturerDetailView })));
 const AdminManufacturingRequestDetailView = lazy(() => import('./components/admin/AdminManufacturingRequestDetailView').then((m) => ({ default: m.AdminManufacturingRequestDetailView })));
 const AdminQuoteDetailView = lazy(() => import('./components/admin/AdminQuoteDetailView').then((m) => ({ default: m.AdminQuoteDetailView })));
+const AdminDeletionRequestsView = lazy(() => import('./components/admin/AdminDeletionRequestsView').then((m) => ({ default: m.AdminDeletionRequestsView })));
 const AdminCadFileDetailView = lazy(() => import('./components/admin/AdminCadFileDetailView').then((m) => ({ default: m.AdminCadFileDetailView })));
 const AdminPaymentsView = lazy(() => import('./components/admin/AdminPaymentsView').then((m) => ({ default: m.AdminPaymentsView })));
 const AdminShippingView = lazy(() => import('./components/admin/AdminShippingView').then((m) => ({ default: m.AdminShippingView })));
@@ -148,12 +163,28 @@ export const App: React.FC = () => {
   }, [closeAuthModal, closeComparisonModal, closeForgotPassword, closeOrderTimeline, closePersonaModal]);
 
   useEffect(() => {
-    document.body.style.overflow = activeView === 'manufacturing-request' ? 'hidden' : '';
+    // Desktop workspace is a viewport-locked app (internal column scroll), so
+    // the document is locked. On mobile the workspace is a normally scrolling
+    // page — locking the body there traps the user in the initial viewport.
+    const mq = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      ? window.matchMedia('(max-width: 920px)')
+      : null;
+    const apply = () => {
+      const isMobile = mq ? mq.matches : false;
+      document.body.style.overflow = activeView === 'manufacturing-request' && !isMobile ? 'hidden' : '';
+    };
+    apply();
+    if (mq && typeof mq.addEventListener === 'function') {
+      mq.addEventListener('change', apply);
+      return () => mq.removeEventListener('change', apply);
+    }
+    return undefined;
   }, [activeView]);
 
   return (
-    <div className={`${isAdminView ? '' : 'tech-grid-bg'} page-enter${activeView === 'manufacturing-request' ? ' app-viewport' : ''}`} style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      {!isAdminView && <Header onToggleMobileNav={() => setMobileNavOpen(!mobileNavOpen)} />}
+    <div className={`page-enter${activeView === 'manufacturing-request' ? ' app-viewport' : ''}`} style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--cam-bg)' }}>
+      {!isAdminView && <BetaAnnouncementBar />}
+      {!isAdminView && <Header onToggleMobileNav={() => setMobileNavOpen(!mobileNavOpen)} mobileNavOpen={mobileNavOpen} />}
       {!isAdminView && <MobileNav isOpen={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />}
 
       {isLoading && <main id="view-loading"><div className="container loading-state"><div className="skeleton loading-state-mark" /><p>{t('status.resolvingSession')}</p></div></main>}
@@ -174,7 +205,8 @@ export const App: React.FC = () => {
             )}
           >
           {activeView === 'not-found' && <NotFoundView />}
-          {activeView === 'dashboard' && isAuthenticated && <OrderCenter />}
+          {activeView === 'dashboard' && isAuthenticated && <DashboardView />}
+          {activeView === 'orders' && isAuthenticated && <OrderCenter />}
           {activeView === 'profile' && isAuthenticated && <ProfileView />}
           {activeView === 'marketplace' && <MarketplaceView />}
           {activeView === 'manufacturing-request' && (
@@ -193,7 +225,57 @@ export const App: React.FC = () => {
               <ManufacturingRequestView />
             </ErrorBoundary>
           )}
+          {activeView === 'submit-quote' && (
+            <Suspense fallback={<ViewLoader />}>
+              <SubmitQuoteView />
+            </Suspense>
+          )}
+          {activeView === 'quote-success' && (
+            <Suspense fallback={<ViewLoader />}>
+              <QuoteSuccessView />
+            </Suspense>
+          )}
           {activeView === 'coming-soon' && <ComingSoonView />}
+          {activeView === 'privacy' && (
+            <Suspense fallback={<ViewLoader />}>
+              <PrivacyView />
+            </Suspense>
+          )}
+          {activeView === 'terms' && (
+            <Suspense fallback={<ViewLoader />}>
+              <TermsView />
+            </Suspense>
+          )}
+          {activeView === 'nda' && (
+            <Suspense fallback={<ViewLoader />}>
+              <NdaView />
+            </Suspense>
+          )}
+          {activeView === 'security' && (
+            <Suspense fallback={<ViewLoader />}>
+              <SecurityView />
+            </Suspense>
+          )}
+          {activeView === 'faq' && (
+            <Suspense fallback={<ViewLoader />}>
+              <FaqView />
+            </Suspense>
+          )}
+          {activeView === 'shipping' && (
+            <Suspense fallback={<ViewLoader />}>
+              <ShippingView />
+            </Suspense>
+          )}
+          {activeView === 'contact' && (
+            <Suspense fallback={<ViewLoader />}>
+              <ContactView />
+            </Suspense>
+          )}
+          {activeView === 'quotes' && (
+            <Suspense fallback={<ViewLoader />}>
+              <CustomerQuotesView />
+            </Suspense>
+          )}
           {activeView === 'equation-builder' && isAuthenticated && currentUser?.role?.includes('ADMIN') && <EquationBuilderView />}
 
           {/* Admin Views */}
@@ -209,6 +291,9 @@ export const App: React.FC = () => {
           {activeView === 'admin-materials' && isAuthenticated && currentUser?.role?.includes('ADMIN') && <AdminMaterialsView />}
           {activeView === 'admin-quotes' && isAuthenticated && currentUser?.role?.includes('ADMIN') && <AdminQuotesView />}
           {activeView === 'admin-quote-detail' && isAuthenticated && currentUser?.role?.includes('ADMIN') && <AdminQuoteDetailView />}
+          {activeView === 'admin-deletion-requests' && isAuthenticated && currentUser?.role?.includes('ADMIN') && <AdminDeletionRequestsView />}
+          {activeView === 'admin-discount-codes' && isAuthenticated && currentUser?.role?.includes('ADMIN') && <AdminDiscountCodesView />}
+          {activeView === 'admin-discount-code-detail' && isAuthenticated && currentUser?.role?.includes('ADMIN') && <AdminDiscountCodeDetailView />}
           {activeView === 'admin-cad-files' && isAuthenticated && currentUser?.role?.includes('ADMIN') && <AdminCadFilesView />}
           {activeView === 'admin-cad-file-detail' && isAuthenticated && currentUser?.role?.includes('ADMIN') && <AdminCadFileDetailView />}
           {activeView === 'admin-shipping' && isAuthenticated && currentUser?.role?.includes('ADMIN') && <AdminShippingView />}
@@ -223,7 +308,7 @@ export const App: React.FC = () => {
         </Suspense>
       )}
 
-      {!isLoading && activeView !== 'marketplace' && activeView !== 'manufacturing-request' && activeView !== 'coming-soon' && activeView !== 'equation-builder' && activeView !== 'not-found' && !activeView.startsWith('admin-') && (activeView !== 'dashboard' || !isAuthenticated) && (activeView !== 'profile' || !isAuthenticated) && (
+      {!isLoading && activeView !== 'marketplace' && activeView !== 'manufacturing-request' && activeView !== 'submit-quote' && activeView !== 'quote-success' && activeView !== 'coming-soon' && activeView !== 'equation-builder' && activeView !== 'not-found' && activeView !== 'privacy' && activeView !== 'terms' && activeView !== 'nda' && activeView !== 'security' && activeView !== 'faq' && activeView !== 'shipping' && activeView !== 'contact' && activeView !== 'quotes' && !activeView.startsWith('admin-') && (activeView !== 'dashboard' || !isAuthenticated) && (activeView !== 'orders' || !isAuthenticated) && (activeView !== 'profile' || !isAuthenticated) && (
         <main className={leavingToWorkspace ? 'app-exiting' : ''} id="view-landing">
           <HeroSection />
           <ServicesSection />

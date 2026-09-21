@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 import i18n from '../../i18n';
 import { Icon, IconName } from '../ui/Icon';
 import { CadGeometryViewer } from '../manufacturing/CadGeometryViewer';
-import { AnimatedModal } from '../ui/AnimatedModal';
+import { OrderDetailModal } from '../dashboard/OrderDetailModal';
 
 // Canonical CAM LABS order lifecycle — the backend is the source of truth for
 // the valid statuses (ORDER_LIFECYCLE_STATUSES in the admin API). This only
@@ -70,40 +70,6 @@ const formatDate = (value?: string | null): string => {
   }).format(date);
 };
 
-const formatDateTime = (value?: string): string => {
-  if (!value) return '—';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat(i18n.language.startsWith('ar') ? 'ar-EG' : 'en-US', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
-};
-
-const eventLabel = (eventType: string): string => {
-  const map: Record<string, string> = {
-    ORDER_CREATED: 'order.event.created',
-    CAD_UPLOADED: 'order.event.cadUploaded',
-    QUOTE_GENERATED: 'order.event.quoteGenerated',
-    ORDER_CONFIRMED: 'order.event.confirmed',
-    ORDER_APPROVED: 'order.event.approved',
-    MANUFACTURER_ASSIGNED: 'order.event.manufacturerAssigned',
-    PRODUCTION_STARTED: 'order.event.productionStarted',
-    PRODUCTION_COMPLETED: 'order.event.productionCompleted',
-    QA_PASSED: 'order.event.qaPassed',
-    QA_FAILED: 'order.event.qaFailed',
-    SHIPPED: 'order.event.shipped',
-    DELIVERED: 'order.event.delivered',
-    CANCELLED: 'order.event.cancelled',
-    STATUS_UPDATE: 'order.event.statusUpdate',
-    PRICE_UPDATED: 'order.event.priceUpdated',
-  };
-  return map[eventType] || 'order.event.generic';
-};
-
 type TFunction = (key: string, opts?: Record<string, unknown>) => string;
 
 const PAGE_SIZE = 6;
@@ -119,7 +85,7 @@ const SUMMARY_DEFS: Array<{ cls: string; valueKey: 'total' | 'inReview' | 'inPro
 
 export const OrderCenter: React.FC = () => {
   const { currentUser } = useAuth();
-  const { startManufacturingRequest } = useStore();
+  const { startManufacturingRequest, pendingOrderDetailId, consumeOrderDetail } = useStore();
   const { t } = useTranslation();
 
   const [orders, setOrders] = useState<Order[]>([]);
@@ -130,10 +96,7 @@ export const OrderCenter: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<'all' | OrderStatus>('all');
   const [page, setPage] = useState(1);
 
-  const [detailOrderId, setDetailOrderId] = useState<string | null>(null);
-  const [detail, setDetail] = useState<Order | null>(null);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [detailError, setDetailError] = useState('');
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const loadOrders = useCallback(async () => {
@@ -153,26 +116,15 @@ export const OrderCenter: React.FC = () => {
   // Load real orders whenever the customer reaches the dashboard.
   useEffect(() => { void loadOrders(); }, [loadOrders, currentUser?.id]);
 
-  const openDetail = useCallback(async (orderId: string) => {
-    setDetailOrderId(orderId);
-    setDetail(null);
-    setDetailError('');
-    setDetailLoading(true);
-    try {
-      const full = await ApiService.getOrderById(orderId);
-      if (!full) throw new Error(t('orderCenter.detailNotFound'));
-      setDetail(full);
-    } catch (err) {
-      setDetailError(err instanceof ApiError ? err.message : t('orderCenter.errorTitle'));
-    } finally {
-      setDetailLoading(false);
+  // Deep-open if pendingOrderDetailId is set.
+  useEffect(() => {
+    if (pendingOrderDetailId) {
+      const id = pendingOrderDetailId;
+      consumeOrderDetail();
+      const found = orders.find((o) => o.id === id);
+      setSelectedOrder(found || ({ id } as Order));
     }
-  }, [t]);
-
-  const closeDetail = useCallback(() => {
-    setDetailOrderId(null);
-    setDetail(null);
-  }, []);
+  }, [pendingOrderDetailId, consumeOrderDetail, orders]);
 
   const copyOrderId = async (id: string) => {
     try {
@@ -351,8 +303,8 @@ export const OrderCenter: React.FC = () => {
                     key={order.id}
                     order={order}
                     copiedId={copiedId}
-                    onCopy={() => void copyOrderId(order.id)}
-                    onOpen={() => void openDetail(order.id)}
+                    onCopy={() => void copyOrderId(order.reference || order.id)}
+                    onOpen={() => setSelectedOrder(order)}
                     t={t}
                   />
                 ))}
@@ -392,25 +344,7 @@ export const OrderCenter: React.FC = () => {
         )}
       </div>
 
-      {/* Detail modal */}
-      <AnimatedModal open={!!detailOrderId} cardClassName="modal-lg" role="dialog" ariaLabel={t('orderCenter.detailTitle')}>
-        <div className="modal-header">
-          <div className="modal-title">{t('orderCenter.detailTitle')}</div>
-          <button className="modal-close" onClick={closeDetail} aria-label={t('common.close')}>
-            <Icon name="close" size={20} />
-          </button>
-        </div>
-        <div className="modal-body">
-          {detailLoading && <div className="oc-state"><strong className="oc-state__title">{t('orderCenter.loading')}</strong></div>}
-          {detailError && (
-            <div className="oc-state is-error" role="alert">
-              <strong className="oc-state__title">{t('orderCenter.errorTitle')}</strong>
-              <button className="btn btn-sm btn-outline" onClick={() => detailOrderId && void openDetail(detailOrderId)}>{t('orderCenter.retry')}</button>
-            </div>
-          )}
-          {!detailLoading && !detailError && detail && <OrderDetail order={detail} t={t} />}
-        </div>
-      </AnimatedModal>
+      <OrderDetailModal order={selectedOrder} onClose={() => setSelectedOrder(null)} />
     </main>
   );
 };
@@ -485,6 +419,7 @@ const OrderCard: React.FC<{ order: Order; copiedId: string | null; onCopy: () =>
   const steps = statusStepsFor(order);
   const cad = order.cadFiles?.[0]?.cadFile;
   const fileName = cad?.name || t('orderCenter.notProvided');
+  const reference = order.reference || order.id;
   const delivery = order.estDelivery ? formatDate(order.estDelivery) : deliveryFallback(t);
   const updated = formatDate(order.updatedAt || order.createdAt);
 
@@ -495,7 +430,7 @@ const OrderCard: React.FC<{ order: Order; copiedId: string | null; onCopy: () =>
       tabIndex={0}
       onClick={onOpen}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(); } }}
-      aria-label={t('orderCenter.openOrder', { id: order.id })}
+      aria-label={t('orderCenter.openOrder', { id: reference })}
     >
       <div className="oc-card__top">
         <div className="oc-card__preview" aria-hidden="true">
@@ -510,9 +445,9 @@ const OrderCard: React.FC<{ order: Order; copiedId: string | null; onCopy: () =>
         </div>
         <div className="oc-card__head">
           <div className="oc-card__id-row">
-            <span className="oc-card__id">{order.id}</span>
-            <button className={`oc-card__copy${copiedId === order.id ? ' is-copied' : ''}`} onClick={(e) => { e.stopPropagation(); onCopy(); }} title={t('orderCenter.copyId')} aria-label={t('orderCenter.copyId')}>
-              {copiedId === order.id ? <Icon name="check" size={14} /> : <Icon name="copy" size={14} />}
+            <span className="oc-card__id" title={order.id} dir="ltr">{reference}</span>
+            <button className={`oc-card__copy${copiedId === reference ? ' is-copied' : ''}`} onClick={(e) => { e.stopPropagation(); onCopy(); }} title={t('orderCenter.copyId')} aria-label={t('orderCenter.copyId')}>
+              {copiedId === reference ? <Icon name="check" size={14} /> : <Icon name="copy" size={14} />}
             </button>
           </div>
           <div className="oc-card__name" title={order.partName || fileName}>{order.partName || fileName}</div>
@@ -574,97 +509,3 @@ const OCKV: React.FC<{ label: string; value: React.ReactNode; icon?: IconName }>
     <div className="oc-kv__value">{value}</div>
   </div>
 );
-
-const OrderDetail: React.FC<{ order: Order; t: TFunction }> = ({ order, t }) => {
-  const events = order.events || [];
-  const priceEvents = events
-    .filter((e) => e.eventType === 'PRICE_UPDATED' && e.metadata?.newPrice)
-    .slice()
-    .reverse();
-
-  const cadEntries = order.cadFiles || [];
-  const cadFile = cadEntries[0]?.cadFile;
-
-  const createdAt = order.createdAt || order.date;
-  const updatedAt = order.updatedAt;
-
-  return (
-    <div>
-      <div className="oc-detail__grid">
-        <OCKV icon="copy" label={t('orderCenter.orderId')} value={order.id} />
-        <OCKV label={t('order.status.status')} value={<span className={statusClassName(order.status)}><StatusGlyph status={order.status} />{t(orderStatusKey(order.status))}</span>} />
-        <OCKV icon="calendar" label={t('order.created')} value={formatDate(createdAt)} />
-        <OCKV icon="clock" label={t('order.updated')} value={formatDate(updatedAt)} />
-        <OCKV icon="calendar" label={t('order.delivery')} value={order.estDelivery ? formatDate(order.estDelivery) : deliveryFallback(t)} />
-      </div>
-
-      <div className="oc-detail__group">
-        <h4 className="oc-detail__group-title">{t('orderCenter.manufacturingInfo')}</h4>
-        {cadFile && (
-          <div className="oc-detail__preview">
-            <CadGeometryViewer file={cadFile} thumbnail onGeometry={() => undefined} />
-          </div>
-        )}
-        <div className="oc-detail__grid">
-          <OCKV icon="file" label={t('orderCenter.fileName')} value={cadFile?.name || t('orderCenter.notProvided')} />
-          <OCKV icon="gear" label={t('dashboard.process')} value={order.technology || '—'} />
-          <OCKV icon="cube" label={t('dashboard.material')} value={order.material || '—'} />
-          <OCKV icon="layers3" label={t('dashboard.qty')} value={`${order.quantity} ${t('dashboard.pcs')}`} />
-          <OCKV icon="precision" label={t('orderCenter.tolerance')} value={order.tolerance || '—'} />
-          {cadFile?.dimensions && <OCKV icon="expand" label={t('orderCenter.dimensions')} value={cadFile.dimensions} />}
-          {cadFile?.volume && <OCKV icon="cube" label={t('orderCenter.volume')} value={cadFile.volume} />}
-          {cadFile?.format && <OCKV icon="file" label={t('orderCenter.fileFormat')} value={cadFile.format} />}
-        </div>
-        {cadEntries[0]?.configuration && (
-          <div className="oc-detail__config" style={{ marginTop: 'var(--space-4)' }}>
-            <h4 className="oc-detail__group-title">{t('orderCenter.configuration')}</h4>
-            <pre>{JSON.stringify(cadEntries[0].configuration, null, 2)}</pre>
-          </div>
-        )}
-      </div>
-
-      <div className="oc-detail__group">
-        <h4 className="oc-detail__group-title">{t('orderCenter.pricing')}</h4>
-        <div className="oc-price-row">
-          <span className="oc-price-row__label">{t('orderCenter.currentPrice')}</span>
-          <span className="oc-price-row__amount is-new">{formatPrice(order.totalCost)}</span>
-        </div>
-        {priceEvents.map((event, idx) => (
-          <div className="oc-price-row" key={event.id}>
-            <div style={{ display: 'grid', gap: 2 }}>
-              <span className="oc-price-row__label">{idx === priceEvents.length - 1 ? t('orderCenter.estimatedPrice') : t('orderCenter.priceUpdated')}</span>
-              <span className="oc-price-row__meta">{event.metadata?.changedByName ? `${t('orderCenter.updatedBy')} ${event.metadata.changedByName}` : t('orderCenter.updatedBy')} · {formatDate(event.createdAt)}</span>
-            </div>
-            <span className="oc-price-row__amount">{formatPrice(event.metadata?.newPrice)}</span>
-          </div>
-        ))}
-        {priceEvents.length === 0 && <p className="oc-empty-events">{t('orderCenter.noPriceHistory')}</p>}
-      </div>
-
-      <div className="oc-detail__group">
-        <h4 className="oc-detail__group-title">{t('orderCenter.timeline')}</h4>
-        {events.length === 0 ? (
-          <div className="oc-events">
-            <div className="oc-event is-current">
-              <span className="oc-event__dot" />
-              <div className="oc-event__title">{t('order.event.created')}</div>
-              <div className="oc-event__time">{formatDateTime(createdAt)}</div>
-            </div>
-            <p className="oc-empty-events">{t('orderCenter.noMoreEvents')}</p>
-          </div>
-        ) : (
-          <div className="oc-events">
-            {events.map((event, idx) => (
-              <div key={event.id} className={`oc-event ${idx === 0 ? 'is-current' : 'is-completed'}`}>
-                <span className="oc-event__dot" />
-                <div className="oc-event__title">{t(eventLabel(event.eventType))}</div>
-                {event.description && <div className="oc-event__desc">{event.description}</div>}
-                <div className="oc-event__time">{formatDateTime(event.createdAt)}</div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};

@@ -1,55 +1,44 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../../context/StoreContext';
+import { useAuth } from '../../context/AuthContext';
 import { AdminLayout } from './AdminLayout';
-import { AdminCard, AdminCardHeader, AdminCardBody } from './ui/Card';
-import { Button } from './ui/Button';
-import { DetailsGrid, DetailItem } from './ui/DetailItem';
 import { EmptyState } from './ui/States';
-import { StatusBadge, StatusTone, statusToneOf } from './ui/StatusBadge';
 import { ApiService } from '../../services/api';
-
-const ACCOUNT_TONES: Record<string, StatusTone> = {
-  ACTIVE: 'delivered',
-  DISABLED: 'unknown',
-  SUSPENDED: 'cancelled',
-};
-
-const ORDER_TONES: Record<string, StatusTone> = {
-  'In Review': 'review',
-  'In Production': 'production',
-  'Ready for Approval': 'review',
-  'Quality Inspection': 'inspection',
-  'Delivered': 'delivered',
-  'Completed': 'delivered',
-  'Cancelled': 'cancelled',
-  'Approved': 'delivered',
-  'Pending': 'review',
-};
-
-const PAYMENT_TONES: Record<string, StatusTone> = {
-  'Pending': 'review',
-  'Paid': 'delivered',
-  'Refunded': 'inspection',
-  'Partially Refunded': 'inspection',
-  'Failed': 'cancelled',
-};
+import { CadFile } from '../../types';
+import { OrderHeader } from './order-detail/OrderHeader';
+import { OrderSummaryStrip } from './order-detail/OrderSummaryStrip';
+import { CadItemsSection } from './order-detail/CadItemsSection';
+import { CadViewerDialog } from './order-detail/CadViewerDialog';
+import { ConfigCard, TechNotesDocsCard, TimelineCard } from './order-detail/SupportCards';
+import { CustomerCard, ManufacturingCard, OrderStatusCard, PricingCard } from './order-detail/SidebarCards';
+import { EditPriceDialog, MessageCustomerDialog } from './order-detail/dialogs';
+import { generateOrderPdf } from './order-detail/pdf';
+import { AdminOrderCadEntry, AdminOrderEvent, toViewerFile } from './order-detail/types';
+import { Icon } from '../ui/Icon';
 
 export const AdminOrderDetailView: React.FC = () => {
   const { t } = useTranslation();
   const { selectedAdminOrderId, closeAdminDetail, setActiveView, showToast, openAdminCustomerDetail } = useStore();
-  const [order, setOrder] = useState<any>(null);
-  const [manufacturers, setManufacturers] = useState<any[]>([]);
+  const { currentUser } = useAuth();
+  const [order, setOrder] = useState<Record<string, unknown> | null>(null);
+  const [manufacturers, setManufacturers] = useState<Array<{ id: string; companyName: string; availability?: string }>>([]);
   const [manufacturerId, setManufacturerId] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [approving, setApproving] = useState(false);
-  const [editPriceOpen, setEditPriceOpen] = useState(false);
-  const [newPrice, setNewPrice] = useState('');
-  const [priceReason, setPriceReason] = useState('');
-  const [savingPrice, setSavingPrice] = useState(false);
+  const [statusBusy, setStatusBusy] = useState(false);
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const [messageOpen, setMessageOpen] = useState(false);
+  const [messageSending, setMessageSending] = useState(false);
+  const [messageError, setMessageError] = useState<string | null>(null);
+  const [priceOpen, setPriceOpen] = useState(false);
+  const [priceSaving, setPriceSaving] = useState(false);
+  const [priceError, setPriceError] = useState<string | null>(null);
+  const [viewerId, setViewerId] = useState<string | null>(null);
+  const [downloadAllBusy, setDownloadAllBusy] = useState(false);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!selectedAdminOrderId) return;
     setLoading(true);
     try {
@@ -61,26 +50,55 @@ export const AdminOrderDetailView: React.FC = () => {
       if (!manufacturersRes.ok) throw new Error('Failed to load manufacturers');
       const orderJson = await orderRes.json();
       const manufacturersJson = await manufacturersRes.json();
-      setOrder(orderJson.data);
+      const data = orderJson.data as Record<string, unknown>;
+      setOrder(data);
       setManufacturers(manufacturersJson.data.manufacturers || []);
-      setManufacturerId(orderJson.data?.manufacturerId || '');
-    } catch (err: any) {
-      showToast('Error', err.message || 'Failed to load order details', 'error');
+      setManufacturerId((data?.manufacturerId as string) || '');
+    } catch (err: unknown) {
+      showToast('Error', err instanceof Error ? err.message : 'Failed to load order details', 'error');
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedAdminOrderId, showToast]);
 
-  useEffect(() => { void load(); }, [selectedAdminOrderId]);
+  useEffect(() => {
+    void load();
+  }, [load]);
 
-  const accountStatusLabel = (value: string): string => {
-    switch (value) {
-      case 'ACTIVE': return t('admin.status.active');
-      case 'DISABLED': return t('admin.status.disabled');
-      case 'SUSPENDED': return t('admin.status.suspended');
-      default: return value;
+  const entries: AdminOrderCadEntry[] = useMemo(
+    () => (Array.isArray(order?.cadFiles) ? (order?.cadFiles as AdminOrderCadEntry[]) : []),
+    [order],
+  );
+  const events: AdminOrderEvent[] = useMemo(
+    () => (Array.isArray(order?.events) ? (order?.events as AdminOrderEvent[]) : []),
+    [order],
+  );
+  const files: CadFile[] = useMemo(() => {
+    const mapped: CadFile[] = [];
+    for (const entry of entries) {
+      const file = toViewerFile(entry);
+      if (file) mapped.push(file);
     }
-  };
+    return mapped;
+  }, [entries]);
+
+  const user = (order?.user || {}) as { id?: string; name?: string; email?: string; phone?: string; accountStatus?: string };
+  const manufacturer = (order?.manufacturer || {}) as { companyName?: string };
+  const pricingVersion = order?.pricingEquationVersion as { version?: number; name?: string } | null;
+
+  const cadBadge = useMemo(() => {
+    if (entries.length === 0) return { label: String(order?.status || 'No CAD files'), tone: 'unknown' as const };
+    const statuses = entries.map((e) => e.cadFile?.status || '');
+    if (statuses.every((s) => s === 'Verified CAD')) return { label: 'Verified CAD', tone: 'delivered' as const };
+    if (statuses.some((s) => s === 'DFM Flagged')) return { label: 'DFM Flagged', tone: 'review' as const };
+    if (statuses.some((s) => s === 'Analyzing')) return { label: 'Analyzing CAD', tone: 'review' as const };
+    return { label: statuses[0] || String(order?.status || 'CAD'), tone: 'unknown' as const };
+  }, [entries, order?.status]);
+
+  const goBack = useCallback(() => {
+    closeAdminDetail();
+    setActiveView('admin-orders');
+  }, [closeAdminDetail, setActiveView]);
 
   const assignManufacturer = async () => {
     if (!selectedAdminOrderId || !manufacturerId) return;
@@ -95,14 +113,12 @@ export const AdminOrderDetailView: React.FC = () => {
       if (!res.ok) throw new Error('Failed to assign manufacturer');
       showToast('Saved', 'Manufacturer assignment updated.', 'success');
       await load();
-    } catch (err: any) {
-      showToast('Error', err.message || 'Failed to assign manufacturer', 'error');
+    } catch (err: unknown) {
+      showToast('Error', err instanceof Error ? err.message : 'Failed to assign manufacturer', 'error');
     } finally {
       setSaving(false);
     }
   };
-
-  const timeline = useMemo(() => order?.events || [], [order]);
 
   const approveOrder = async () => {
     if (!selectedAdminOrderId) return;
@@ -111,36 +127,120 @@ export const AdminOrderDetailView: React.FC = () => {
       await ApiService.adminApproveOrder(selectedAdminOrderId);
       showToast(t('admin.orderDetail.approveSuccessTitle'), t('admin.orderDetail.approveSuccess'), 'success');
       await load();
-    } catch (err: any) {
-      showToast('Error', err?.message || t('admin.orderDetail.approveFailed'), 'error');
+    } catch (err: unknown) {
+      showToast('Error', err instanceof Error ? err.message : t('admin.orderDetail.approveFailed'), 'error');
     } finally {
       setApproving(false);
     }
   };
 
-  const canApprove = order && !['Delivered', 'Cancelled', 'Quality Inspection'].includes(order.status);
-
-  const updatePrice = async () => {
+  const changeStatus = async (status: string) => {
     if (!selectedAdminOrderId) return;
-    const price = Number(newPrice);
-    if (!Number.isFinite(price) || price <= 0) {
-      showToast('Error', t('admin.orderDetail.invalidPrice'), 'error');
-      return;
-    }
-    setSavingPrice(true);
+    setStatusBusy(true);
     try {
-      await ApiService.adminUpdateOrderPrice(selectedAdminOrderId, price, priceReason || undefined);
-      showToast(t('admin.orderDetail.priceSuccessTitle'), t('admin.orderDetail.priceSuccess'), 'success');
-      setEditPriceOpen(false);
-      setNewPrice('');
-      setPriceReason('');
+      await ApiService.adminUpdateOrderStatus(selectedAdminOrderId, status);
+      showToast('Status updated', `Order moved to ${status}.`, 'success');
       await load();
-    } catch (err: any) {
-      showToast('Error', err?.message || t('admin.orderDetail.priceFailed'), 'error');
+    } catch (err: unknown) {
+      showToast('Error', err instanceof Error ? err.message : 'Order status could not be updated.', 'error');
     } finally {
-      setSavingPrice(false);
+      setStatusBusy(false);
     }
   };
+
+  const sendMessage = async (message: string) => {
+    if (!selectedAdminOrderId) return;
+    setMessageSending(true);
+    setMessageError(null);
+    try {
+      await ApiService.adminSendCustomerMessage(selectedAdminOrderId, message);
+      showToast('Message sent', 'Your message was recorded in the order history.', 'success');
+      setMessageOpen(false);
+      await load();
+    } catch (err: unknown) {
+      setMessageError(err instanceof Error ? err.message : 'Message could not be sent.');
+    } finally {
+      setMessageSending(false);
+    }
+  };
+
+  const savePrice = async (price: number, reason: string) => {
+    if (!selectedAdminOrderId) return;
+    setPriceSaving(true);
+    setPriceError(null);
+    try {
+      await ApiService.adminUpdateOrderPrice(selectedAdminOrderId, price, reason || undefined);
+      showToast(t('admin.orderDetail.priceSuccessTitle'), t('admin.orderDetail.priceSuccess'), 'success');
+      setPriceOpen(false);
+      await load();
+    } catch (err: unknown) {
+      setPriceError(err instanceof Error ? err.message : t('admin.orderDetail.priceFailed'));
+    } finally {
+      setPriceSaving(false);
+    }
+  };
+
+  const downloadFile = useCallback(
+    async (file: CadFile) => {
+      try {
+        const res = await fetch(ApiService.getCadDownloadUrl(file.id), { credentials: 'same-origin' });
+        if (!res.ok) throw new Error(`Download failed (${res.status})`);
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = file.name || 'cad-file';
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 4000);
+      } catch (err: unknown) {
+        showToast('Error', err instanceof Error ? err.message : `Could not download ${file.name}.`, 'error');
+      }
+    },
+    [showToast],
+  );
+
+  const downloadAll = useCallback(async () => {
+    if (files.length === 0 || downloadAllBusy) return;
+    setDownloadAllBusy(true);
+    let failed = 0;
+    for (const file of files) {
+      try {
+        const res = await fetch(ApiService.getCadDownloadUrl(file.id), { credentials: 'same-origin' });
+        if (!res.ok) throw new Error(`Download failed (${res.status})`);
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = file.name || 'cad-file';
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 4000);
+        // Small pause keeps the browser download shelf reliable for multi-file orders.
+        await new Promise((resolve) => window.setTimeout(resolve, 350));
+      } catch {
+        failed += 1;
+      }
+    }
+    setDownloadAllBusy(false);
+    if (failed === 0) showToast('Downloads started', `${files.length} CAD file${files.length === 1 ? '' : 's'} downloading.`, 'success');
+    else showToast('Partial download', `${failed} of ${files.length} files could not be downloaded.`, 'error');
+  }, [files, downloadAllBusy, showToast]);
+
+  const downloadPdf = useCallback(() => {
+    if (!order || pdfBusy) return;
+    setPdfBusy(true);
+    try {
+      const opened = generateOrderPdf(order);
+      if (!opened) showToast('Popup blocked', 'Allow popups to generate the order PDF.', 'error');
+    } catch (err: unknown) {
+      showToast('Error', err instanceof Error ? err.message : 'Order PDF could not be generated.', 'error');
+    } finally {
+      window.setTimeout(() => setPdfBusy(false), 600);
+    }
+  }, [order, pdfBusy, showToast]);
 
   if (!selectedAdminOrderId) {
     return (
@@ -153,233 +253,135 @@ export const AdminOrderDetailView: React.FC = () => {
   }
 
   return (
-    <AdminLayout title={`${t('admin.orderDetail.title')} · ${selectedAdminOrderId}`} subtitle={t('admin.orderDetail.subtitle')}>
-      <div className="admin-section">
+    <AdminLayout title={`${t('admin.orderDetail.title')} · ${typeof order?.reference === 'string' && order.reference ? order.reference : selectedAdminOrderId}`} subtitle={t('admin.orderDetail.subtitle')}>
+      <div className="od-page">
         {loading ? (
-          <div className="admin-muted" style={{ textAlign: 'center', padding: '60px 0' }}>{t('admin.orderDetail.loading')}</div>
+          <div className="od-state" role="status">
+            <Icon name="loader" size={22} className="admin-spin" />
+            {t('admin.orderDetail.loading')}
+          </div>
         ) : !order ? (
           <EmptyState icon="cube" text={t('admin.orderDetail.notFound')} />
         ) : (
           <>
-            <AdminCard>
-              <AdminCardHeader
-                title={order.id}
-                description={order.partName || order.technology}
-                actions={
-                  <>
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      icon="check"
-                      onClick={() => void approveOrder()}
-                      disabled={approving || !canApprove}
-                      title={canApprove ? t('admin.orderDetail.approveTooltip') : t('admin.orderDetail.noApprove')}
-                    >
-                      {approving ? t('admin.approving') : t('admin.orderDetail.approveOrder')}
-                    </Button>
-                    <Button variant="outline" size="sm" icon="arrowLeft" onClick={() => { closeAdminDetail(); setActiveView('admin-orders'); }}>
-                      {t('admin.orderDetail.backToOrders')}
-                    </Button>
-                  </>
-                }
-              />
-              <AdminCardBody>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
-                  <StatusBadge status={order.status} tone={ORDER_TONES[order.status] ?? statusToneOf(order.status)} />
-                  <StatusBadge status={order.paymentStatus} tone={PAYMENT_TONES[order.paymentStatus] ?? statusToneOf(order.paymentStatus)} />
-                  <StatusBadge status={order.manufacturingStatus} tone={statusToneOf(order.manufacturingStatus)} />
-                  <StatusBadge status={order.shippingStatus} tone={statusToneOf(order.shippingStatus)} />
-                </div>
-                <DetailsGrid>
-                  <DetailItem label={t('admin.orderDetail.orderId')} value={order.id} />
-                  <DetailItem label={t('admin.orderDetail.customer')} value={order.user?.name || '—'} />
-                  <DetailItem label={t('admin.orderDetail.created')} value={new Date(order.createdAt).toLocaleString()} />
-                  <DetailItem label={t('admin.orderDetail.updated')} value={new Date(order.updatedAt).toLocaleString()} />
-                  <DetailItem label={t('admin.orderDetail.totalPrice')} value={order.totalCost} />
-                  <DetailItem label={t('admin.orderDetail.currency')} value="EGP" />
-                  <DetailItem label={t('admin.orderDetail.assignedManufacturer')} value={order.manufacturer?.companyName || t('admin.orderDetail.unassigned')} />
-                </DetailsGrid>
-              </AdminCardBody>
-            </AdminCard>
+            <OrderHeader
+              orderId={String((order as any)?.reference || order.id)}
+              cadBadge={cadBadge.label}
+              cadBadgeTone={cadBadge.tone}
+              createdAt={order.createdAt as string}
+              status={String(order.status)}
+              onBack={goBack}
+              onDownloadPdf={downloadPdf}
+              pdfBusy={pdfBusy}
+              onMessage={() => {
+                setMessageError(null);
+                setMessageOpen(true);
+              }}
+              onApprove={() => void approveOrder()}
+              approveBusy={approving}
+              onStatusChange={(status) => void changeStatus(status)}
+              statusBusy={statusBusy || approving}
+            />
 
-            <AdminCard>
-              <AdminCardHeader title={t('admin.orderDetail.customerSection')} />
-              <AdminCardBody>
-                <DetailsGrid>
-                  <DetailItem label={t('admin.orderDetail.name')} value={order.user?.name || '—'} />
-                  <DetailItem label={t('admin.orderDetail.email')} value={order.user?.email || '—'} />
-                  <DetailItem label={t('admin.orderDetail.phone')} value={order.user?.phone || '—'} />
-                  <DetailItem label={t('admin.orderDetail.customerId')} value={order.user?.id || '—'} />
-                  <DetailItem
-                    label={t('admin.orderDetail.accountStatus')}
-                    value={order.user?.accountStatus
-                      ? <StatusBadge status={accountStatusLabel(order.user.accountStatus)} tone={ACCOUNT_TONES[order.user.accountStatus] ?? 'unknown'} />
-                      : '—'}
+            <OrderSummaryStrip
+              orderId={String((order as any)?.reference || order.id)}
+              customerName={user.name || ''}
+              customerEmail={user.email || ''}
+              createdAt={order.createdAt as string}
+              totalCost={order.totalCost as string}
+              onCopied={(message) => showToast('Copied', message, 'success')}
+            />
+
+            <div className="od-grid">
+              <div className="od-main">
+                <CadItemsSection
+                  entries={entries}
+                  files={files}
+                  onOpenViewer={(id) => setViewerId(id)}
+                  onOpenViewerAll={() => {
+                    if (files[0]) setViewerId(files[0].id);
+                  }}
+                  onDownload={(file) => void downloadFile(file)}
+                  onDownloadAll={() => void downloadAll()}
+                  downloadAllBusy={downloadAllBusy}
+                />
+                <div className="od-support-row">
+                  <TechNotesDocsCard
+                    notes={order.technicalNotes as string}
+                    documents={((order.technicalDocuments as Array<{ id: string; name: string; mimeType?: string; byteSize?: number; scanStatus?: string }>) || [])}
                   />
-                  <DetailItem
-                    label={t('admin.orderDetail.profile')}
-                    value={
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        icon="eye"
-                        onClick={() => { if (order.user?.id) openAdminCustomerDetail(order.user.id); }}
-                      >
-                        {t('admin.orderDetail.openCustomerProfile')}
-                      </Button>
-                    }
-                  />
-                </DetailsGrid>
-              </AdminCardBody>
-            </AdminCard>
-
-            <AdminCard>
-              <AdminCardHeader title={t('admin.orderDetail.cadInformation')} />
-              <AdminCardBody>
-                <div className="admin-list">
-                  {(order.cadFiles || []).map((entry: any) => (
-                    <div key={entry.cadFileId} style={{ padding: 14, border: '1px solid var(--admin-border)', borderRadius: 10, background: 'var(--admin-card-2)' }}>
-                      <DetailsGrid>
-                        <DetailItem label={t('admin.orderDetail.fileName')} value={entry.cadFile?.name || '—'} />
-                        <DetailItem label={t('admin.orderDetail.fileType')} value={entry.cadFile?.format || '—'} />
-                        <DetailItem label={t('admin.orderDetail.size')} value={entry.cadFile?.size || '—'} />
-                        <DetailItem label={t('admin.orderDetail.status')} value={<StatusBadge status={entry.cadFile?.status || '—'} tone={statusToneOf(entry.cadFile?.status ?? '')} />} />
-                        <DetailItem label={t('admin.orderDetail.dimensions')} value={entry.cadFile?.dimensions || '—'} />
-                        <DetailItem label={t('admin.orderDetail.volume')} value={entry.cadFile?.volume || '—'} />
-                      </DetailsGrid>
-                      {entry.configuration && <pre className="admin-muted" style={{ whiteSpace: 'pre-wrap', margin: '12px 0 0' }}>{JSON.stringify(entry.configuration, null, 2)}</pre>}
-                    </div>
-                  ))}
-                  {(order.cadFiles || []).length === 0 && <EmptyState icon="file" text={t('admin.orderDetail.noCadFiles')} />}
+                  <ConfigCard order={order} />
+                  <TimelineCard events={events} />
                 </div>
-              </AdminCardBody>
-            </AdminCard>
+              </div>
+              <div className="od-side">
+                <OrderStatusCard status={String(order.status)} createdAt={order.createdAt as string} events={events} />
+                <CustomerCard
+                  name={user.name}
+                  email={user.email}
+                  customerId={user.id}
+                  onViewProfile={() => {
+                    if (user.id) openAdminCustomerDetail(user.id);
+                  }}
+                  onCopied={(message) => showToast('Copied', message, 'success')}
+                />
+                <PricingCard
+                  materialCost={order.manufacturingCost as string}
+                  machineCost={order.serviceFee as string}
+                  totalCost={order.totalCost as string}
+                  pricingVersion={pricingVersion && typeof pricingVersion.version === 'number' ? `v${pricingVersion.version}` : null}
+                  equationName={pricingVersion?.name || null}
+                  events={events}
+                  role={currentUser?.role}
+                  onEdit={() => {
+                    setPriceError(null);
+                    setPriceOpen(true);
+                  }}
+                />
+                <ManufacturingCard
+                  manufacturingStatus={order.manufacturingStatus as string}
+                  shippingStatus={order.shippingStatus as string}
+                  paymentStatus={order.paymentStatus as string}
+                  requiredManufacturer={manufacturer.companyName}
+                  manufacturers={manufacturers}
+                  manufacturerId={manufacturerId}
+                  onSelect={setManufacturerId}
+                  onSave={() => void assignManufacturer()}
+                  saving={saving}
+                />
+              </div>
+            </div>
 
-            <AdminCard>
-              <AdminCardHeader title="Technical Notes & Documents" />
-              <AdminCardBody>
-                {order.technicalNotes ? (
-                  <div className="admin-muted" style={{ whiteSpace: 'pre-wrap', margin: '0 0 12px', padding: 12, border: '1px solid var(--admin-border)', borderRadius: 10, background: 'var(--admin-card-2)' }}>
-                    {order.technicalNotes}
-                  </div>
-                ) : (
-                  <EmptyState icon="file" text="No technical notes were provided." />
-                )}
-                <div className="admin-list">
-                  {(order.technicalDocuments || []).map((doc: any) => {
-                    const ext = (doc?.name || '').split('.').pop()?.toUpperCase() || '';
-                    const size = doc?.byteSize
-                      ? doc.byteSize < 1024 * 1024 ? `${(doc.byteSize / 1024).toFixed(0)} KB` : `${(doc.byteSize / (1024 * 1024)).toFixed(2)} MB`
-                      : '';
-                    return (
-                      <div key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', border: '1px solid var(--admin-border)', borderRadius: 10, background: 'var(--admin-card-2)' }}>
-                        <span style={{ fontWeight: 600, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, fontSize: 13 }} title={doc.name}>{doc.name}</span>
-                        <span className="admin-muted" style={{ fontSize: 12, flex: 'none' }}>{(doc.scanStatus === 'QUARANTINED' ? 'QUARANTINED · ' : '')}{[ext, size].filter(Boolean).join(' · ')}</span>
-                        <a
-                          href={ApiService.getTechnicalDocumentDownloadUrl(doc.id)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{ flex: 'none', fontSize: 13, fontWeight: 600, color: 'var(--admin-primary, #1677ff)' }}
-                        >
-                          Open
-                        </a>
-                      </div>
-                    );
-                  })}
-                  {(order.technicalDocuments || []).length === 0 && <EmptyState icon="clipboard" text="No technical documents are attached to this order." />}
-                </div>
-              </AdminCardBody>
-            </AdminCard>
-
-            <AdminCard>
-              <AdminCardHeader title={t('admin.orderDetail.configuration')} />
-              <AdminCardBody>
-                <pre className="admin-muted" style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{JSON.stringify({
-                  technology: order.technology,
-                  material: order.material,
-                  quantity: order.quantity,
-                  tolerance: order.tolerance,
-                  shippingMethod: order.shippingMethod,
-                  shippingAddress: order.shippingAddress,
-                  provider: order.provider,
-                }, null, 2)}</pre>
-              </AdminCardBody>
-            </AdminCard>
-
-            <AdminCard>
-              <AdminCardHeader
-                title={t('admin.orderDetail.pricing')}
-                actions={
-                  <Button variant="outline" size="sm" onClick={() => { setEditPriceOpen((open) => !open); setNewPrice(''); setPriceReason(''); }}>
-                    {editPriceOpen ? t('admin.orderDetail.cancelPriceEdit') : t('admin.orderDetail.editPrice')}
-                  </Button>
-                }
-              />
-              <AdminCardBody>
-                <DetailsGrid>
-                  <DetailItem label={t('admin.orderDetail.materialCost')} value={order.manufacturingCost || '—'} />
-                  <DetailItem label={t('admin.orderDetail.machineCost')} value={order.serviceFee || '—'} />
-                  <DetailItem label={t('admin.orderDetail.finalPrice')} value={order.totalCost} />
-                  <DetailItem label={t('admin.orderDetail.pricingVersion')} value={order.pricingEquationVersion ? `v${order.pricingEquationVersion.version}` : '—'} />
-                  <DetailItem label={t('admin.orderDetail.equationName')} value={order.pricingEquationVersion?.name || '—'} />
-                </DetailsGrid>
-                {editPriceOpen && (
-                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'end', marginTop: 16, padding: 14, border: '1px solid var(--admin-border)', borderRadius: 10, background: 'var(--admin-card-2)' }}>
-                    <div style={{ minWidth: 200, flex: 1 }}>
-                      <label className="admin-muted" style={{ display: 'block', fontSize: 12, marginBottom: 6 }}>{t('admin.orderDetail.newPrice')}</label>
-                      <input className="form-control" type="number" min="0" step="0.01" value={newPrice} onChange={(e) => setNewPrice(e.target.value)} placeholder="0.00" style={{ width: '100%' }} />
-                    </div>
-                    <div style={{ minWidth: 240, flex: 2 }}>
-                      <label className="admin-muted" style={{ display: 'block', fontSize: 12, marginBottom: 6 }}>{t('admin.orderDetail.priceReason')}</label>
-                      <input className="form-control" value={priceReason} onChange={(e) => setPriceReason(e.target.value)} placeholder={t('admin.orderDetail.priceReasonPlaceholder')} style={{ width: '100%' }} />
-                    </div>
-                    <Button variant="primary" onClick={() => void updatePrice()} disabled={savingPrice}>
-                      {savingPrice ? t('admin.saving') : t('admin.orderDetail.applyPrice')}
-                    </Button>
-                  </div>
-                )}
-              </AdminCardBody>
-            </AdminCard>
-
-            <AdminCard>
-              <AdminCardHeader title={t('admin.orderDetail.manufacturing')} />
-              <AdminCardBody>
-                <DetailsGrid>
-                  <DetailItem label={t('admin.orderDetail.manufacturingStatus')} value={<StatusBadge status={order.manufacturingStatus || '—'} tone={statusToneOf(order.manufacturingStatus ?? '')} />} />
-                  <DetailItem label={t('admin.orderDetail.shippingStatus')} value={<StatusBadge status={order.shippingStatus || '—'} tone={statusToneOf(order.shippingStatus ?? '')} />} />
-                  <DetailItem label={t('admin.orderDetail.paymentStatus')} value={<StatusBadge status={order.paymentStatus || '—'} tone={PAYMENT_TONES[order.paymentStatus] ?? statusToneOf(order.paymentStatus ?? '')} />} />
-                  <DetailItem label={t('admin.orderDetail.requiredManufacturer')} value={order.manufacturer?.companyName || t('admin.orderDetail.unassigned')} />
-                </DetailsGrid>
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'end', marginTop: 16 }}>
-                  <div style={{ minWidth: 280, flex: 1 }}>
-                    <label className="admin-muted" style={{ display: 'block', fontSize: 12, marginBottom: 6 }}>{t('admin.orderDetail.assignReassignManufacturer')}</label>
-                    <select className="form-control" value={manufacturerId} onChange={(e) => setManufacturerId(e.target.value)} style={{ width: '100%' }}>
-                      <option value="">{t('admin.selectManufacturer')}</option>
-                      {manufacturers.map((m) => <option key={m.id} value={m.id}>{m.companyName} — {m.availability}</option>)}
-                    </select>
-                  </div>
-                  <Button variant="primary" onClick={() => void assignManufacturer()} disabled={!manufacturerId || saving}>
-                    {saving ? t('admin.saving') : t('admin.saveAssignment')}
-                  </Button>
-                </div>
-              </AdminCardBody>
-            </AdminCard>
-
-            <AdminCard>
-              <AdminCardHeader title={t('admin.orderDetail.timeline')} />
-              <AdminCardBody>
-                <div className="admin-list">
-                  {timeline.map((event: any) => (
-                    <div key={event.id} style={{ padding: '12px 14px', borderLeft: '2px solid var(--admin-blue)', background: 'var(--admin-card-2)', borderRadius: 8 }}>
-                      <div className="admin-card-title">{event.eventType}</div>
-                      <div className="admin-muted" style={{ fontSize: 13, marginTop: 2 }}>{event.description}</div>
-                      <div className="admin-muted" style={{ fontSize: 12, marginTop: 2 }}>{new Date(event.createdAt).toLocaleString()}</div>
-                    </div>
-                  ))}
-                  {timeline.length === 0 && <EmptyState icon="clock" text={t('admin.orderDetail.noTimelineEvents')} />}
-                </div>
-              </AdminCardBody>
-            </AdminCard>
+            <CadViewerDialog
+              files={files}
+              activeId={viewerId}
+              onSelect={(id) => setViewerId(id)}
+              onClose={() => setViewerId(null)}
+              onDownload={(file) => void downloadFile(file)}
+            />
+            <MessageCustomerDialog
+              open={messageOpen}
+              customerName={user.name}
+              customerEmail={user.email}
+              orderId={String((order as any)?.reference || order.id)}
+              sending={messageSending}
+              error={messageError}
+              onClose={() => {
+                if (!messageSending) setMessageOpen(false);
+              }}
+              onSend={(message) => void sendMessage(message)}
+            />
+            <EditPriceDialog
+              open={priceOpen}
+              currentPrice={order.totalCost as string}
+              currency={(order.totalCost as string)?.match(/[A-Z]{3}/)?.[0] || 'EGP'}
+              saving={priceSaving}
+              error={priceError}
+              onClose={() => {
+                if (!priceSaving) setPriceOpen(false);
+              }}
+              onSave={(price, reason) => void savePrice(price, reason)}
+            />
           </>
         )}
       </div>

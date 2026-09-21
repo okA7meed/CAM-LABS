@@ -5,14 +5,33 @@ import { ENV } from '../config/env';
 
 export const SESSION_COOKIE_NAME = 'cam_labs_session';
 export const SESSION_TTL_DAYS = ENV.SESSION_TTL_DAYS;
+/** Session lifetime when "Keep me signed in" is unchecked (12 hours — always shorter than the configured long policy, whose minimum is 1 day). */
+export const SESSION_TTL_DAYS_SHORT = 0.5;
 
 const hashToken = (token: string): string => createHash('sha256').update(token).digest('hex');
 
-export const createSession = async (userId: string): Promise<{ token: string; expiresAt: Date; sessionId: string }> => {
+export interface SessionDeviceMeta {
+  userAgent?: string;
+  ipAddress?: string;
+}
+
+export const createSession = async (
+  userId: string,
+  meta?: SessionDeviceMeta,
+  ttlDays: number = SESSION_TTL_DAYS,
+): Promise<{ token: string; expiresAt: Date; sessionId: string }> => {
   const token = randomBytes(32).toString('base64url');
-  const expiresAt = new Date(Date.now() + SESSION_TTL_DAYS * 24 * 60 * 60 * 1000);
+  const safeTtl = Number.isFinite(ttlDays) && ttlDays > 0 ? Math.min(ttlDays, 365) : SESSION_TTL_DAYS;
+  const expiresAt = new Date(Date.now() + safeTtl * 24 * 60 * 60 * 1000);
   const session = await getPrismaClient().session.create({
-    data: { tokenHash: hashToken(token), userId, expiresAt },
+    data: {
+      tokenHash: hashToken(token),
+      userId,
+      expiresAt,
+      // Display metadata only — never used for authentication decisions.
+      userAgent: meta?.userAgent?.slice(0, 512) || null,
+      ipAddress: meta?.ipAddress?.slice(0, 64) || null,
+    },
   });
   return { token, expiresAt, sessionId: session.id };
 };

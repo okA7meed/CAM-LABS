@@ -77,7 +77,7 @@ const makeQuote = (overrides: Record<string, unknown> = {}) => ({
   id: 'quote-1', userId: 'user-a', partName: 'part.stl', technology: 'FDM', material: 'PLA', quantity: 1,
   toleranceGrade: 'standard', surfaceFinish: 'standard', manufacturingCost: '$15.00', serviceFee: null,
   unitPrice: '$15.00', totalPrice: '$15.00', leadTime: '24 - 48 Hours',
-  validUntil: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(), status: 'Ready for Approval',
+  validUntil: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(), status: 'Approved',
   provider: 'CAM LABS', providerQuoteRef: 'CAM-QUOTE-1', isSimulated: false, cadFileIds: ['file-a'],
   ...overrides,
 });

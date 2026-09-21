@@ -6,14 +6,17 @@
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@700;800;900&family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
 :root {
-  /* ── Brand Colors ─────────────────────────────────────────────────────── */
-  --cam-bg: #0A0A0A;
-  --cam-surface-1: #111317;
-  --cam-surface-2: #191d24;
+  /* ── Brand Colors ───────────────────────────────────────────────────────
+     Dark app base is the CAM LABS Deep Navy family (#050B18, shared with
+     --landing-page-bg) so the transparent + backdrop-blur Navbar reveals and
+     blurs navy glass instead of black. Light mode remaps below. */
+  --cam-bg: #050B18;
+  --cam-surface-1: #030a1a;
+  --cam-surface-2: #191d2461;
   --cam-surface-3: #252b34;
   --cam-surface-4: #2d3440;
   --cam-surface-hover: #202630;
-  --cam-surface-elevated: #161a22;
+  --cam-surface-elevated: #0f1a31;
 
   --cam-blue-primary: #0066FF;
   --cam-blue-hover: #1A75FF;
@@ -163,6 +166,15 @@
   --navbar-control-height: 36px;
   --sidebar-width: 280px;
   --sidebar-collapsed-width: 76px;
+
+  /* ── Public landing page environment ──────────────────────────────────
+     Semantic base behind the marketing/landing website only (#view-loading
+     + #view-landing). Dark value reuses the established landing navy base
+     already used by .about-section, .cam-footer, and the endpoints of the
+     explorer/marketplace gradients (#050B18). This is intentionally NOT
+     --cam-bg: the neutral app token stays untouched for dashboard, order
+     center, manufacturing workspace, CAD, admin, and modal surfaces. */
+  --landing-page-bg: #050B18;
 }
 
 [data-theme='light'] {
@@ -192,6 +204,9 @@
   --shadow-xl: 0 22px 44px rgba(15, 23, 42, 0.15);
   --shadow-2xl: 0 25px 50px rgba(15, 23, 42, 0.20);
   --shadow-inset: inset 0 2px 4px 0 rgba(15, 23, 42, 0.06);
+  /* Light landing environment: the existing light page background. The dark
+     navy base above must never leak into light mode. */
+  --landing-page-bg: #f7f9fc;
 }
 
 /* Base Reset & Box Sizing */
@@ -274,7 +289,10 @@ body {
   letter-spacing: 0;
 }
 
-/* Engineering Technical Grid Background */
+/* Engineering Technical Grid Background — SCOPED decorative utility only.
+   Do NOT apply to body, #root, or the global App wrapper: those layers must
+   stay solid (var(--cam-bg)) so the page owns its environment. Apply only to
+   a specific section/component that intentionally needs graph-paper texture. */
 .tech-grid-bg {
   position: relative;
 }

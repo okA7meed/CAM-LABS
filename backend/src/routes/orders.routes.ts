@@ -6,6 +6,7 @@ import { hasRole, ROLES } from '../auth/roles';
 import { QuotesService } from '../services/quotes.service';
 import { sendSafeRouteError } from '../utils/errors';
 import { AdminService } from '../services/admin.service';
+import { requireOperationsAdmin } from '../middleware/admin.middleware';
 
 const router = Router();
 
@@ -40,8 +41,10 @@ router.get('/:id', requireAuth, async (req: any, res: any) => {
   }
 });
 
-// POST /api/v1/orders (Create and queue an internal CAM LABS manufacturing order)
-router.post('/', requireAuth, async (req: any, res: any) => {
+// POST /api/v1/orders (Staff-only: create and queue an internal CAM LABS
+// manufacturing order. Customers never place orders directly — they submit
+// quotes, which an operations admin converts via /admin/orders/from-quote/:quoteId.)
+router.post('/', requireOperationsAdmin, async (req: any, res: any) => {
   try {
     const newOrder = await OrdersService.createOrder({ ...req.body, userId: req.auth!.id, guestCadId: getGuestCadId(req.headers.cookie) });
     ApiResponseHelper.success(res, newOrder, 'Order created and queued in CAM LABS manufacturing', 201);
@@ -66,15 +69,14 @@ router.post('/', requireAuth, async (req: any, res: any) => {
   }
 });
 
-// POST /api/v1/orders/convert-quote/:quoteId (Convert approved quote to order)
-router.post('/convert-quote/:quoteId', requireAuth, async (req: any, res: any) => {
+// POST /api/v1/orders/convert-quote/:quoteId (Staff-only conversion of a quote
+// to an order. Customers cannot convert their own quotes — the canonical flow
+// is admin review + /admin/orders/from-quote/:quoteId.)
+router.post('/convert-quote/:quoteId', requireOperationsAdmin, async (req: any, res: any) => {
   try {
     const quote = await QuotesService.getQuoteById(req.params.quoteId);
     if (!quote) {
       return ApiResponseHelper.error(res, 'QUOTE_NOT_FOUND', `Quote '${req.params.quoteId}' not found for conversion`, 404);
-    }
-    if (quote.userId !== req.auth!.id && !hasRole(req.auth!.role, [ORDER_STAFF_ROLE])) {
-      return ApiResponseHelper.error(res, 'FORBIDDEN', 'You do not have permission to access this resource.', 403);
     }
     const order = await OrdersService.convertQuoteToOrder(req.params.quoteId);
     ApiResponseHelper.success(res, order, 'Quote approved and converted to manufacturing order', 201);

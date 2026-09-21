@@ -69,12 +69,12 @@ export const UploadPanel = ({ status, hasProcess, isDragging, isUploading, uploa
       return (
         <div className="mw-file-progress">
           <div className="mw-file-progress-track"><div className="mw-file-progress-bar" style={{ width: `${Math.min(100, Math.max(0, item.progress))}%` }} /></div>
-          <span className="mw-file-progress-label">{item.progress}% uploaded</span>
+          <span className="mw-file-progress-label">{t('mw.uploadedPct', { progress: item.progress })}</span>
         </div>
       );
     }
     if (item.status === 'scanning' || item.status === 'processing') {
-      return <span className="mw-file-detail-text">Processing this file — validating geometry and extracting metadata…</span>;
+      return <span className="mw-file-detail-text">{t('mw.processingFile')}</span>;
     }
     if (item.status === 'failed' || item.status === 'unsupported') {
       return <span className="mw-file-detail-text is-alert">{item.message || item.status}</span>;
@@ -91,22 +91,22 @@ export const UploadPanel = ({ status, hasProcess, isDragging, isUploading, uploa
       const fmt = (n: number) => (Number.isInteger(n) || Math.abs(n) >= 10 ? n.toFixed(1).replace(/\.0$/, '') : n.toFixed(2).replace(/0$/, ''));
       parts.push(`${fmt(md.dimensions.width)} × ${fmt(md.dimensions.depth)} × ${fmt(md.dimensions.height)}`);
     }
-    return parts.length ? <span className="mw-file-detail-text">{parts.join(' · ')}</span> : <span className="mw-file-detail-text">Processed and validated.</span>;
+    return parts.length ? <span className="mw-file-detail-text">{parts.join(' · ')}</span> : <span className="mw-file-detail-text">{t('mw.processedValid')}</span>;
   };
 
   return (
     <PanelShell
       id={panelIds.upload}
       icon="upload"
-      title="Upload Design"
-      subtitle="Drag & drop or click to browse"
+      title={t('mw.uploadDesign')}
+      subtitle={t('mw.uploadDesignSub')}
       status={status}
       hideStateMark
       className="mw-panel-upload"
       action={
         uploadItems.length > 0 ? (
           <button type="button" className="mw-clear-btn" onClick={onClearAll}>
-            <Icon name="trash" size={11} /> Clear All
+            <Icon name="trash" size={11} /> {t('mw.clearAll')}
           </button>
         ) : undefined
       }
@@ -128,17 +128,17 @@ export const UploadPanel = ({ status, hasProcess, isDragging, isUploading, uploa
             <Icon name="folder" size={46} className="mw-stage-upload-folder-main" />
           </div>
           <span className="mw-stage-upload-text">
-            {disabled ? (hasProcess ? 'Processing uploads…' : 'Select your manufacturing technology and process first.') : isDragging ? 'Drop files here' : 'Drop your CAD files here'}
+            {disabled ? (hasProcess ? t('mw.uploadProcessing') : t('mw.uploadSelectFirst')) : isDragging ? t('mw.dropHere') : t('mw.dropCadHere')}
           </span>
-          {!disabled && <span className="mw-stage-upload-or">or click to browse</span>}
-          <span className="mw-stage-upload-hint">Supports formats: STEP, STL, OBJ, IGES, and more (max 500MB per file)</span>
+          {!disabled && <span className="mw-stage-upload-or">{t('mw.orBrowse')}</span>}
+          <span className="mw-stage-upload-hint">{t('mw.uploadFormats')}</span>
         </div>
 
         <div className="mw-stage-upload-list">
           {uploadItems.length > 0 ? (
             <>
               <div className="mw-upload-list-head">
-                <span className="mw-upload-list-title">Uploaded Files</span>
+                <span className="mw-upload-list-title">{t('mw.uploadedFiles')}</span>
                 <span className="mw-upload-list-count">{uploadItems.length}</span>
               </div>
               <div className="mw-stage-file-list">
@@ -157,7 +157,7 @@ export const UploadPanel = ({ status, hasProcess, isDragging, isUploading, uploa
                         type="button"
                         className={`mw-file-expand ${expandedId === item.id ? 'is-open' : ''}`}
                         aria-expanded={expandedId === item.id}
-                        aria-label={(expandedId === item.id ? 'Collapse' : 'Expand') + ' details for ' + item.name}
+                        aria-label={expandedId === item.id ? t('mw.collapseDetails', { name: item.name }) : t('mw.expandDetails', { name: item.name })}
                         onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}
                       >
                         <Icon name="chevronRight" size={11} />
@@ -172,20 +172,20 @@ export const UploadPanel = ({ status, hasProcess, isDragging, isUploading, uploa
                       </div>
                       <div className="mw-file-actions">
                         {isUploadItemReady(item) || isUploadItemThumbnailReady(item) ? (
-                          <span className="mw-file-badge is-ready"><Icon name="check" size={10} /> Ready</span>
+                          <span className="mw-file-badge is-ready"><Icon name="check" size={10} /> {t('mw.ready')}</span>
                         ) : (
                           <span className="mw-file-badge">{item.status}</span>
                         )}
                         {(isUploadItemReady(item) || isUploadItemThumbnailReady(item)) && item.cadFile && (
                           <button type="button" className="mw-text-btn" onClick={() => onPreview(item.cadFile!)}>
-                            <Icon name="eye" size={11} /> Preview
+                            <Icon name="eye" size={11} /> {t('mw.preview')}
                           </button>
                         )}
                         <button
                           type="button"
                           className="mw-file-delete-btn"
-                          aria-label={`Delete ${item.name}`}
-                          title="Delete file"
+                          aria-label={`${t('mw.deleteFile')}: ${item.name}`}
+                          title={t('mw.deleteFile')}
                           onClick={() => onDelete(item)}
                         >
                           <Icon name="trash" size={12} />
@@ -212,8 +212,8 @@ export const UploadPanel = ({ status, hasProcess, isDragging, isUploading, uploa
           ) : (
             <div className="mw-upload-empty">
               <span className="mw-upload-empty-icon" aria-hidden="true"><Icon name="file" size={16} /></span>
-              <span className="mw-upload-empty-text">No files yet</span>
-              <span className="mw-upload-empty-hint">Drop or browse to add CAD designs.</span>
+              <span className="mw-upload-empty-text">{t('mw.noFiles')}</span>
+              <span className="mw-upload-empty-hint">{t('mw.noFilesHint')}</span>
             </div>
           )}
         </div>

@@ -5,6 +5,12 @@ import { requireAuth, resolveCadOwner, getGuestCadId } from '../middleware/auth.
 import { hasRole, ROLES } from '../auth/roles';
 import { sendSafeRouteError } from '../utils/errors';
 import { AdminService } from '../services/admin.service';
+import { getActiveShippingMethods } from '../services/shipping.service';
+import { CouponsService } from '../services/coupons.service';
+import { QuoteSubmissionService } from '../services/quoteSubmission.service';
+import { BusinessReferenceService } from '../services/businessReference.service';
+import { QuoteDeletionService } from '../services/quoteDeletion.service';
+import { getPrismaClient } from '../config/database';
 
 const router = Router();
 
@@ -12,6 +18,32 @@ const router = Router();
 const QUOTE_STAFF_ROLE = ROLES.SUPPORT_ADMIN;
 
 const MAX_QUOTE_QUANTITY = 10000;
+
+/**
+ * Ensure a legacy-path quote carries the unified CAM business reference.
+ * saveQuotation/saveMultiFileQuotation predate the reference model, so rows
+ * created here would otherwise introduce new RFQ-style business-facing
+ * references. Best-effort and non-blocking: failures only affect the
+ * notification display, never the saved quote.
+ */
+async function ensureQuoteReference(quote: { id: string; reference?: string | null }): Promise<string | null> {
+  try {
+    if (quote.reference) return quote.reference;
+    const prisma = getPrismaClient() as any;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const reference = await BusinessReferenceService.generateUniqueReference();
+      try {
+        await prisma.quote.update({ where: { id: quote.id }, data: { reference } });
+        return reference;
+      } catch (err: any) {
+        if (String(err?.code) !== 'P2002') throw err;
+      }
+    }
+    return null;
+  } catch {
+    return (quote.reference as string) || null;
+  }
+}
 
 // GET /api/v1/quotes
 router.get('/', requireAuth, async (req: any, res: any) => {
@@ -22,6 +54,32 @@ router.get('/', requireAuth, async (req: any, res: any) => {
     ApiResponseHelper.success(res, quotes, `${quotes.length} quotations retrieved`);
   } catch (err: any) {
     sendSafeRouteError(res, err, { code: 'QUOTES_FETCH_ERROR', message: 'Quotations could not be retrieved.' });
+  }
+});
+
+// GET /api/v1/quotes/shipping-rates — enabled Super Admin-controlled methods.
+// NOTE: registered BEFORE /:id so "shipping-rates" is not captured as an id.
+router.get('/shipping-rates', async (_req: Request, res: Response) => {
+  try {
+    const methods = await getActiveShippingMethods();
+    ApiResponseHelper.success(
+      res,
+      {
+        rates: methods.map((m) => ({
+          id: m.code,
+          code: m.code,
+          label: `${m.name}${m.eta ? ` (${m.eta})` : ''}`,
+          name: m.name,
+          description: m.description,
+          eta: m.eta,
+          feeEgp: m.priceEgp,
+        })),
+        currency: 'EGP',
+      },
+      'Shipping rates retrieved',
+    );
+  } catch (err: any) {
+    sendSafeRouteError(res, err, { code: 'SHIPPING_RATES_ERROR', message: 'Shipping rates could not be retrieved.' });
   }
 });
 
@@ -89,7 +147,71 @@ router.post('/calculate', resolveCadOwner, async (req: Request, res: Response) =
   }
 });
 
-// POST /api/v1/quotes (Save quote draft)
+// POST /api/v1/quotes/validate-coupon (authenticated preview; final revalidation happens at submit)
+router.post('/validate-coupon', requireAuth, async (req: any, res: any) => {
+  try {
+    const { code, subtotalAmount, shippingAmount } = req.body || {};
+    const result = await CouponsService.validateForQuote({
+      code: String(code || ''),
+      userId: req.auth!.id,
+      subtotalAmount: Number(subtotalAmount) || 0,
+      shippingAmount: Number(shippingAmount) || 0,
+    });
+    ApiResponseHelper.success(res, {
+      code: result.coupon.code,
+      discountType: result.coupon.discountType,
+      discountValue: Number(result.coupon.discountValue),
+      eligibleAmount: result.eligibleAmount,
+      discountAmount: result.discountAmount,
+      amountAfterDiscount: result.amountAfterDiscount,
+      currency: 'EGP',
+    }, 'Coupon is valid');
+  } catch (err: any) {
+    sendSafeRouteError(res, err, { code: 'COUPON_INVALID', message: 'Coupon could not be applied.' });
+  }
+});
+
+// POST /api/v1/quotes/submit (Submit Quote — creates a Quote ONLY, never an Order or payment)
+router.post('/submit', requireAuth, async (req: any, res: any) => {
+  try {
+    const body = req.body || {};
+    const { quote, pricing } = await QuoteSubmissionService.submit({
+      userId: req.auth!.id,
+      guestCadId: getGuestCadId(req.headers.cookie) || body.guestCadId,
+      partName: body.partName,
+      technology: body.technology,
+      material: body.material,
+      quantity: body.quantity,
+      toleranceGrade: body.toleranceGrade,
+      surfaceFinish: body.surfaceFinish,
+      cadFileIds: body.cadFileIds,
+      files: body.files,
+      cadFileId: body.cadFileId,
+      technicalNotes: body.technicalNotes,
+      technicalDocumentIds: body.technicalDocumentIds,
+      contact: body.contact,
+      delivery: body.delivery,
+      saveAddress: body.saveAddress,
+      shippingMethod: body.shippingMethod,
+      preferredPaymentMethod: body.preferredPaymentMethod,
+      billingSameAsShipping: body.billingSameAsShipping,
+      billingAddress: body.billingAddress,
+      couponCode: body.couponCode,
+    });
+    void AdminService.notifySafely({
+      type: 'QUOTE',
+      entityType: 'QUOTE',
+      entityId: quote.id,
+      title: 'New Quote Submitted',
+      message: `Quote ${quote.reference || quote.id} submitted for ${quote.partName}.`,
+      metadata: { quoteId: quote.id, reference: (quote as any).reference || null, customerId: req.auth!.id, partName: quote.partName, type: 'QUOTE' },
+      priority: 'INFO',
+    });
+    ApiResponseHelper.success(res, { quote, pricing }, 'Quote submitted successfully', 201);
+  } catch (err: any) {
+    sendSafeRouteError(res, err, { code: 'QUOTE_SUBMIT_ERROR', message: 'Quote could not be submitted.' });
+  }
+});
 router.post('/', requireAuth, async (req: Request, res: Response) => {
   try {
     const body = req.body;
@@ -118,6 +240,7 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
         pricing,
       });
       // Real business event: only after the multi-file quote is committed.
+      const multiReference = await ensureQuoteReference(savedQuote as { id: string; reference?: string | null });
       void AdminService.notifySafely({
         type: 'QUOTE',
         entityType: 'QUOTE',
@@ -126,6 +249,7 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
         message: `A new quote has been submitted${body.partName ? ` for ${body.partName}` : ''}.`,
         metadata: {
           quoteId: savedQuote.id,
+          reference: multiReference,
           customerId: req.auth!.id,
           partName: savedQuote.partName || body.partName || null,
           type: 'QUOTE',
@@ -164,6 +288,7 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
 
     // Real business event: never on a failed save — this runs only after the
     // quote row has been successfully committed.
+    const singleReference = await ensureQuoteReference(savedQuote as { id: string; reference?: string | null });
     void AdminService.notifySafely({
       type: 'QUOTE',
       entityType: 'QUOTE',
@@ -172,6 +297,7 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
       message: `A new quote has been submitted${body.partName ? ` for ${body.partName}` : ''}.`,
       metadata: {
         quoteId: savedQuote.id,
+        reference: singleReference,
         customerId: req.auth!.id,
         partName: savedQuote.partName || body.partName || null,
         type: 'QUOTE',
@@ -181,6 +307,74 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
   } catch (err: any) {
     sendSafeRouteError(res, err, { code: 'QUOTE_SAVE_ERROR', message: 'Quote could not be saved.' });
   }
+});
+
+// POST /api/v1/quotes/:id/deletion-request — customer files a Quote deletion
+// request (deletion-by-approval). NEVER deletes the row: the Quote stays
+// visible with a "Deletion Requested" state until an authorized admin
+// approves or rejects. Idempotent: an existing PENDING request is reused.
+router.post('/:id/deletion-request', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const reason = typeof req.body?.reason === 'string' ? req.body.reason : '';
+    const existing = await QuoteDeletionService.pendingForQuote(req.params.id);
+    const request = await QuoteDeletionService.requestDeletion({
+      quoteId: req.params.id,
+      userId: req.auth!.id,
+      reason,
+    });
+    void AdminService.notifySafely({
+      type: 'QUOTE',
+      entityType: 'QUOTE_DELETION_REQUEST',
+      entityId: request.id,
+      title: 'Quote Deletion Requested',
+      message: `Customer requested deletion of quote ${req.params.id}.`,
+      metadata: { quoteId: req.params.id, requestId: request.id, customerId: req.auth!.id, type: 'QUOTE_DELETION_REQUEST' },
+      priority: 'WARNING',
+    });
+    ApiResponseHelper.success(
+      res,
+      request,
+      existing
+        ? 'A deletion request is already pending for this quote.'
+        : 'Your quote deletion request has been sent. Please wait for CAM LABS approval.',
+      existing ? 200 : 201,
+    );
+  } catch (err: any) {
+    sendSafeRouteError(res, err, { code: 'DELETION_REQUEST_ERROR', message: 'Deletion request could not be submitted.' });
+  }
+});
+
+// GET /api/v1/quotes/:id/deletion-request — caller's latest request state.
+router.get('/:id/deletion-request', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const prisma = getPrismaClient() as any;
+    const quote = await prisma.quote.findUnique({ where: { id: req.params.id } });
+    if (!quote || quote.userId !== req.auth!.id) {
+      return ApiResponseHelper.error(res, 'QUOTE_NOT_FOUND', 'Quote not found.', 404);
+    }
+    const requests = await prisma.quoteDeletionRequest.findMany({
+      where: { quoteId: req.params.id },
+      orderBy: { requestedAt: 'desc' },
+      take: 5,
+    });
+    ApiResponseHelper.success(res, { requests }, 'Deletion request state retrieved');
+  } catch (err: any) {
+    sendSafeRouteError(res, err, { code: 'DELETION_REQUEST_FETCH_ERROR', message: 'Deletion request could not be retrieved.' });
+  }
+});
+
+// DELETE /api/v1/quotes/:id — direct customer deletion is DISABLED.
+//
+// Deletion-by-approval only: file POST /quotes/:id/deletion-request and wait
+// for an authorized admin. This endpoint always refuses with 410 so no client
+// (old or new) can delete a Quote row directly.
+router.delete('/:id', requireAuth, async (req: Request, res: Response) => {
+  return ApiResponseHelper.error(
+    res,
+    'QUOTE_DELETE_DISABLED',
+    'Direct quote deletion is disabled. Your quote deletion request has been sent. Please wait for CAM LABS approval.',
+    410,
+  );
 });
 
 export default router;

@@ -180,6 +180,7 @@ const buildOrderListWhere = (query: Record<string, unknown>): Prisma.OrderWhereI
       const match = { contains: q, mode: 'insensitive' as const };
       where.OR = [
         { id: match },
+        { reference: match },
         { partName: match },
         { technology: match },
         { material: match },
@@ -643,6 +644,68 @@ router.put('/orders/:id/price', requireOperationsAdmin, async (req: Request, res
       return;
     }
     ApiResponseHelper.error(res, 'ORDER_PRICE_ERROR', 'Order price could not be updated.', 400);
+  }
+});
+
+/**
+ * POST /admin/orders/:id/message
+ * Send a message to the customer about a specific order. The message is
+ * persisted as an auditable order event (visible to the customer through the
+ * existing order timeline) and recorded in the global audit log with the
+ * sender, timestamp, and order association. There is no standalone chat
+ * system — the order event stream is the project's communication record.
+ */
+router.post('/orders/:id/message', requireOperationsAdmin, async (req: Request, res: Response) => {
+  try {
+    const schema = z.object({
+      message: z.string().trim().min(1, 'message must not be empty').max(5000, 'message must be at most 5000 characters'),
+      subject: z.string().trim().max(200).optional(),
+    });
+    const { message, subject } = schema.parse(req.body);
+    const prisma = getPrismaClient();
+
+    const existing = await prisma.order.findUnique({
+      where: { id: req.params.id },
+      include: { user: { select: { id: true, name: true, email: true } } },
+    });
+    if (!existing) {
+      ApiResponseHelper.error(res, 'ORDER_NOT_FOUND', 'Order not found', 404);
+      return;
+    }
+
+    const description = subject ? `${subject} — ${message}` : message;
+    const event = await prisma.orderEvent.create({
+      data: {
+        orderId: req.params.id,
+        eventType: 'CUSTOMER_MESSAGE',
+        description,
+        metadata: {
+          subject: subject || null,
+          message,
+          recipientId: existing.userId,
+          recipientEmail: (existing.user as { email?: string } | null)?.email || null,
+          sentBy: req.auth?.id,
+          sentByName: req.auth?.name,
+        },
+      },
+    });
+
+    await AdminService.createAuditLog({
+      userId: req.auth?.id,
+      action: 'MESSAGE',
+      entityType: 'ORDER',
+      entityId: req.params.id,
+      newValue: { eventId: event.id, subject: subject || null },
+      metadata: { recipientId: existing.userId },
+    });
+
+    ApiResponseHelper.success(res, event, 'Message sent to customer', 201);
+  } catch (error: any) {
+    if (error instanceof AppError) {
+      ApiResponseHelper.error(res, error.code, error.message, error.statusCode);
+      return;
+    }
+    ApiResponseHelper.error(res, 'ORDER_MESSAGE_ERROR', 'Message could not be sent.', 400);
   }
 });
 
@@ -1181,6 +1244,7 @@ router.get('/quotes', requireSupportAdmin, async (req: Request, res: Response) =
       const q = String(search);
       where.OR = [
         { id: { contains: q, mode: 'insensitive' } },
+        { reference: { contains: q, mode: 'insensitive' } },
         { partName: { contains: q, mode: 'insensitive' } },
         { user: { name: { contains: q, mode: 'insensitive' } } },
         { user: { email: { contains: q, mode: 'insensitive' } } },
@@ -1245,6 +1309,7 @@ router.get('/quotes/:id', requireSupportAdmin, async (req: Request, res: Respons
       where: { id: req.params.id },
       include: {
         technicalDocuments: true,
+        coupon: { select: { id: true, code: true, discountType: true, discountValue: true } },
         user: {
           select: {
             id: true,
@@ -1257,6 +1322,7 @@ router.get('/quotes/:id', requireSupportAdmin, async (req: Request, res: Respons
           },
         },
         pricingEquationVersion: true,
+        deletionRequests: { orderBy: { requestedAt: 'desc' }, take: 5 },
       },
     });
 
@@ -1268,6 +1334,308 @@ router.get('/quotes/:id', requireSupportAdmin, async (req: Request, res: Respons
     ApiResponseHelper.success(res, quote, 'Quote details retrieved');
   } catch (error: any) {
     sendSafeRouteError(res, error, { code: 'QUOTE_ERROR', message: 'The request could not be completed.', status: 500 });
+  }
+});
+
+// ============================================================================
+// QUOTE DELETION REQUESTS — review queue (deletion-by-approval)
+// ============================================================================
+
+router.get('/quote-deletion-requests', requireOperationsAdmin, async (req: Request, res: Response) => {
+  try {
+    const { QuoteDeletionService } = await import('../services/quoteDeletion.service');
+    const status = typeof req.query.status === 'string' && req.query.status ? req.query.status : undefined;
+    const requests = await QuoteDeletionService.listRequests(status ? { status } : undefined);
+    ApiResponseHelper.success(res, { requests, total: requests.length }, 'Deletion requests retrieved');
+  } catch (error: any) {
+    sendSafeRouteError(res, error, { code: 'DELETION_REQUESTS_ERROR', message: 'The request could not be completed.', status: 500 });
+  }
+});
+
+router.post('/quote-deletion-requests/:id/approve', requireOperationsAdmin, async (req: Request, res: Response) => {
+  try {
+    const schema = z.object({ adminNote: z.string().trim().max(1000).optional() });
+    const { adminNote } = schema.parse(req.body || {});
+    const { QuoteDeletionService } = await import('../services/quoteDeletion.service');
+    const reviewed = await QuoteDeletionService.approve(req.params.id, req.auth?.id || 'admin', adminNote);
+    await AdminService.createAuditLog({
+      userId: req.auth?.id,
+      action: 'DELETE',
+      entityType: 'QUOTE',
+      entityId: (reviewed as { quoteId: string }).quoteId,
+      newValue: { deletionRequestId: req.params.id, decision: 'APPROVED' },
+      metadata: { adminNote: adminNote || null },
+    });
+    ApiResponseHelper.success(res, reviewed, 'Quote deletion approved. The quote was removed from active quotes.');
+  } catch (error: any) {
+    if (error instanceof AppError) {
+      ApiResponseHelper.error(res, error.code, error.message, error.statusCode);
+      return;
+    }
+    sendSafeRouteError(res, error, { code: 'DELETION_APPROVE_ERROR', message: 'The request could not be completed.', status: 400 });
+  }
+});
+
+router.post('/quote-deletion-requests/:id/reject', requireOperationsAdmin, async (req: Request, res: Response) => {
+  try {
+    const schema = z.object({ adminNote: z.string().trim().max(1000).optional() });
+    const { adminNote } = schema.parse(req.body || {});
+    const { QuoteDeletionService } = await import('../services/quoteDeletion.service');
+    const reviewed = await QuoteDeletionService.reject(req.params.id, req.auth?.id || 'admin', adminNote);
+    await AdminService.createAuditLog({
+      userId: req.auth?.id,
+      action: 'UPDATE',
+      entityType: 'QUOTE',
+      entityId: (reviewed as { quoteId: string }).quoteId,
+      newValue: { deletionRequestId: req.params.id, decision: 'REJECTED' },
+      metadata: { adminNote: adminNote || null },
+    });
+    ApiResponseHelper.success(res, reviewed, 'Deletion request rejected. The quote remains active.');
+  } catch (error: any) {
+    if (error instanceof AppError) {
+      ApiResponseHelper.error(res, error.code, error.message, error.statusCode);
+      return;
+    }
+    sendSafeRouteError(res, error, { code: 'DELETION_REJECT_ERROR', message: 'The request could not be completed.', status: 400 });
+  }
+});
+
+// ============================================================================
+// QUOTE LIFECYCLE — STATUS / PRICE / NOTES / MESSAGING
+// ============================================================================
+
+/** Quote statuses recognized across the admin panel (list filters + detail). */
+const QUOTE_LIFECYCLE_STATUSES = ['Draft', 'Ready for Approval', 'Approved', 'Revised', 'Rejected'];
+
+/**
+ * PUT /admin/quotes/:id/status
+ * Change the lifecycle status of a quote. Converted quotes are immutable
+ * here (they already produced an order). Rejection requires a reason.
+ * Recorded in the audit log — Quote has no event stream of its own.
+ */
+router.put('/quotes/:id/status', requireOperationsAdmin, async (req: Request, res: Response) => {
+  try {
+    const schema = z.object({
+      status: z.string(),
+      reason: z.string().trim().max(1000).optional(),
+    });
+    const data = schema.parse(req.body);
+    if (!QUOTE_LIFECYCLE_STATUSES.includes(data.status)) {
+      throw new AppError(`status must be one of: ${QUOTE_LIFECYCLE_STATUSES.join(', ')}.`, 400, 'INVALID_QUOTE_STATUS');
+    }
+    if (data.status === 'Rejected' && !data.reason?.trim()) {
+      throw new AppError('A reason is required to reject a quote.', 400, 'REJECTION_REASON_REQUIRED');
+    }
+    const prisma = getPrismaClient();
+    const existing = await prisma.quote.findUnique({ where: { id: req.params.id } });
+    if (!existing) {
+      ApiResponseHelper.error(res, 'QUOTE_NOT_FOUND', 'Quote not found', 404);
+      return;
+    }
+    if (existing.convertedOrderId) {
+      throw new AppError('This quote has already been converted to an order and its status cannot be changed.', 409, 'QUOTE_CONVERTED');
+    }
+
+    const updated = await prisma.quote.update({
+      where: { id: req.params.id },
+      data: {
+        status: data.status,
+        statusReason: data.reason?.trim() || null,
+        statusUpdatedAt: new Date(),
+        statusUpdatedBy: req.auth?.id,
+      },
+    });
+
+    await AdminService.createAuditLog({
+      userId: req.auth?.id,
+      action: 'UPDATE',
+      entityType: 'QUOTE',
+      entityId: req.params.id,
+      oldValue: { status: existing.status },
+      newValue: { status: data.status },
+      metadata: { reason: data.reason?.trim() || null },
+    });
+
+    ApiResponseHelper.success(res, updated, 'Quote status updated');
+  } catch (error: any) {
+    if (error instanceof AppError) {
+      ApiResponseHelper.error(res, error.code, error.message, error.statusCode);
+      return;
+    }
+    ApiResponseHelper.error(res, 'QUOTE_STATUS_ERROR', 'Quote status could not be updated.', 400);
+  }
+});
+
+/**
+ * PUT /admin/quotes/:id/price
+ * Manual price override. The engine snapshot in pricingBreakdown is never
+ * mutated: the first override archives the engine total in systemTotalPrice,
+ * totalPrice becomes the manual value, and the reason/author/timestamp plus
+ * the audit log entry make the change traceable. Converted quotes are locked.
+ */
+router.put('/quotes/:id/price', requireOperationsAdmin, async (req: Request, res: Response) => {
+  try {
+    const schema = z.object({
+      price: z.number().positive('price must be a positive number'),
+      reason: z.string().trim().min(3, 'A reason is required for manual price overrides.').max(1000),
+    });
+    const { price, reason } = schema.parse(req.body);
+    const prisma = getPrismaClient();
+    const existing = await prisma.quote.findUnique({ where: { id: req.params.id } });
+    if (!existing) {
+      ApiResponseHelper.error(res, 'QUOTE_NOT_FOUND', 'Quote not found', 404);
+      return;
+    }
+    if (existing.convertedOrderId) {
+      throw new AppError('This quote has already been converted to an order and its price cannot be changed.', 409, 'QUOTE_CONVERTED');
+    }
+    const previousPrice = existing.totalPrice;
+    const nextPrice = formatOrderPrice(price, existing.totalPrice);
+    const currency = nextPrice.match(/[A-Z]{3}/)?.[0] || 'EGP';
+    const unitPrice = `${(price / Math.max(1, existing.quantity)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`;
+
+    const updated = await prisma.quote.update({
+      where: { id: req.params.id },
+      data: {
+        totalPrice: nextPrice,
+        unitPrice,
+        systemTotalPrice: existing.systemTotalPrice || previousPrice,
+        priceOverrideReason: reason,
+        priceOverriddenBy: req.auth?.id,
+        priceOverriddenAt: new Date(),
+      },
+    });
+
+    await AdminService.createAuditLog({
+      userId: req.auth?.id,
+      action: 'UPDATE',
+      entityType: 'QUOTE',
+      entityId: req.params.id,
+      oldValue: { totalPrice: previousPrice },
+      newValue: { totalPrice: nextPrice },
+      metadata: { reason },
+    });
+
+    ApiResponseHelper.success(res, updated, 'Quote price updated');
+  } catch (error: any) {
+    if (error instanceof AppError) {
+      ApiResponseHelper.error(res, error.code, error.message, error.statusCode);
+      return;
+    }
+    ApiResponseHelper.error(res, 'QUOTE_PRICE_ERROR', 'Quote price could not be updated.', 400);
+  }
+});
+
+/**
+ * PUT /admin/quotes/:id/notes
+ * Edit the technical notes attached to a quote (the only safe free-text
+ * admin edit — pricing/geometry stay engine-owned). Converted quotes locked.
+ */
+router.put('/quotes/:id/notes', requireOperationsAdmin, async (req: Request, res: Response) => {
+  try {
+    const schema = z.object({
+      technicalNotes: z.string().max(500, 'Technical notes must be at most 500 characters.'),
+    });
+    const { technicalNotes } = schema.parse(req.body);
+    const prisma = getPrismaClient();
+    const existing = await prisma.quote.findUnique({ where: { id: req.params.id } });
+    if (!existing) {
+      ApiResponseHelper.error(res, 'QUOTE_NOT_FOUND', 'Quote not found', 404);
+      return;
+    }
+    if (existing.convertedOrderId) {
+      throw new AppError('This quote has already been converted to an order and cannot be edited.', 409, 'QUOTE_CONVERTED');
+    }
+
+    const updated = await prisma.quote.update({
+      where: { id: req.params.id },
+      data: { technicalNotes: technicalNotes.trim() },
+    });
+
+    await AdminService.createAuditLog({
+      userId: req.auth?.id,
+      action: 'UPDATE',
+      entityType: 'QUOTE',
+      entityId: req.params.id,
+      oldValue: { technicalNotes: existing.technicalNotes },
+      newValue: { technicalNotes: updated.technicalNotes },
+    });
+
+    ApiResponseHelper.success(res, updated, 'Quote notes updated');
+  } catch (error: any) {
+    if (error instanceof AppError) {
+      ApiResponseHelper.error(res, error.code, error.message, error.statusCode);
+      return;
+    }
+    ApiResponseHelper.error(res, 'QUOTE_NOTES_ERROR', 'Quote notes could not be updated.', 400);
+  }
+});
+
+/**
+ * POST /admin/quotes/:id/message + GET /admin/quotes/:id/messages
+ * Admin-to-customer communication for a quote. Persisted as QuoteMessage rows
+ * (visible to the customer through GET /quotes/:id) and audit-logged.
+ */
+router.post('/quotes/:id/message', requireSupportAdmin, async (req: Request, res: Response) => {
+  try {
+    const schema = z.object({
+      message: z.string().trim().min(1, 'message must not be empty').max(5000, 'message must be at most 5000 characters'),
+      subject: z.string().trim().max(200).optional(),
+    });
+    const { message, subject } = schema.parse(req.body);
+    const prisma = getPrismaClient();
+    const existing = await prisma.quote.findUnique({
+      where: { id: req.params.id },
+      include: { user: { select: { id: true, email: true } } },
+    });
+    if (!existing) {
+      ApiResponseHelper.error(res, 'QUOTE_NOT_FOUND', 'Quote not found', 404);
+      return;
+    }
+
+    const record = await prisma.quoteMessage.create({
+      data: {
+        quoteId: req.params.id,
+        senderId: req.auth?.id,
+        subject: subject || null,
+        message,
+      },
+    });
+
+    await AdminService.createAuditLog({
+      userId: req.auth?.id,
+      action: 'MESSAGE',
+      entityType: 'QUOTE',
+      entityId: req.params.id,
+      newValue: { messageId: record.id, subject: subject || null },
+      metadata: { recipientId: existing.userId },
+    });
+
+    ApiResponseHelper.success(res, record, 'Message sent to customer', 201);
+  } catch (error: any) {
+    if (error instanceof AppError) {
+      ApiResponseHelper.error(res, error.code, error.message, error.statusCode);
+      return;
+    }
+    ApiResponseHelper.error(res, 'QUOTE_MESSAGE_ERROR', 'Message could not be sent.', 400);
+  }
+});
+
+router.get('/quotes/:id/messages', requireSupportAdmin, async (req: Request, res: Response) => {
+  try {
+    const prisma = getPrismaClient();
+    const quote = await prisma.quote.findUnique({ where: { id: req.params.id }, select: { id: true } });
+    if (!quote) {
+      ApiResponseHelper.error(res, 'QUOTE_NOT_FOUND', 'Quote not found', 404);
+      return;
+    }
+    const messages = await prisma.quoteMessage.findMany({
+      where: { quoteId: req.params.id },
+      orderBy: { createdAt: 'asc' },
+    });
+    ApiResponseHelper.success(res, messages, 'Quote messages retrieved');
+  } catch (error: any) {
+    sendSafeRouteError(res, error, { code: 'QUOTE_MESSAGES_ERROR', message: 'The request could not be completed.', status: 500 });
   }
 });
 

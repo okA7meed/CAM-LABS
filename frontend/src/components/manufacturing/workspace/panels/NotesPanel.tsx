@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { ApiService } from '../../../../services/api';
 import { Icon } from '../../../ui/Icon';
 import { formatBytes } from '../helpers';
@@ -16,30 +17,32 @@ export const NotesPanel = ({ note, onNoteChange, documents, isDragging, onBrowse
   onRemove: (key: string) => void;
   onPreview: (doc: TechnicalDocumentItem) => void;
 }) => {
+  const { t } = useTranslation();
   const uploadingCount = documents.filter((d) => d.status === 'uploading').length;
   return (
     <PanelShell
       id={panelIds.notes}
       icon="file"
-      title="Technical Drawings & Notes"
-      subtitle="Add notes, drawings or special requirements about your design"
+      title={t('mw.notes')}
+      subtitle={t('mw.notesSub')}
       className="mw-panel-notes"
     >
-      <div className="mw-stage-notes-callout">Add references, drawing numbers, datasheets, or manufacturing instructions for your part.</div>
+      <div className="mw-stage-notes-callout">{t('mw.notesCallout')}</div>
       <textarea
         className="mw-stage-notes"
         value={note}
         onChange={(e) => onNoteChange(e.target.value)}
-        placeholder="Add drawings, special requirements or notes about your design…"
+        placeholder={t('mw.notesPlaceholder')}
         rows={2}
         maxLength={500}
+        aria-label={t('mw.notes')}
       />
       <div className="mw-stage-notes-foot">
         <span>{note.length}/500</span>
       </div>
 
       <div className="mw-docs-head">
-        <span className="mw-docs-head-label">Technical Documents</span>
+        <span className="mw-docs-head-label">{t('mw.techDocs')}</span>
         <span className="mw-docs-head-count">{documents.filter((d) => d.status !== 'error').length}/10</span>
       </div>
 
@@ -48,7 +51,7 @@ export const NotesPanel = ({ note, onNoteChange, documents, isDragging, onBrowse
         role="button"
         tabIndex={uploadingCount > 0 ? -1 : 0}
         aria-disabled={uploadingCount > 0}
-        title="Click to browse or drag & drop technical documents"
+        title={t('mw.docsBrowseTitle')}
         onClick={() => { if (uploadingCount === 0) onBrowse(); }}
         onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && uploadingCount === 0) { e.preventDefault(); onBrowse(); } }}
         onDragEnter={(e) => { e.preventDefault(); onDragState(true); }}
@@ -58,8 +61,8 @@ export const NotesPanel = ({ note, onNoteChange, documents, isDragging, onBrowse
       >
         <span className="mw-doc-dropzone-icon" aria-hidden="true"><Icon name="upload" size={16} /></span>
         <div className="mw-doc-dropzone-text">
-          <button type="button" className="mw-doc-browse-btn" onClick={(e) => { e.stopPropagation(); onBrowse(); }} disabled={uploadingCount > 0}>Browse files</button>
-          <span className="mw-doc-dropzone-hint">or drop PDF, DOC, DOCX, TXT, RTF, PNG, JPG · max 10 · 10MB each</span>
+          <button type="button" className="mw-doc-browse-btn" onClick={(e) => { e.stopPropagation(); onBrowse(); }} disabled={uploadingCount > 0}>{t('mw.browseFiles')}</button>
+          <span className="mw-doc-dropzone-hint">{t('mw.docsHint')}</span>
         </div>
       </div>
 
@@ -68,9 +71,9 @@ export const NotesPanel = ({ note, onNoteChange, documents, isDragging, onBrowse
           {documents.map((doc) => {
             const ext = doc.name.split('.').pop()?.toUpperCase() || '';
             const sub = doc.status === 'uploading'
-              ? `Uploading ${doc.progress}%`
+              ? t('mw.uploadingPct', { progress: doc.progress })
               : doc.status === 'error'
-                ? (doc.message || 'Upload failed.')
+                ? (doc.message || t('mw.uploadFailed'))
                 : `${ext} · ${formatBytes(doc.byteSize)}`;
             return (
               <div key={doc.key} className={`mw-doc-item is-${doc.status}`}>
@@ -88,23 +91,23 @@ export const NotesPanel = ({ note, onNoteChange, documents, isDragging, onBrowse
                 )}
                 {doc.status === 'ready' && doc.id && (
                   <span className="mw-doc-item-actions">
-                    <button type="button" className="mw-doc-item-preview" onClick={(e) => { e.stopPropagation(); onPreview(doc); }} aria-label={`Preview ${doc.name}`} title="Preview document">
-                      <Icon name="eye" size={12} /> Preview
+                    <button type="button" className="mw-doc-item-preview" onClick={(e) => { e.stopPropagation(); onPreview(doc); }} aria-label={t('mw.previewDoc', { name: doc.name })} title={t('mw.preview')}>
+                      <Icon name="eye" size={12} /> {t('mw.preview')}
                     </button>
                     <a
                       className="mw-doc-item-open"
                       href={ApiService.getTechnicalDocumentDownloadUrl(doc.id)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      aria-label={`Download ${doc.name}`}
-                      title="Download document"
+                      aria-label={t('mw.downloadDoc', { name: doc.name })}
+                      title={t('mw.downloadDoc', { name: doc.name })}
                       onClick={(e) => e.stopPropagation()}
                     >
                       <Icon name="download" size={13} />
                     </a>
                   </span>
                 )}
-                <button type="button" className="mw-doc-item-remove" onClick={(e) => { e.stopPropagation(); onRemove(doc.key); }} aria-label={`Remove ${doc.name}`} title="Remove document">
+                <button type="button" className="mw-doc-item-remove" onClick={(e) => { e.stopPropagation(); onRemove(doc.key); }} aria-label={t('mw.removeDoc', { name: doc.name })} title={t('mw.removeDoc', { name: doc.name })}>
                   <Icon name="trash" size={13} />
                 </button>
               </div>
